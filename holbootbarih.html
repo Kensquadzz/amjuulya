@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="mn">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Холбоо барих — AMJUULYA</title>
+<link rel="icon" type="image/png" href="assets/logo-badge.png">
+<link rel="stylesheet" href="assets/styles.css">
+</head>
+<body>
+<header class="site">
+    <div class="bar">
+      <a href="index.html" class="logo"><img src="assets/logo-badge.png" alt="Amjuulya">Amjuulya</a>
+      <button class="nav-toggle" id="navToggle" aria-label="Цэс">
+        <span></span><span></span><span></span>
+      </button>
+      <nav class="main" id="mainNav">
+          <a href="index.html">Нүүр</a>
+          <a href="index.html#services">Үйлчилгээ</a>
+          <a href="index.html#payment">Төлбөр</a>
+          <a href="index.html#contact">Холбоо барих</a>
+      </nav>
+    </div>
+  </header>
+
+  <section class="hero" style="padding-bottom:24px;">
+    <div class="wrap">
+      <span class="eyebrow">Холбоо барих</span>
+      <h1 style="max-width:20ch;">Танд туслахад бэлэн байна</h1>
+      <p class="lead">Асуулт, гомдол, санал хүсэлтээ доорх сувгуудаар илгээгээрэй. Элион Грэйс ХХК — AMJUULYA платформыг эзэмшигч, ажиллуулагч компани.</p>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
+      <div class="contact-grid">
+        <div class="contact-card">
+          <div class="icon-badge">🏢</div>
+          <div>
+            <h3>Компани</h3>
+            <p>Элион Грэйс ХХК</p>
+          </div>
+        </div>
+        <div class="contact-card">
+          <div class="icon-badge">📍</div>
+          <div>
+            <h3>Хаяг</h3>
+            <p>СБД, 2-р хороо, Twin Tower 2, 401 тоот</p>
+          </div>
+        </div>
+        <div class="contact-card">
+          <div class="icon-badge">📞</div>
+          <div>
+            <h3>Утас</h3>
+            <p><a href="tel:80053358">8005-3358</a></p>
+          </div>
+        </div>
+        <div class="contact-card">
+          <div class="icon-badge">✉️</div>
+          <div>
+            <h3>Email</h3>
+            <p><a href="mailto:Elyongracellc@gmail.com">Elyongracellc@gmail.com</a></p>
+          </div>
+        </div>
+      </div>
+      <div class="callout" style="margin-top:32px;">Ажилтай холбоотой бүх асуудлыг эхлээд аппликейшн доторх дэмжлэгийн чат хэсгээр илгээхийг зөвлөж байна — ингэснээр таны хүсэлтийг хамгийн хурдан шийдвэрлэнэ.</div>
+    </div>
+  </section>
+
+  <footer class="site">
+    <div class="wrap">
+      <div class="cols">
+        <div>
+          <a href="index.html" class="logo"><img src="assets/logo-badge.png" alt="Amjuulya">Amjuulya</a>
+          <p class="blurb">Ажил олгогч, Гүйцэтгэгчийг холбодог Монголын gig ажлын платформ. Бүх захиалга, төлбөр тооцоо аппликейшнээр дамжина.</p>
+        </div>
+        <div>
+          <h4>Платформ</h4>
+          <ul>
+            <li><a href="index.html">Нүүр</a></li>
+            <li><a href="index.html#services">Үйлчилгээ</a></li>
+            <li><a href="index.html#payment">Төлбөр</a></li>
+            <li><a href="index.html#contact">Холбоо барих</a></li>
+          </ul>
+        </div>
+        <div>
+          <h4>Хууль эрх зүй</h4>
+          <ul>
+            <li><a href="butsaalt.html">Буцаалт / Цуцлалт</a></li>
+            <li><a href="nohtsol.html">Үйлчилгээний нөхцөл</a></li>
+            <li><a href="hurgelt.html">Хүргэлт / Гүйцэтгэх нөхцөл</a></li>
+            <li><a href="nuutslal.html">Нууцлалын бодлого</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="bottom">
+        <span>© 2026 Элион Грэйс ХХК. Бүх эрх хуулиар хамгаалагдсан.</span>
+        <span>СБД, 2-р хороо, Twin Tower 2, 401 тоот · 8005-3358</span>
+      </div>
+    </div>
+  </footer>
+  <script>
+    var t = document.getElementById('navToggle');
+    var n = document.getElementById('mainNav');
+    if(t){ t.addEventListener('click', function(){ n.classList.toggle('open'); }); }
+  </script>
+
+</body>
+</html>

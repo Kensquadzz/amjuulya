@@ -1,5 +1,8 @@
 export default async function handler(req, res) {
-  // Meta webhook verification
+  // ==========================================
+  // META WEBHOOK VERIFICATION
+  // ==========================================
+
   if (req.method === "GET") {
     const mode = req.query["hub.mode"];
     const token = req.query["hub.verify_token"];
@@ -15,7 +18,10 @@ export default async function handler(req, res) {
     return res.status(403).send("Forbidden");
   }
 
-  // Messenger events
+  // ==========================================
+  // MESSENGER EVENTS
+  // ==========================================
+
   if (req.method === "POST") {
     const body = req.body;
 
@@ -29,30 +35,45 @@ export default async function handler(req, res) {
 
         if (!senderId) continue;
 
-        // =========================
-        // TEXT MESSAGE
-        // =========================
+        // ======================================
+        // 1. POSTBACK BUTTON
+        // ======================================
+
+        if (event.postback?.payload) {
+          const payload = event.postback.payload;
+
+          console.log("Postback:", senderId, payload);
+
+          if (payload === "BUY_CANVA_PRO") {
+            await sendPaymentInfo(senderId);
+          }
+
+          continue;
+        }
+
+        // ======================================
+        // 2. TEXT MESSAGE
+        // ======================================
+
         if (event.message?.text) {
           const message = event.message.text.trim().toLowerCase();
 
           console.log("Messenger:", senderId, message);
 
-          // Canva Pro авах / үнэ асуух
+          // Canva Pro хүсэлт
           if (
             message.includes("canva") ||
-            message.includes("авах") ||
-            message.includes("avay") ||
-            message.includes("pro")
+            message.includes("канва")
           ) {
             await sendCanvaInfo(senderId);
           }
 
-          // Төлбөр хийх хүсэлт
+          // Төлбөрийн мэдээлэл хүссэн
           else if (
             message.includes("төлбөр") ||
             message.includes("tulbur") ||
-            message.includes("авъя") ||
-            message.includes("avya")
+            message.includes("данс") ||
+            message.includes("iban")
           ) {
             await sendPaymentInfo(senderId);
           }
@@ -61,28 +82,33 @@ export default async function handler(req, res) {
           else {
             await sendMessage(
               senderId,
-              "Сайн байна уу 👋\n\nMongol AI-д тавтай морил!\n\n🎨 Canva Pro авах бол \"Canva Pro авъя\" гэж бичээрэй."
+              "Сайн байна уу 👋\n\n" +
+              "🇲🇳 Mongol AI-д тавтай морил!\n\n" +
+              "🎨 Canva Pro авах бол \"Canva Pro авъя\" гэж бичээрэй."
             );
           }
         }
 
-        // =========================
-        // IMAGE / SCREENSHOT
-        // =========================
+        // ======================================
+        // 3. PAYMENT SCREENSHOT
+        // ======================================
+
         if (event.message?.attachments) {
           const hasImage = event.message.attachments.some(
             (attachment) => attachment.type === "image"
           );
 
           if (hasImage) {
-            await sendMessage(
-              senderId,
-              "✅ Төлбөрийн баримтын зургийг хүлээн авлаа.\n\n⏳ Админ төлбөрийг шалгаад баталгаажуулна.\n\nТөлбөр баталгаажсаны дараа дараагийн алхмыг танд автоматаар мэдэгдэнэ."
-            );
-
             console.log(
               "Payment screenshot received from:",
               senderId
+            );
+
+            await sendMessage(
+              senderId,
+              "✅ Төлбөрийн баримтыг хүлээн авлаа.\n\n" +
+              "⏳ Админ төлбөрийг гараар шалгаж байна.\n\n" +
+              "Төлбөр баталгаажсаны дараа танд дараагийн алхмыг автоматаар мэдэгдэнэ."
             );
           }
         }
@@ -103,20 +129,68 @@ export default async function handler(req, res) {
 async function sendCanvaInfo(recipientId) {
   const text =
     "🎨 CANVA PRO\n\n" +
-    "1 жилийн эрх — 25,000₮\n\n" +
+    "🔥 1 жилийн эрх — 25,000₮\n\n" +
     "✨ Canva Pro-ийн premium боломжууд\n" +
     "✨ Premium template, element ашиглах\n" +
-    "✨ Background remover\n" +
+    "✨ Background Remover\n" +
     "✨ Magic Resize\n" +
     "✨ Premium зураг, видео, font\n" +
-    "✨ Илүү олон AI боломж\n\n" +
+    "✨ AI боломжууд\n\n" +
     "Canva Pro авах бол доорх товчийг дарна уу 👇";
 
-  await sendMessageWithButton(
-    recipientId,
-    text,
-    "Авах"
+  await sendCanvaPurchaseCard(recipientId);
+}
+
+
+// ==========================================
+// BIG CANVA PURCHASE BUTTON
+// ==========================================
+
+async function sendCanvaPurchaseCard(recipientId) {
+  const token = process.env.META_PAGE_ACCESS_TOKEN;
+
+  const response = await fetch(
+    `https://graph.facebook.com/v24.0/me/messages?access_token=${token}`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        recipient: {
+          id: recipientId,
+        },
+        message: {
+          attachment: {
+            type: "template",
+            payload: {
+              template_type: "generic",
+              elements: [
+                {
+                  title: "🎨 CANVA PRO — 1 ЖИЛ",
+                  subtitle: "25,000₮ • Premium Canva боломжууд",
+                  buttons: [
+                    {
+                      type: "postback",
+                      title: "🟢 АВАХ — 25,000₮",
+                      payload: "BUY_CANVA_PRO"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        }
+      })
+    }
   );
+
+  if (!response.ok) {
+    console.error(
+      "Canva purchase card error:",
+      await response.text()
+    );
+  }
 }
 
 
@@ -127,22 +201,30 @@ async function sendCanvaInfo(recipientId) {
 async function sendPaymentInfo(recipientId) {
   const text =
     "💳 ТӨЛБӨРИЙН МЭДЭЭЛЭЛ\n\n" +
+
     "🎨 Canva Pro — 1 жил\n" +
     "💰 Төлбөр: 25,000₮\n\n" +
+
     "🏦 Банк: Khan Bank\n" +
     "💳 Данс: 5037598829\n\n" +
+
     "📋 IBAN:\n" +
     "MN890005005037598829\n\n" +
-    "⬆️ IBAN дээр удаан дарж COPY хийгээд шууд банкны апп дээрээ PASTE хийж болно.\n\n" +
-    "Төлбөр хийсний дараа төлбөрийн баримтын SCREENSHOT-оо энд илгээнэ үү.\n\n" +
-    "⚠️ Төлбөрийг админ гараар шалгаж баталгаажуулна.";
+
+    "📌 IBAN-аа copy хийх:\n" +
+    "MN890005005037598829\n\n" +
+
+    "⬆️ Төлбөр хийсний дараа төлбөрийн баримтын SCREENSHOT-оо энд илгээнэ үү.\n\n" +
+
+    "⚠️ Төлбөрийг админ гараар шалгаж баталгаажуулна.\n" +
+    "Төлбөр баталгаажсаны дараа дараагийн алхам руу шилжинэ.";
 
   await sendMessage(recipientId, text);
 }
 
 
 // ==========================================
-// SEND MESSAGE
+// SEND TEXT MESSAGE
 // ==========================================
 
 async function sendMessage(recipientId, text) {
@@ -167,48 +249,9 @@ async function sendMessage(recipientId, text) {
   );
 
   if (!response.ok) {
-    console.error("Messenger API error:", await response.text());
-  }
-}
-
-
-// ==========================================
-// QUICK REPLY BUTTON
-// ==========================================
-
-async function sendMessageWithButton(
-  recipientId,
-  text,
-  buttonTitle
-) {
-  const token = process.env.META_PAGE_ACCESS_TOKEN;
-
-  const response = await fetch(
-    `https://graph.facebook.com/v24.0/me/messages?access_token=${token}`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        recipient: {
-          id: recipientId,
-        },
-        message: {
-          text,
-          quick_replies: [
-            {
-              content_type: "text",
-              title: buttonTitle,
-              payload: "BUY_CANVA_PRO",
-            },
-          ],
-        },
-      }),
-    }
-  );
-
-  if (!response.ok) {
-    console.error("Messenger API error:", await response.text());
+    console.error(
+      "Messenger API error:",
+      await response.text()
+    );
   }
 }

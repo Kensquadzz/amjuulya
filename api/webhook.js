@@ -1,8 +1,5 @@
 export default async function handler(req, res) {
-  // ==========================================
-  // META WEBHOOK VERIFICATION
-  // ==========================================
-
+  // Meta webhook verification
   if (req.method === "GET") {
     const mode = req.query["hub.mode"];
     const token = req.query["hub.verify_token"];
@@ -18,214 +15,37 @@ export default async function handler(req, res) {
     return res.status(403).send("Forbidden");
   }
 
-  // ==========================================
-  // MESSENGER EVENTS
-  // ==========================================
-
+  // Receive Messenger events
   if (req.method === "POST") {
     const body = req.body;
 
-    if (body.object !== "page") {
-      return res.status(404).send("Not a page event");
-    }
+    if (body.object === "page") {
+      for (const entry of body.entry || []) {
+        for (const event of entry.messaging || []) {
+          if (event.message?.text) {
+            const senderId = event.sender.id;
+            const message = event.message.text;
 
-    for (const entry of body.entry || []) {
-      for (const event of entry.messaging || []) {
-        const senderId = event.sender?.id;
+            console.log("Messenger:", senderId, message);
 
-        if (!senderId) continue;
-
-        // ======================================
-        // 1. POSTBACK BUTTON
-        // ======================================
-
-        if (event.postback?.payload) {
-          const payload = event.postback.payload;
-
-          console.log("Postback:", senderId, payload);
-
-          if (payload === "BUY_CANVA_PRO") {
-            await sendPaymentInfo(senderId);
-          }
-
-          continue;
-        }
-
-        // ======================================
-        // 2. TEXT MESSAGE
-        // ======================================
-
-        if (event.message?.text) {
-          const message = event.message.text.trim().toLowerCase();
-
-          console.log("Messenger:", senderId, message);
-
-          // Canva Pro хүсэлт
-          if (
-            message.includes("canva") ||
-            message.includes("канва")
-          ) {
-            await sendCanvaInfo(senderId);
-          }
-
-          // Төлбөрийн мэдээлэл хүссэн
-          else if (
-            message.includes("төлбөр") ||
-            message.includes("tulbur") ||
-            message.includes("данс") ||
-            message.includes("iban")
-          ) {
-            await sendPaymentInfo(senderId);
-          }
-
-          // Бусад мессеж
-          else {
+            // Test reply
             await sendMessage(
               senderId,
-              "Сайн байна уу 👋\n\n" +
-              "🇲🇳 Mongol AI-д тавтай морил!\n\n" +
-              "🎨 Canva Pro авах бол \"Canva Pro авъя\" гэж бичээрэй."
-            );
-          }
-        }
-
-        // ======================================
-        // 3. PAYMENT SCREENSHOT
-        // ======================================
-
-        if (event.message?.attachments) {
-          const hasImage = event.message.attachments.some(
-            (attachment) => attachment.type === "image"
-          );
-
-          if (hasImage) {
-            console.log(
-              "Payment screenshot received from:",
-              senderId
-            );
-
-            await sendMessage(
-              senderId,
-              "✅ Төлбөрийн баримтыг хүлээн авлаа.\n\n" +
-              "⏳ Админ төлбөрийг гараар шалгаж байна.\n\n" +
-              "Төлбөр баталгаажсаны дараа танд дараагийн алхмыг автоматаар мэдэгдэнэ."
+              "Сайн байна уу 👋 Mongol AI-д тавтай морил!"
             );
           }
         }
       }
+
+      return res.status(200).send("EVENT_RECEIVED");
     }
 
-    return res.status(200).send("EVENT_RECEIVED");
+    return res.status(404).send("Not a page event");
   }
 
   return res.status(405).send("Method Not Allowed");
 }
 
-
-// ==========================================
-// CANVA PRO INFORMATION
-// ==========================================
-
-async function sendCanvaInfo(recipientId) {
-  const text =
-    "🎨 CANVA PRO\n\n" +
-    "🔥 1 жилийн эрх — 25,000₮\n\n" +
-    "✨ Canva Pro-ийн premium боломжууд\n" +
-    "✨ Premium template, element ашиглах\n" +
-    "✨ Background Remover\n" +
-    "✨ Magic Resize\n" +
-    "✨ Premium зураг, видео, font\n" +
-    "✨ AI боломжууд\n\n" +
-    "Canva Pro авах бол доорх товчийг дарна уу 👇";
-
-  await sendCanvaPurchaseCard(recipientId);
-}
-
-
-// ==========================================
-// BIG CANVA PURCHASE BUTTON
-// ==========================================
-
-async function sendCanvaPurchaseCard(recipientId) {
-  const token = process.env.META_PAGE_ACCESS_TOKEN;
-
-  const response = await fetch(
-    `https://graph.facebook.com/v24.0/me/messages?access_token=${token}`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        recipient: {
-          id: recipientId,
-        },
-        message: {
-          attachment: {
-            type: "template",
-            payload: {
-              template_type: "generic",
-              elements: [
-                {
-                  title: "🎨 CANVA PRO — 1 ЖИЛ",
-                  subtitle: "25,000₮ • Premium Canva боломжууд",
-                  buttons: [
-                    {
-                      type: "postback",
-                      title: "🟢 АВАХ — 25,000₮",
-                      payload: "BUY_CANVA_PRO"
-                    }
-                  ]
-                }
-              ]
-            }
-          }
-        }
-      })
-    }
-  );
-
-  if (!response.ok) {
-    console.error(
-      "Canva purchase card error:",
-      await response.text()
-    );
-  }
-}
-
-
-// ==========================================
-// PAYMENT INFORMATION
-// ==========================================
-
-async function sendPaymentInfo(recipientId) {
-  const text =
-    "💳 ТӨЛБӨРИЙН МЭДЭЭЛЭЛ\n\n" +
-
-    "🎨 Canva Pro — 1 жил\n" +
-    "💰 Төлбөр: 25,000₮\n\n" +
-
-    "🏦 Банк: Khan Bank\n" +
-    "💳 Данс: 5037598829\n\n" +
-
-    "📋 IBAN:\n" +
-    "MN890005005037598829\n\n" +
-
-    "📌 IBAN-аа copy хийх:\n" +
-    "MN890005005037598829\n\n" +
-
-    "⬆️ Төлбөр хийсний дараа төлбөрийн баримтын SCREENSHOT-оо энд илгээнэ үү.\n\n" +
-
-    "⚠️ Төлбөрийг админ гараар шалгаж баталгаажуулна.\n" +
-    "Төлбөр баталгаажсаны дараа дараагийн алхам руу шилжинэ.";
-
-  await sendMessage(recipientId, text);
-}
-
-
-// ==========================================
-// SEND TEXT MESSAGE
-// ==========================================
 
 async function sendMessage(recipientId, text) {
   const token = process.env.META_PAGE_ACCESS_TOKEN;
@@ -242,16 +62,14 @@ async function sendMessage(recipientId, text) {
           id: recipientId,
         },
         message: {
-          text,
+          text: text,
         },
       }),
     }
   );
 
-  if (!response.ok) {
-    console.error(
-      "Messenger API error:",
-      await response.text()
-    );
-  }
+  const result = await response.text();
+
+  console.log("SEND STATUS:", response.status);
+  console.log("SEND RESPONSE:", result);
 }

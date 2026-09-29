@@ -52,10 +52,28 @@ export default async function handler(req, res) {
         }
 
         // ======================================
-        // 2. TEXT MESSAGE
+        // 2. QUICK REPLY (АВАХ chip)
+        // Quick reply нь "messages" event-ээр ирдэг тул
+        // messaging_postbacks тохиргооноос хамаарахгүй.
         // ======================================
 
-        if (event.message?.text) {
+        if (event.message?.quick_reply?.payload) {
+          const payload = event.message.quick_reply.payload;
+
+          console.log("Quick reply:", senderId, payload);
+
+          if (payload === "BUY_CANVA_PRO") {
+            await sendPaymentInfo(senderId);
+          }
+
+          continue;
+        }
+
+        // ======================================
+        // 3. TEXT MESSAGE
+        // ======================================
+
+        if (event.message?.text && !event.message?.is_echo) {
           const message = event.message.text.trim().toLowerCase();
 
           console.log("Messenger:", senderId, message);
@@ -66,6 +84,16 @@ export default async function handler(req, res) {
             message.includes("канва")
           ) {
             await sendCanvaInfo(senderId);
+          }
+
+          // "АВАХ" гэж гараар бичсэн
+          else if (
+            message.includes("авах") ||
+            message.includes("avah") ||
+            message.includes("авна") ||
+            message.includes("avna")
+          ) {
+            await sendPaymentInfo(senderId);
           }
 
           // Төлбөрийн мэдээлэл хүссэн
@@ -177,7 +205,14 @@ async function sendCanvaPurchaseCard(recipientId) {
                 }
               ]
             }
-          }
+          },
+          quick_replies: [
+            {
+              content_type: "text",
+              title: "🟢 АВАХ — 25,000₮",
+              payload: "BUY_CANVA_PRO"
+            }
+          ]
         }
       })
     }

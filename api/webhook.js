@@ -215,7 +215,7 @@ export default async function handler(req, res) {
 // Ботын өөрийн мессежийг админых гэж андуурахгүйн тулд
 const BOT_TAG = "MONGOL_AI_BOT";
 
-const DEFAULT_PRICE = 25000;
+const DEFAULT_PRICE = 15000;
 
 // ==========================================
 // АВАХ → төлбөрийн мэдээлэл + InitiateCheckout
@@ -241,7 +241,7 @@ async function handleComment(commentId) {
 
   const text =
     "Сайн байна уу 👋 Comment бичсэнд баярлалаа!\n\n" +
-    "🎨 CANVA PRO — 1 жил: 25,000₮\n" +
+    "🎨 CANVA PRO — 1 жил: 15,000₮\n" +
     "✨ Premium template, AI, Background Remover, Magic Resize\n\n" +
     "Авах бол доорх товчийг дарна уу 👇";
 
@@ -252,7 +252,7 @@ async function handleComment(commentId) {
     quick_replies: [
       {
         content_type: "text",
-        title: "🟢 АВАХ — 25,000₮",
+        title: "🟢 АВАХ — 15,000₮",
         payload: "BUY_CANVA_PRO",
       },
     ],
@@ -400,7 +400,7 @@ async function sendConversionEvent({ eventName, pageId, psid, value, eventId }) 
 async function sendCanvaInfo(recipientId) {
   const text =
     "🎨 CANVA PRO\n\n" +
-    "🔥 1 жилийн эрх — 25,000₮\n\n" +
+    "🔥 1 жилийн эрх — 15,000₮\n\n" +
     "✨ Canva Pro-ийн premium боломжууд\n" +
     "✨ Premium template, element ашиглах\n" +
     "✨ Background Remover\n" +
@@ -439,11 +439,11 @@ async function sendCanvaPurchaseCard(recipientId) {
               elements: [
                 {
                   title: "🎨 CANVA PRO — 1 ЖИЛ",
-                  subtitle: "25,000₮ • Premium Canva боломжууд",
+                  subtitle: "15,000₮ • Premium Canva боломжууд",
                   buttons: [
                     {
                       type: "postback",
-                      title: "🟢 АВАХ — 25,000₮",
+                      title: "🟢 АВАХ — 15,000₮",
                       payload: "BUY_CANVA_PRO"
                     }
                   ]
@@ -454,7 +454,7 @@ async function sendCanvaPurchaseCard(recipientId) {
           quick_replies: [
             {
               content_type: "text",
-              title: "🟢 АВАХ — 25,000₮",
+              title: "🟢 АВАХ — 15,000₮",
               payload: "BUY_CANVA_PRO"
             }
           ]
@@ -480,7 +480,7 @@ async function sendPaymentInfo(recipientId) {
     "💳 ТӨЛБӨРИЙН МЭДЭЭЛЭЛ\n\n" +
 
     "🎨 Canva Pro — 1 жил\n" +
-    "💰 Төлбөр: 25,000₮\n\n" +
+    "💰 Төлбөр: 15,000₮\n\n" +
 
     "🏦 Банк: Khan Bank\n" +
     "💳 Данс: 5037598829\n\n" +

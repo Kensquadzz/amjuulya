@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="mn">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Bibi — AI хэлний туслах · AMJUULYA</title>
+<meta name="description" content="Монгол ⇄ Англи орчуулга, англиар ярих дасгал. Дуугаар ярьж, AI-аас хариулт сонсоорой." />
+<meta name="theme-color" content="#6CB91B" />
+<link rel="icon" type="image/png" href="assets/logo-badge.png" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="assets/learn.css" />
+</head>
+<body>
+<div class="app">
+  <header class="topbar">
+    <a class="back" href="index.html" aria-label="AMJUULYA нүүр хуудас"><img src="assets/logo-badge.png" alt="" width="34" height="34" /></a>
+    <div class="title">
+      <strong>Bibi</strong>
+      <span>Монгол ⇄ English AI туслах</span>
+    </div>
+    <button class="icon-btn" id="newChat" type="button" aria-label="Шинэ яриа эхлүүлэх" title="Шинэ яриа">↺</button>
+  </header>
+
+  <section class="controls" aria-label="Тохиргоо">
+    <div class="segmented" role="radiogroup" aria-label="Горим">
+      <button type="button" role="radio" data-mode="translate" aria-checked="true">🔁 Орчуулга</button>
+      <button type="button" role="radio" data-mode="conversation" aria-checked="false">💬 Ярилцах</button>
+    </div>
+    <div class="lang-row">
+      <span class="lang-label" id="langLabel">Би ярих хэл:</span>
+      <div class="segmented small" role="radiogroup" aria-labelledby="langLabel">
+        <button type="button" role="radio" data-lang="mn" aria-checked="true">Монгол</button>
+        <button type="button" role="radio" data-lang="en" aria-checked="false">English</button>
+      </div>
+      <span class="direction" id="direction" aria-live="polite">Монгол → English</span>
+    </div>
+  </section>
+
+  <main class="chat" id="chat" aria-live="polite" aria-label="Яриа">
+    <div class="stage" id="stage">
+      <div class="mascot" id="mascot" data-state="idle">
+        <img src="assets/mascot.webp" alt="Bibi — AI туслах" width="180" height="180" />
+        <span class="ring" aria-hidden="true"></span>
+      </div>
+      <p class="stage-status" id="stageStatus">Сайн уу! Микрофон дээр дараад ярина уу.</p>
+      <p class="stage-hint" id="stageHint"></p>
+    </div>
+    <div class="messages" id="messages"></div>
+  </main>
+
+  <footer class="dock">
+    <div class="notice" id="notice" role="status" hidden></div>
+
+    <div class="review" id="review" hidden>
+      <label for="reviewText" class="review-label">Таны хэлсэн үг — шаардлагатай бол засаад илгээнэ үү</label>
+      <textarea id="reviewText" rows="2" maxlength="1000"></textarea>
+      <div class="review-actions">
+        <button type="button" class="btn ghost" id="reviewCancel">Болих</button>
+        <button type="button" class="btn ghost" id="reviewRetry">🎤 Дахин</button>
+        <button type="button" class="btn primary" id="reviewSend">Илгээх ➤</button>
+      </div>
+    </div>
+
+    <p class="live-transcript" id="liveTranscript" aria-live="polite" hidden></p>
+
+    <div class="mic-row">
+      <button type="button" class="mic" id="mic" aria-label="Ярьж эхлэх" data-state="idle">
+        <span class="mic-level" id="micLevel" aria-hidden="true"></span>
+        <svg viewBox="0 0 24 24" aria-hidden="true" class="mic-icon"><path d="M12 15a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3Zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-2.08A7 7 0 0 0 19 12h-2Z"/></svg>
+        <svg viewBox="0 0 24 24" aria-hidden="true" class="stop-icon"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
+        <span class="spinner" aria-hidden="true"></span>
+      </button>
+      <span class="mic-caption" id="micCaption">Дарж ярих</span>
+    </div>
+
+    <form class="composer" id="composer" autocomplete="off">
+      <label for="textInput" class="sr-only">Мессеж бичих</label>
+      <textarea id="textInput" rows="1" maxlength="1000" placeholder="Эсвэл энд бичнэ үү…"></textarea>
+      <button type="submit" class="send" id="sendBtn" aria-label="Илгээх" disabled>➤</button>
+    </form>
+  </footer>
+</div>
+
+<template id="aiTemplate">
+  <div class="msg ai">
+    <img class="avatar" src="assets/mascot.webp" alt="" width="34" height="34" />
+    <div class="bubble">
+      <span class="chip"></span>
+      <div class="translation" hidden><span class="t-lang"></span><p class="t-text"></p></div>
+      <p class="reply" hidden></p>
+      <div class="correction" hidden>
+        <span class="c-title">✏️ Засвар</span>
+        <p><s class="c-orig"></s> → <b class="c-fixed"></b></p>
+        <p class="c-note"></p>
+      </div>
+      <p class="explanation" hidden></p>
+      <div class="repeat" hidden><p class="r-text"></p><button type="button" class="btn small repeat-btn">🎤 Давтаж хэлэх</button></div>
+      <div class="actions">
+        <button type="button" class="play" aria-label="Хариултыг сонсох"><span class="play-icon">▶</span><span class="play-label">Сонсох</span></button>
+        <span class="play-error" hidden></span>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script type="module" src="assets/learn.js"></script>
+</body>
+</html>

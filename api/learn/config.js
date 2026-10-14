@@ -31,6 +31,7 @@ function diagnostics() {
   return {
     deployment: {
       env: process.env.VERCEL_ENV || "local",
+      id: process.env.VERCEL_DEPLOYMENT_ID || null,
       branch: process.env.VERCEL_GIT_COMMIT_REF || null,
       commit: (process.env.VERCEL_GIT_COMMIT_SHA || "").slice(0, 7) || null,
     },

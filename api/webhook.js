@@ -283,6 +283,9 @@ const KEYWORDS = {
 
 export default async function handler(req, res) {
   if (req.method === "GET") {
+    // Оношилгоо: хөтчөөр /api/webhook?diag=1 нээхэд AI ажиллаж байгаа эсэхийг харуулна (нууц мэдээлэл харуулахгүй)
+    if (req.query.diag) return res.status(200).json(await diagnose());
+
     const mode = req.query["hub.mode"];
     const token = req.query["hub.verify_token"];
     const challenge = req.query["hub.challenge"];
@@ -773,6 +776,46 @@ async function handleAI(psid, pageId, raw) {
   return sendText(psid, text || "Админ удахгүй хариулна 🙏");
 }
 
+async function diagnose() {
+  const key = process.env.ANTHROPIC_API_KEY || "";
+  const out = {
+    time: new Date().toISOString(),
+    anthropicKey: key ? `тохируулсан (${key.length} тэмдэгт, ${key.startsWith("sk-ant-") ? "sk-ant- эхлэлтэй" : "ЭХЛЭЛ БУРУУ"})` : "БАЙХГҮЙ",
+    pageToken: process.env.META_PAGE_ACCESS_TOKEN ? "тохируулсан" : "БАЙХГҮЙ",
+    systemPromptChars: systemPrompt().length,
+    models: [],
+  };
+  if (!key) return out;
+  const models = [process.env.ANTHROPIC_MODEL, "claude-haiku-5-5", "claude-haiku-4-5-20251001"].filter(
+    (m, i, a) => m && a.indexOf(m) === i
+  );
+  for (const model of models) {
+    const started = Date.now();
+    try {
+      const r = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-api-key": key, "anthropic-version": "2023-06-01" },
+        body: JSON.stringify({
+          model,
+          max_tokens: 60,
+          system: [{ type: "text", text: systemPrompt(), cache_control: { type: "ephemeral" } }],
+          messages: [{ role: "user", content: "sain bnu" }],
+        }),
+      });
+      const body = await r.text();
+      let info = body.slice(0, 300);
+      try {
+        const j = JSON.parse(body);
+        info = r.ok ? `stop=${j.stop_reason}; хариу="${(j.content || []).map((b) => b.text || "").join("").slice(0, 120)}"` : j.error?.message || info;
+      } catch {}
+      out.models.push({ model, status: r.status, ms: Date.now() - started, info });
+    } catch (e) {
+      out.models.push({ model, error: String(e), ms: Date.now() - started });
+    }
+  }
+  return out;
+}
+
 // Claude руу хүсэлт. Тохируулсан model олдохгүй бол дараагийнхыг оролдоно.
 async function askClaude(apiKey, messages) {
   const models = [
@@ -805,11 +848,13 @@ async function askClaude(apiKey, messages) {
 
       if (response.ok) {
         const data = await response.json();
-        return (data.content || [])
+        const text = (data.content || [])
           .filter((b) => b.type === "text")
           .map((b) => b.text)
           .join("")
           .trim();
+        if (!text) console.error(`Claude API empty reply (${model}):`, data.stop_reason, JSON.stringify(data.content));
+        return text;
       }
 
       const errText = await response.text();

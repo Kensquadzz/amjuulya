@@ -1,0 +1,19 @@
+{
+  "name": "amjuulya",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node scripts/dev-server.mjs",
+    "test": "node --test test/*.test.js",
+    "test:e2e": "node scripts/e2e-learn.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.133.0"
+  },
+  "devDependencies": {
+    "playwright": "^1.56.1"
+  }
+}

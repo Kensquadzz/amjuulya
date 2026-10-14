@@ -25,7 +25,7 @@ export default async function handler(req, res) {
     const provider = llmProvider();
     if (!provider.configured()) {
       return sendJson(res, 503, {
-        error: { code: "ai_not_configured", message: "AI үйлчилгээ тохируулаагүй байна (ANTHROPIC_API_KEY)." },
+        error: { code: "ai_not_configured", message: "AI үйлчилгээ тохируулаагүй байна (LEARN_ANTHROPIC_API_KEY эсвэл ANTHROPIC_API_KEY)." },
       });
     }
 

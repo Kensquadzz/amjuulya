@@ -214,7 +214,7 @@ async function loadConfig() {
   }
   state.configLoaded = true;
   if (state.configLoaded && !state.config.ai) {
-    showNotice("AI үйлчилгээ серверт тохируулаагүй байна (ANTHROPIC_API_KEY). Админ тохируулсны дараа ажиллана.", { type: "info" });
+    showNotice("AI үйлчилгээ серверт тохируулаагүй байна (LEARN_ANTHROPIC_API_KEY эсвэл ANTHROPIC_API_KEY). Админ тохируулсны дараа ажиллана.", { type: "info" });
   }
   renderStage();
   renderInputs();

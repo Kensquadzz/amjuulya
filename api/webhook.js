@@ -185,7 +185,15 @@ async function handleMessagingEvent(event, pageId) {
     const text = (event.message.text || "").toLowerCase();
     const customerId = event.recipient?.id;
 
-    if (!fromBot && customerId && isAdminConfirmation(text)) {
+    if (fromBot || !customerId) return;
+
+    // Админ гараар бичвэл тэр хүн дээр бот түр чимээгүй болно.
+    // "#bot" → ботыг дахин асаана, "#stop" → 30 хоног зогсооно
+    if (text.trim() === "#bot") return resumeUser(customerId);
+    if (text.trim() === "#stop") return pauseUser(customerId, 24 * 30);
+    await pauseUser(customerId, HUMAN_PAUSE_HOURS);
+
+    if (isAdminConfirmation(text)) {
       const value =
         extractAmount(text) || (await lastQuotedPrice(customerId)) || 0;
 
@@ -199,6 +207,12 @@ async function handleMessagingEvent(event, pageId) {
         eventId: `purchase_${event.message.mid}`,
       });
     }
+    return;
+  }
+
+  // Админ энэ хүнтэй ярьж байгаа бол бот оролцохгүй
+  if (await isPaused(senderId)) {
+    console.log("Paused (admin handling):", senderId);
     return;
   }
 
@@ -226,6 +240,7 @@ async function handleMessagingEvent(event, pageId) {
         "📧 Файл хүлээн авах ИМЭЙЛ хаягаа илгээгээгүй бол энд бичээрэй.\n\n" +
         "⏳ Админ баталгаажуулсны дараа танд мэдэгдэх болно."
     );
+    await notifyAdmin(senderId, "Төлбөрийн баримт (зураг) ирлээ", "[зураг]");
     return;
   }
 
@@ -464,9 +479,14 @@ ${catalog}
 - Төлбөр баталгаажуулах, мөнгө буцаах, гомдол зэрэгт "админ удахгүй хариулна" гэж хэл.
 - Бүтээгдэхүүнтэй холбоогүй сэдвээр бол эелдгээр товч хариулаад бүтээгдэхүүн рүү чиглүүл.
 - Аль нь тохирохыг асуувал хэрэгцээг нь сонсоод тохирохыг санал болго. Олон PACK хэрэгтэй бол MASTER PACK-ийг санал болго.
+- Хэрэглэгчийн ЯГ бичсэн зүйлд нь хариул. Яриан дээр цэс аль хэдийн илгээгдсэн бол цэсийг дахин бүү давт.
+- Хэрэглэгч доромжилсон, уурласан ч тайван, эелдэг хэвээр бай.
+- Canva урилга / файл имэйлээр ирээгүй гэвэл: уучлалт гуйж, Spam/Promotions хавтсаа шалгах, Canva урилгыг Accept дарах хэрэгтэйг хэлээд, ямар имэйл өгснийг асуу. Төгсгөлд [[HUMAN]] бич.
+- Гомдол, уурласан, мөнгө буцаах, "хүнтэй ярья" гэвэл: уучлалт гуйж, админ удахгүй холбогдоно гэж хэлээд төгсгөлд [[HUMAN]] бич.
 
 ТОВЧ ХАРУУЛАХ (хариултын хамгийн төгсгөлд дээд тал нь НЭГИЙГ бич, хэрэглэгчид харагдахгүй):
-- [[MENU]] — бүх бүтээгдэхүүний цэсийг харуулах (мэндчилгээ, "юу байгаа вэ" г.м.)
+- [[HUMAN]] — админд мэдэгдэж, энэ хүн дээр ботыг түр зогсооно
+- [[MENU]] — бүх бүтээгдэхүүний цэсийг харуулах (зөвхөн анхны мэндчилгээ эсвэл "юу байгаа вэ" гэж асуувал)
 - [[PRODUCT:ID]] — нэг бүтээгдэхүүний дэлгэрэнгүй, АВАХ товч (жишээ [[PRODUCT:HR]])
 - [[BUY:ID]] — хэрэглэгч тодорхой бүтээгдэхүүнийг авахаар шийдсэн бол төлбөрийн мэдээлэл илгээх
 Дансны дугаарыг өөрөө бүү бич — [[BUY:ID]] ашигла.`;
@@ -475,55 +495,36 @@ ${catalog}
 async function handleAI(psid, pageId, raw) {
   const apiKey = process.env.ANTHROPIC_API_KEY;
 
-  // AI тохируулаагүй бол цэс харуулна
-  if (!apiKey) return sendMenu(psid);
-
   await senderAction(psid, "typing_on");
 
   const history = await recentMessages(psid, 12);
-  const messages = buildMessages(history, raw);
+  // Бот/админ энэ хүнд өмнө нь бичсэн эсэх — бичсэн бол цэсийг дахин бүү илгээ
+  const talkedBefore = history.some((m) => m.fromPage);
 
   let reply = "";
-  try {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 15000);
-
-    const response = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      signal: controller.signal,
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
-      },
-      body: JSON.stringify({
-        model: process.env.ANTHROPIC_MODEL || "claude-haiku-4-5-20251001",
-        max_tokens: 500,
-        system: systemPrompt(),
-        messages,
-      }),
-    });
-    clearTimeout(timer);
-
-    if (!response.ok) {
-      console.error("Claude API error:", response.status, await response.text());
-    } else {
-      const data = await response.json();
-      reply = (data.content || [])
-        .filter((b) => b.type === "text")
-        .map((b) => b.text)
-        .join("")
-        .trim();
-    }
-  } catch (error) {
-    console.error("Claude API failed:", error);
+  if (!apiKey) {
+    console.error("ANTHROPIC_API_KEY тохируулаагүй байна");
+  } else {
+    reply = await askClaude(apiKey, buildMessages(history, raw));
   }
 
-  if (!reply) return sendMenu(psid);
+  // AI ажиллахгүй бол: анх удаа бичсэн хүнд цэс, бусад үед товч хариу + админд мэдэгдэл
+  if (!reply) {
+    if (!talkedBefore) return sendMenu(psid);
+    await sendText(psid, "Уучлаарай, бичсэнийг тань хүлээн авлаа 🙏 Админ удахгүй хариулна.");
+    await pauseUser(psid, HUMAN_PAUSE_HOURS);
+    return notifyAdmin(psid, "AI хариулж чадсангүй", raw);
+  }
 
   // Төгсгөлийн товчны тэмдэглэгээ
-  const marker = reply.match(/\[\[(MENU|PRODUCT:(\w+)|BUY:(\w+))\]\]/);
+  const marker = reply.match(/\[\[(MENU|HUMAN|PRODUCT:(\w+)|BUY:(\w+))\]\]/);
   const text = reply.replace(/\[\[[^\]]*\]\]/g, "").trim();
+
+  if (marker?.[1] === "HUMAN") {
+    await sendText(psid, text || "Уучлаарай 🙏 Админ удахгүй холбогдоно.");
+    await pauseUser(psid, HUMAN_PAUSE_HOURS);
+    return notifyAdmin(psid, "Хүн шаардлагатай (гомдол/асуудал)", raw);
+  }
 
   if (marker?.[3] && PRODUCTS[marker[3]]) {
     if (text) await sendText(psid, text);
@@ -543,6 +544,56 @@ async function handleAI(psid, pageId, raw) {
   }
 
   return sendText(psid, text || "Админ удахгүй хариулна 🙏");
+}
+
+// Claude руу хүсэлт. Тохируулсан model олдохгүй бол дараагийнхыг оролдоно.
+async function askClaude(apiKey, messages) {
+  const models = [
+    process.env.ANTHROPIC_MODEL,
+    "claude-haiku-5-5",
+    "claude-haiku-4-5-20251001",
+  ].filter((m, i, a) => m && a.indexOf(m) === i);
+
+  for (const model of models) {
+    try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 20000);
+      const response = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        signal: controller.signal,
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": apiKey,
+          "anthropic-version": "2023-06-01",
+        },
+        body: JSON.stringify({
+          model,
+          max_tokens: 500,
+          system: systemPrompt(),
+          messages,
+        }),
+      });
+      clearTimeout(timer);
+
+      if (response.ok) {
+        const data = await response.json();
+        return (data.content || [])
+          .filter((b) => b.type === "text")
+          .map((b) => b.text)
+          .join("")
+          .trim();
+      }
+
+      const errText = await response.text();
+      console.error(`Claude API error (${model}):`, response.status, errText);
+      // Model олдоогүй үед л дараагийн model-ийг оролдоно (key/кредитийн алдаа бол зогсоно)
+      if (response.status !== 404 && !/model/i.test(errText)) return "";
+    } catch (error) {
+      console.error(`Claude API failed (${model}):`, error);
+      return "";
+    }
+  }
+  return "";
 }
 
 // Messenger-ийн түүхийг Claude-ийн формат руу хөрвүүлэх
@@ -602,6 +653,61 @@ async function lastQuotedPrice(psid) {
     if (match) return Number(match[1].replace(/,/g, ""));
   }
   return null;
+}
+
+// ==========================================
+// АДМИН РУУ ШИЛЖҮҮЛЭХ (human takeover)
+// Админ гараар бичих эсвэл AI [[HUMAN]] гэвэл тухайн хүн дээр бот түр зогсоно.
+// UPSTASH_REDIS_REST_URL/TOKEN тохируулбал төлөв найдвартай хадгалагдана,
+// эс бөгөөс зөвхөн серверийн санах ойд (заримдаа мартагдаж болно).
+// ==========================================
+
+const HUMAN_PAUSE_HOURS = Number(process.env.HUMAN_PAUSE_HOURS || 6);
+const pausedUntil = new Map();
+const hasRedis = !!(process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN);
+
+async function redis(cmd) {
+  const response = await fetch(process.env.UPSTASH_REDIS_REST_URL, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${process.env.UPSTASH_REDIS_REST_TOKEN}` },
+    body: JSON.stringify(cmd),
+  });
+  return (await response.json()).result;
+}
+
+async function pauseUser(psid, hours) {
+  const until = Date.now() + hours * 3600 * 1000;
+  pausedUntil.set(psid, until);
+  if (hasRedis) {
+    await redis(["SET", `pause:${psid}`, String(until), "EX", String(Math.ceil(hours * 3600))]).catch((e) =>
+      console.error("Redis error:", e)
+    );
+  }
+}
+
+async function resumeUser(psid) {
+  pausedUntil.delete(psid);
+  if (hasRedis) await redis(["DEL", `pause:${psid}`]).catch((e) => console.error("Redis error:", e));
+}
+
+async function isPaused(psid) {
+  if (hasRedis) {
+    const value = await redis(["GET", `pause:${psid}`]).catch(() => null);
+    if (value) return Number(value) > Date.now();
+  }
+  return (pausedUntil.get(psid) || 0) > Date.now();
+}
+
+// ADMIN_PSID тохируулбал админд Messenger-ээр мэдэгдэнэ
+async function notifyAdmin(psid, reason, userText) {
+  const admin = process.env.ADMIN_PSID;
+  console.log("ADMIN NEEDED:", psid, reason, userText);
+  if (!admin || admin === psid) return;
+  await sendText(
+    admin,
+    `🔔 Анхаарах чат\nШалтгаан: ${reason}\nХэрэглэгч: "${String(userText).slice(0, 300)}"\nPSID: ${psid}\n\n` +
+      `Page Inbox-оос хариулна уу. Ботыг дахин асаах бол тэр чатад "#bot" гэж бичнэ.`
+  );
 }
 
 // ==========================================

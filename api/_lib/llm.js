@@ -11,11 +11,14 @@ const DEFAULT_MODEL = "claude-opus-5-5";
 // Server-side refusal fallback дэмждэг model-ууд (Claude API дээр)
 const FALLBACK_MODELS = new Set(["claude-opus-5-5", "claude-opus-5", "claude-sonnet-5-5", "claude-fable-5-1", "claude-fable-5"]);
 
+// Bibi-д тусдаа түлхүүр өгч болно; эс бөгөөс Messenger ботынхтой ижил ANTHROPIC_API_KEY-г ашиглана
+const apiKey = () => process.env.LEARN_ANTHROPIC_API_KEY || process.env.ANTHROPIC_API_KEY;
+
 let client;
 function anthropic() {
   if (!client) {
     client = new Anthropic({
-      apiKey: process.env.ANTHROPIC_API_KEY,
+      apiKey: apiKey(),
       timeout: Number(process.env.LEARN_LLM_TIMEOUT_MS || 25000),
       maxRetries: 1,
     });
@@ -41,7 +44,7 @@ export function buildMessages(history, mode, inputLang, text) {
 
 const anthropicProvider = {
   name: "anthropic",
-  configured: () => !!process.env.ANTHROPIC_API_KEY,
+  configured: () => !!apiKey(),
   async generate(messages) {
     const model = process.env.LEARN_ANTHROPIC_MODEL || DEFAULT_MODEL;
     const params = {

@@ -26,7 +26,8 @@ Files under `api/_lib` start with `_`, so Vercel does not expose them as endpoin
 
 - **Language model:** Anthropic Claude via the official `@anthropic-ai/sdk` (`ANTHROPIC_API_KEY`, already used by the
   Messenger bot). Default model `claude-opus-5-5` at low effort for voice latency, with server-side refusal fallback.
-  Override with `LEARN_ANTHROPIC_MODEL`.
+  Override with `LEARN_ANTHROPIC_MODEL`. To give Bibi its own key (separate billing/limits from the bot), set
+  `LEARN_ANTHROPIC_API_KEY`; it takes priority for `/api/learn/*` only.
 - **Speech-to-text:** ElevenLabs Scribe (lists Mongolian among its supported languages) or OpenAI transcription.
   If none is configured, the page falls back to the browser's Web Speech API (Chrome/Edge/Safari). Mongolian support
   there depends on the browser, and an unsupported language shows a clear message.

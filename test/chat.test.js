@@ -161,6 +161,21 @@ test("missing API key → 503 without calling provider", async () => {
   }
 });
 
+test("LEARN_ANTHROPIC_API_KEY takes priority and works without ANTHROPIC_API_KEY", async () => {
+  requests = [];
+  const key = process.env.ANTHROPIC_API_KEY;
+  delete process.env.ANTHROPIC_API_KEY;
+  process.env.LEARN_ANTHROPIC_API_KEY = "sk-ant-test-key";
+  try {
+    const { status } = await call(base());
+    assert.equal(status, 200);
+    assert.equal(requests.length, 1);
+  } finally {
+    process.env.ANTHROPIC_API_KEY = key;
+    delete process.env.LEARN_ANTHROPIC_API_KEY;
+  }
+});
+
 test("provider auth failure → 503, and the failed requestId can be retried", async () => {
   replies.push({ status: 401, body: { type: "error", error: { type: "authentication_error", message: "invalid x-api-key" } } });
   const body = base();

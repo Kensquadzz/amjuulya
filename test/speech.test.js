@@ -155,3 +155,26 @@ test("config endpoint exposes only booleans, never secrets", async () => {
   assert.equal(body.tts.mn, false);
   assert.ok(!res.body.includes("el-secret-value"));
 });
+
+test("config ?diag=1 reports variable presence and near-miss names, never values", async () => {
+  const { default: config } = await import("../api/learn/config.js");
+  process.env.ELEVENLABS_API_KEY = "el-secret-value";
+  process.env.ELEVEN_LABS_VOICE_ID_MN = "typo-secret";
+  try {
+    const res = mockRes();
+    const req = mockReq({ method: "GET" });
+    req.url = "/api/learn/config?diag=1";
+    await config(req, res);
+    const body = res.json();
+    assert.equal(body.diag.present.ELEVENLABS_API_KEY, true);
+    assert.equal(body.diag.present.ELEVENLABS_VOICE_ID_MN, false);
+    assert.ok(body.diag.nearMisses.includes("ELEVEN_LABS_VOICE_ID_MN"));
+    assert.ok(!res.body.includes("el-secret-value") && !res.body.includes("typo-secret"));
+
+    const plain = mockRes();
+    await config(mockReq({ method: "GET" }), plain);
+    assert.equal(plain.json().diag, undefined);
+  } finally {
+    delete process.env.ELEVEN_LABS_VOICE_ID_MN;
+  }
+});

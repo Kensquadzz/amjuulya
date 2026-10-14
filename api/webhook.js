@@ -776,6 +776,21 @@ async function handleAI(psid, pageId, raw) {
   return sendText(psid, text || "Админ удахгүй хариулна 🙏");
 }
 
+// Claude-ийн хүсэлтийн бие. Haiku 5.5 зэрэг 5.x model-ууд хариулахаасаа өмнө
+// "бодож" токен зарцуулдаг (adaptive thinking, max_tokens-д тооцогдоно), тиймээс
+// чатад effort-ыг "low" болгож, max_tokens-д зай үлдээнэ. Haiku 4.5 effort дэмждэггүй.
+function claudeBody(model, messages) {
+  const isNew = !/4-5|4\.5/.test(model);
+  return {
+    model,
+    max_tokens: isNew ? 2000 : 800,
+    ...(isNew ? { output_config: { effort: "low" } } : {}),
+    // Урт тул cache-лэнэ — дараагийн мессежүүд хямд, хурдан
+    system: [{ type: "text", text: systemPrompt(), cache_control: { type: "ephemeral" } }],
+    messages,
+  };
+}
+
 async function diagnose() {
   const key = process.env.ANTHROPIC_API_KEY || "";
   const out = {
@@ -795,12 +810,7 @@ async function diagnose() {
       const r = await fetch("https://api.anthropic.com/v1/messages", {
         method: "POST",
         headers: { "Content-Type": "application/json", "x-api-key": key, "anthropic-version": "2023-06-01" },
-        body: JSON.stringify({
-          model,
-          max_tokens: 60,
-          system: [{ type: "text", text: systemPrompt(), cache_control: { type: "ephemeral" } }],
-          messages: [{ role: "user", content: "sain bnu" }],
-        }),
+        body: JSON.stringify(claudeBody(model, [{ role: "user", content: "sain bnu" }])),
       });
       const body = await r.text();
       let info = body.slice(0, 300);
@@ -836,13 +846,7 @@ async function askClaude(apiKey, messages) {
           "x-api-key": apiKey,
           "anthropic-version": "2023-06-01",
         },
-        body: JSON.stringify({
-          model,
-          max_tokens: 500,
-          // Урт тул cache-лэнэ — дараагийн мессежүүд хямд, хурдан
-          system: [{ type: "text", text: systemPrompt(), cache_control: { type: "ephemeral" } }],
-          messages,
-        }),
+        body: JSON.stringify(claudeBody(model, messages)),
       });
       clearTimeout(timer);
 
@@ -853,8 +857,10 @@ async function askClaude(apiKey, messages) {
           .map((b) => b.text)
           .join("")
           .trim();
-        if (!text) console.error(`Claude API empty reply (${model}):`, data.stop_reason, JSON.stringify(data.content));
-        return text;
+        if (text) return text;
+        // Хоосон хариу (бодолд токен дууссан, refusal г.м.) → дараагийн model-ийг оролдоно
+        console.error(`Claude API empty reply (${model}):`, data.stop_reason);
+        continue;
       }
 
       const errText = await response.text();

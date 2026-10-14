@@ -178,3 +178,17 @@ test("config ?diag=1 reports variable presence and near-miss names, never values
     delete process.env.ELEVEN_LABS_VOICE_ID_MN;
   }
 });
+
+test("provider error code is surfaced safely in the message", async () => {
+  process.env.ELEVENLABS_API_KEY = "el";
+  process.env.ELEVENLABS_VOICE_ID_MN = "v";
+  stubFetch(() => new Response(JSON.stringify({ detail: { status: "voice_not_found", message: "secret-ish text el" } }), { status: 404 }));
+  await assert.rejects(synthesize({ text: "Сайн уу", lang: "mn" }), (err) => {
+    assert.equal(err.status, 502);
+    assert.match(err.message, /\(ElevenLabs 404: voice_not_found\)/);
+    assert.ok(!err.message.includes("secret-ish"));
+    return true;
+  });
+  stubFetch(() => new Response("<html>oops</html>", { status: 500 }));
+  await assert.rejects(synthesize({ text: "Сайн уу", lang: "mn" }), /\(ElevenLabs 500\)/);
+});

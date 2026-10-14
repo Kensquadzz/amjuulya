@@ -31,6 +31,21 @@ function audioForm(audio, mimeType, fields) {
   return form;
 }
 
+const PROVIDER_NAMES = { elevenlabs: "ElevenLabs", openai: "OpenAI", azure: "Azure" };
+
+// Provider-ийн алдааны кодыг (жишээ нь "voice_not_found") хэрэглэгчид харуулж, тохиргоог засахад тусална.
+// Зөвхөн богино, тэмдэгтийн шалгалт давсан кодыг буцаана — мессеж, нууц мэдээллийг биш.
+export function providerErrorCode(detail) {
+  try {
+    const data = JSON.parse(detail);
+    const d = data?.detail ?? data?.error ?? data;
+    const code = typeof d === "string" ? null : d?.status ?? d?.code ?? d?.type;
+    return typeof code === "string" && /^[A-Za-z0-9_.-]{1,48}$/.test(code) ? code : null;
+  } catch {
+    return null;
+  }
+}
+
 async function providerFetch(kind, provider, url, options, timeout) {
   let response;
   try {
@@ -43,13 +58,15 @@ async function providerFetch(kind, provider, url, options, timeout) {
   if (!response.ok) {
     const detail = await response.text().catch(() => "");
     safeLog(`${kind} ${provider} ${response.status}`, detail);
+    const code = providerErrorCode(detail);
+    const ref = ` (${PROVIDER_NAMES[provider] || provider} ${response.status}${code ? `: ${code}` : ""})`;
     if (response.status === 401 || response.status === 403) {
-      throw new HttpError(503, `${kind}_not_configured`, "Дуу хоолойн үйлчилгээний API түлхүүр буруу эсвэл эрхгүй байна.");
+      throw new HttpError(503, `${kind}_not_configured`, `Дуу хоолойн үйлчилгээний API түлхүүр буруу эсвэл эрхгүй байна.${ref}`);
     }
     if (response.status === 429) {
-      throw new HttpError(429, `${kind}_busy`, "Дуу хоолойн үйлчилгээ ачаалалтай байна. Түр хүлээнэ үү.", { retryAfter: 10 });
+      throw new HttpError(429, `${kind}_busy`, `Дуу хоолойн үйлчилгээ ачаалалтай байна. Түр хүлээнэ үү.${ref}`, { retryAfter: 10 });
     }
-    throw new HttpError(502, `${kind}_error`, "Дуу хоолойн үйлчилгээ алдаа заалаа. Дахин оролдоно уу.");
+    throw new HttpError(502, `${kind}_error`, `Дуу хоолойн үйлчилгээ алдаа заалаа.${ref}`);
   }
   return response;
 }

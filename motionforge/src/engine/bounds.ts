@@ -53,7 +53,7 @@ function inside(b: Box, x: number, y: number) {
 export function hitTest(p: Project, t: number, x: number, y: number, W: number, H: number): string | null {
   for (let i = p.layers.length - 1; i >= 0; i--) {
     const l = p.layers[i];
-    if (!l.visible || t < l.start || t > l.end) continue;
+    if (!l.visible || l.locked || t < l.start || t > l.end) continue;
     const b = layerBox(l, t, W, H);
     if (b && inside(b, x, y)) return l.id;
   }

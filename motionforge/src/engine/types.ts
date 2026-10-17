@@ -49,6 +49,8 @@ export interface LayerBase {
   name: string;
   type: LayerType;
   visible: boolean;
+  /** locked layers can't be picked or moved in the preview or timeline */
+  locked?: boolean;
   start: number;
   end: number;
   opacity: number; // 0..1

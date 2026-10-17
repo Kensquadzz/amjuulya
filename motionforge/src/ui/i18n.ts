@@ -34,6 +34,14 @@ const MN = {
   aFade: 'Бүдэг', aZoomIn: 'Томрох', aZoomOut: 'Жижгэрэх', aSlideUp: 'Доороос', aSlideDown: 'Дээрээс', aSlideLeft: 'Баруунаас',
   aSlideRight: 'Зүүнээс', aPop: 'Үсрэх', aSpin: 'Эргэх', aBlur: 'Бүдгээс', aRise: 'Дээш хөвөх',
   scenes: 'scene', seconds: 'сек', withSound: 'Дуутай', imageSlots: 'зургийн слот',
+  zoomIn: 'Томруулах', zoomOut: 'Жижигрүүлэх', tlExpand: 'Timeline томруулах', tlCollapse: 'Timeline багасгах',
+  tlHint: 'Хуруугаар гүйлгэж цаг сонгоно · дарж сонгоно', tlSelHint: 'Ирмэгийг чирж тайрна · ◆ дарж очно, чирж зөөнө',
+  cLock: 'Түгжих', cUnlock: 'Тайлах', cHide: 'Нуух', cShow: 'Харуулах', locked: 'Түгжигдсэн',
+  saving: 'Хадгалж байна…', savedState: 'Хадгалсан', unsaved: 'Хадгалаагүй',
+  kfPrev: 'Өмнөх keyframe', kfNext: 'Дараагийн keyframe', kfAll: 'Бүгдэд keyframe', kfEase: 'Keyframe-ийн хурдатгал',
+  kfNone: 'Энэ мөчид keyframe алга. ◆ дарж нэмнэ.', kfSteps: '1) Playhead-ээ зөөнө 2) утгаа өөрчилнө 3) ◆ дарна — бусад мөчид дахин хийхэд хөдөлгөөн үүснэ.',
+  eLinear: 'Шулуун', eIn: 'Удаан эхлэх', eOut: 'Удаан дуусах', eInOut: 'Зөөлөн', eBack: 'Хэтрэлттэй', eHold: 'Үсрэх (hold)',
+  fit: 'Дэлгэцэнд тааруулах',
   posHint: '☝ Preview дээр хуруугаар чирж зөөнө, хоёр хуруугаар томруулж эргүүлнэ. ◆ товч тухайн мөчид keyframe тавина.',
 };
 
@@ -64,6 +72,14 @@ const EN: typeof MN = {
   aFade: 'Fade', aZoomIn: 'Zoom in', aZoomOut: 'Zoom out', aSlideUp: 'From below', aSlideDown: 'From above', aSlideLeft: 'From right',
   aSlideRight: 'From left', aPop: 'Pop', aSpin: 'Spin', aBlur: 'From blur', aRise: 'Rise',
   scenes: 'scenes', seconds: 's', withSound: 'Sound', imageSlots: 'image slots',
+  zoomIn: 'Zoom in', zoomOut: 'Zoom out', tlExpand: 'Expand timeline', tlCollapse: 'Collapse timeline',
+  tlHint: 'Swipe to scrub · tap to select', tlSelHint: 'Drag edges to trim · tap ◆ to jump, drag to move',
+  cLock: 'Lock', cUnlock: 'Unlock', cHide: 'Hide', cShow: 'Show', locked: 'Locked',
+  saving: 'Saving…', savedState: 'Saved', unsaved: 'Not saved',
+  kfPrev: 'Previous keyframe', kfNext: 'Next keyframe', kfAll: 'Keyframe all', kfEase: 'Keyframe easing',
+  kfNone: 'No keyframe at the playhead. Tap ◆ to add one.', kfSteps: '1) Move the playhead 2) change a value 3) tap ◆ — repeat at another time to animate.',
+  eLinear: 'Linear', eIn: 'Ease in', eOut: 'Ease out', eInOut: 'Ease in-out', eBack: 'Overshoot', eHold: 'Hold',
+  fit: 'Fit to screen',
   posHint: '☝ Drag on the preview to move, pinch with two fingers to scale and rotate. ◆ sets a keyframe at the playhead.',
 };
 

@@ -94,7 +94,55 @@ await page.locator('.anim-item', { hasText: 'Үсрэх' }).tap();
 await page.locator('.done-btn').tap();
 st = await S();
 const tile = st.project.layers.find((l) => l.shape === 'glassTile');
+const tile0 = tile;
 check('in-animation writes keyframes', !!tile.tracks.scale?.length && !!tile.tracks.opacity?.length, Object.keys(tile.tracks).join(','));
+
+// timeline: a finger scroll must move the clock and must not be overwritten
+await ev(() => window.__motionforge.engine.player.seek(0.5));
+await wait(200);
+const scrub = await ev(async () => {
+  const el = document.querySelector('.cap-scroll');
+  el.dispatchEvent(new TouchEvent('touchstart', { bubbles: true, touches: [] }));
+  const from = el.scrollLeft;
+  const out = [];
+  for (let i = 1; i <= 6; i++) {
+    el.scrollLeft = from + i * 20;
+    await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+    out.push([el.scrollLeft, window.__motionforge.engine.time]);
+  }
+  el.dispatchEvent(new TouchEvent('touchend', { bubbles: true, touches: [] }));
+  return { from, out };
+});
+const lastS = scrub.out.at(-1);
+check('finger scroll scrubs the playhead (no snap-back)', lastS[0] >= scrub.from + 110 && lastS[1] > 0.5 + 1.4, JSON.stringify(lastS));
+const w0 = await page.locator('.cap-bar.sel').evaluate((e) => e.getBoundingClientRect().width);
+await page.getByRole('button', { name: 'Томруулах' }).first().tap();
+await wait(250);
+const w1 = await page.locator('.cap-bar.sel').evaluate((e) => e.getBoundingClientRect().width);
+check('timeline zoom in', w1 > w0 * 1.3, `${w0.toFixed(0)} → ${w1.toFixed(0)}`);
+await page.getByRole('button', { name: 'Timeline томруулах' }).tap();
+check('timeline expands', await page.locator('.cap-timeline.big').isVisible());
+await page.getByRole('button', { name: 'Timeline багасгах' }).tap();
+
+// keyframes from the position sheet: key all, move the clock, change x → a 2-key animation
+await ev((t) => window.__motionforge.engine.player.seek(t), tile0.start + 0.2);
+await tool('Байрлал');
+await page.locator('.kf-nav .chip').tap();
+await ev((t) => window.__motionforge.engine.player.seek(t), tile0.start + 1.5);
+await wait(200);
+await page.locator('.tool-sheet .prop', { hasText: 'Хэвтээ' }).locator('input.num').fill('20');
+await page.locator('.tool-sheet .prop', { hasText: 'Хэвтээ' }).locator('input.num').press('Enter');
+await page.locator('.done-btn').tap();
+st = await S();
+const tk = st.project.layers.find((l) => l.id === tile0.id);
+check('keyframe workflow animates x', tk.tracks.x?.length >= 2 && Math.abs(tk.tracks.x.at(-1).v - 0.2) < 1e-6, JSON.stringify(tk.tracks.x?.map((k) => [k.t.toFixed(2), k.v])));
+check('keyframe diamonds on the selected bar', (await page.locator('.cap-bar.sel .cap-kf').count()) >= 2);
+
+// lock: locked layers can't be dragged on the preview
+await tool('Түгжих');
+st = await S();
+check('lock layer', st.project.layers.find((l) => l.id === tile0.id).locked === true);
+await tool('Тайлах');
 
 // audio: add sound effect + background music
 await tool('Буцах');

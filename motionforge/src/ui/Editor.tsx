@@ -7,7 +7,8 @@ import { animFor, makeBackground, makeImage, makeParticles, makeShader, makeShap
 import { TEXT_PRESETS } from '../engine/text';
 import { ASPECTS, type AspectId, type ImageLayer, type Layer, type ShapeLayer, type TextLayer, type TextPresetId } from '../engine/types';
 import { getStore, useStore } from '../state/store';
-import { engine, setProp, valueAt, useTime } from '../state/engine';
+import { engine, setProp, toggleKeyframe, valueAt, useTime } from '../state/engine';
+import { keyframeAt } from '../engine/keyframes';
 import { addLayerHere, currentMotion, deleteClip, deleteLayer, duplicateClip, duplicateLayer, moveLayer, MOTION_PRESETS, setMotion, splitClip, splitLayer, type MotionPreset } from '../state/actions';
 import { Preview } from './Preview';
 import { CapTimeline } from './CapTimeline';
@@ -22,7 +23,7 @@ import { cutOutLayer, restoreOriginal, setLayerImageFromFile } from './imageActi
 import { TEXT_ANIM_NAMES, useLang, type StrKey } from './i18n';
 import { layerThumb } from './thumbs';
 import { useThumb } from './TemplatesPanel';
-import type { IconId } from '../engine/types';
+import type { EasingId, IconId } from '../engine/types';
 
 type Panel =
   | null | 'templates' | 'audio' | 'effects' | 'stickers' | 'ratio' | 'background' | 'pro'
@@ -42,6 +43,7 @@ export function Editor({ onHome, onExport }: { onHome: () => void; onExport: () 
   const fileRef = useRef<HTMLInputElement>(null);
   const replaceRef = useRef<HTMLInputElement>(null);
   const dur = useStore((s) => s.project.duration);
+  useStore((s) => s.project); // keeps undo/redo enabled state current
   const store = getStore();
 
   // close a selection-bound panel when the selection goes away
@@ -76,6 +78,8 @@ export function Editor({ onHome, onExport }: { onHome: () => void; onExport: () 
 
   const common = (l: Layer): Tool[] => [
     { id: 'split', icon: '✂', label: 'cSplit', run: split },
+    { id: 'lock', icon: l.locked ? '🔓' : '🔒', label: l.locked ? 'cUnlock' : 'cLock', run: () => store.updateLayer(l.id, (x) => ({ ...x, locked: !x.locked })) },
+    { id: 'vis', icon: l.visible ? '◌' : '●', label: l.visible ? 'cHide' : 'cShow', run: () => store.updateLayer(l.id, (x) => ({ ...x, visible: !x.visible })) },
     { id: 'copy', icon: '⧉', label: 'cCopy', run: () => { duplicateLayer(l.id); toast(t('copied'), 'ok'); } },
     { id: 'fwd', icon: '⬆', label: 'cForward', run: () => moveLayer(l.id, 1) },
     { id: 'bwd', icon: '⬇', label: 'cBackward', run: () => moveLayer(l.id, -1) },
@@ -123,9 +127,14 @@ export function Editor({ onHome, onExport }: { onHome: () => void; onExport: () 
   return (
     <div className="app cap">
       <header className="cap-top">
-        <button className="icon-btn" onClick={onHome} aria-label={t('home')}>⌂</button>
-        <span className="cap-name">{name || 'Untitled'}{dirty ? ' •' : ''}</span>
-        <button className="export-btn" onClick={onExport}>{t('export')} ⤓</button>
+        <button className="icon-btn" onClick={onHome} aria-label={t('home')} title={t('home')}>⌂</button>
+        <span className="cap-title">
+          <span className="cap-name">{name || 'Untitled'}</span>
+          <small className={`save-state ${dirty ? 'dirty' : ''}`} role="status">{dirty ? t('saving') : `✓ ${t('savedState')}`}</small>
+        </span>
+        <button className="icon-btn small" aria-label={t('undo')} title={t('undo')} disabled={!store.canUndo} onClick={() => store.undo()}>↶</button>
+        <button className="icon-btn small" aria-label={t('redo')} title={t('redo')} disabled={!store.canRedo} onClick={() => store.redo()}>↷</button>
+        <button className="export-btn" onClick={onExport}>{t('export')}</button>
       </header>
       <main className="cap-main">
         <Preview simple />
@@ -317,12 +326,60 @@ function PositionSheet({ l, onClose }: { l: Layer; onClose: () => void }) {
   return (
     <ToolSheet title={t('cPosition')} onClose={onClose}>
       <p className="hint">{t('posHint')}</p>
+      <KeyframeBar l={l} t={tt} paths={['x', 'y', 'scale', 'rotation', 'opacity']} />
       <NumProp layer={l} path="x" label={t('posX')} min={-0.3} max={1.3} step={0.001} t={tt} display={100} unit="%" />
       <NumProp layer={l} path="y" label={t('posY')} min={-0.3} max={1.3} step={0.001} t={tt} display={100} unit="%" />
       <NumProp layer={l} path="scale" label={t('scale')} min={0.05} max={4} step={0.01} t={tt} display={100} unit="%" />
       <NumProp layer={l} path="rotation" label={t('rotation')} min={-180} max={180} step={0.5} t={tt} unit="°" />
       <NumProp layer={l} path="opacity" label={t('opacity')} min={0} max={1} step={0.01} t={tt} display={100} unit="%" />
     </ToolSheet>
+  );
+}
+
+const EASE_CHOICES: { id: EasingId; label: StrKey }[] = [
+  { id: 'linear', label: 'eLinear' }, { id: 'easeIn', label: 'eIn' }, { id: 'easeOut', label: 'eOut' },
+  { id: 'easeInOutCubic', label: 'eInOut' }, { id: 'easeOutBack', label: 'eBack' }, { id: 'hold', label: 'eHold' },
+];
+
+/** Keyframe helpers for the simple editor: jump between keys, key every
+ *  property at once and choose the easing leaving the key at the playhead. */
+function KeyframeBar({ l, paths }: { l: Layer; t: number; paths: string[] }) {
+  const { t } = useLang();
+  const tt = engine.frameTime(); // the parent re-renders on clock changes
+  const times = [...new Set(paths.flatMap((p) => (l.tracks[p] ?? []).map((k) => Math.round(k.t * 1000) / 1000)))].sort((a, b) => a - b);
+  const here = paths.flatMap((p) => (l.tracks[p] ?? []).filter((k) => Math.abs(k.t - tt) < 1e-3));
+  const go = (dir: 1 | -1) => {
+    const next = dir > 0 ? times.find((x) => x > tt + 1e-3) : [...times].reverse().find((x) => x < tt - 1e-3);
+    if (next !== undefined) { engine.player?.pause(); engine.player?.seek(next); }
+  };
+  const keyAll = () => {
+    for (const p of paths) {
+      const cur = getStore().state.project.layers.find((x) => x.id === l.id)!;
+      if (!keyframeAt(cur.tracks, p, tt)) toggleKeyframe(cur, p);
+    }
+  };
+  const setEase = (e: EasingId) => getStore().updateLayer(l.id, (x) => {
+    const tracks: Layer['tracks'] = {};
+    for (const [p, ks] of Object.entries(x.tracks)) tracks[p] = paths.includes(p) ? ks.map((k) => (Math.abs(k.t - tt) < 1e-3 ? { ...k, ease: e } : k)) : ks;
+    return { ...x, tracks };
+  });
+  const cur = here[0]?.ease;
+  return (
+    <div className="kf-bar">
+      <div className="kf-nav">
+        <button className="icon-btn small" aria-label={t('kfPrev')} disabled={!times.some((x) => x < tt - 1e-3)} onClick={() => go(-1)}>◀◆</button>
+        <button className={`chip ${here.length ? 'on' : ''}`} onClick={keyAll}>◆ {t('kfAll')}</button>
+        <button className="icon-btn small" aria-label={t('kfNext')} disabled={!times.some((x) => x > tt + 1e-3)} onClick={() => go(1)}>◆▶</button>
+      </div>
+      {here.length ? (
+        <div className="cap-prop">
+          <span className="cap-prop-l">{t('kfEase')}</span>
+          <div className="chips wrap">
+            {EASE_CHOICES.map((c) => <button key={c.id} className={`chip small ${cur === c.id ? 'on' : ''}`} onClick={() => setEase(c.id)}>{t(c.label)}</button>)}
+          </div>
+        </div>
+      ) : <p className="hint">{times.length ? t('kfNone') : t('kfSteps')}</p>}
+    </div>
   );
 }
 

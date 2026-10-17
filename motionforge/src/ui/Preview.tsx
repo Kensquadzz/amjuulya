@@ -64,7 +64,7 @@ export function Preview({ simple = false }: { simple?: boolean }) {
   const selectedMovable = () => {
     const st = getStore().state;
     const l = st.project.layers.find((x) => x.id === st.selectedLayerId);
-    return l && l.type !== 'shader' && l.type !== 'background' && l.type !== 'particles' ? l : null;
+    return l && !l.locked && l.type !== 'shader' && l.type !== 'background' && l.type !== 'particles' ? l : null;
   };
   const startPinch = () => {
     const l = selectedMovable();
@@ -246,7 +246,6 @@ export function PlayRow() {
   const [playing, setPlaying] = useState(false);
   const timeRef = useRef<HTMLSpanElement>(null);
   const { t } = useLang();
-  useStore((s) => s.project); // refresh undo/redo state
   useEffect(() => {
     let unsub: (() => void) | undefined;
     const iv = setInterval(() => {
@@ -263,8 +262,8 @@ export function PlayRow() {
       <span className="time"><span ref={timeRef}>{fmtShort(0)}</span> / {fmtShort(duration)}</span>
       <button className="play-big" aria-label={playing ? t('pause') : t('play')} onClick={() => { liveAudio.unlock(); engine.player?.toggle(); }}>{playing ? '❚❚' : '▶'}</button>
       <span className="time right">
-        <button className="icon-btn small" aria-label={t('undo')} disabled={!getStore().canUndo} onClick={() => getStore().undo()}>↶</button>
-        <button className="icon-btn small" aria-label={t('redo')} disabled={!getStore().canRedo} onClick={() => getStore().redo()}>↷</button>
+        <button className="icon-btn small" aria-label="Previous frame" onClick={() => { engine.player?.pause(); engine.player?.seek(engine.frameTime() - 1 / fps); }}>◂</button>
+        <button className="icon-btn small" aria-label="Next frame" onClick={() => { engine.player?.pause(); engine.player?.seek(engine.frameTime() + 1 / fps); }}>▸</button>
       </span>
     </div>
   );

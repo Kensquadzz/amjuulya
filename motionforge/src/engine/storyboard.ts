@@ -120,7 +120,10 @@ export function planShots(sections: Section[]): PlannedShot[] {
     let cands = shotCandidates(s.text, i, sections.length);
     if (i === 1 && !out.some((o) => o.shot === 'brand')) cands = [{ shot: 'brand', why: 'brand introduction', strong: true }, ...cands];
     const prev = out[out.length - 1]?.shot;
-    const ok = cands.filter((x) => x.shot !== prev);
+    // nothing used in the last two shots (falls back to "not the previous one")
+    const recent = new Set(out.slice(-2).map((o) => o.shot));
+    const wide = cands.filter((x) => !recent.has(x.shot));
+    const ok = wide.length ? wide : cands.filter((x) => x.shot !== prev);
     // a shot that fits the words wins (even if it was used earlier — never twice
     // in a row); prefer an unused one when the line matches several
     const strong = ok.filter((x) => x.strong);
@@ -184,4 +187,27 @@ export function breakLine(s: string, lineChars = 26): string {
   let best = -1;
   for (let i = 0; i < s.length; i++) if (s[i] === ' ' && (best < 0 || Math.abs(i - mid) < Math.abs(best - mid))) best = i;
   return best < 0 ? s : s.slice(0, best) + '\n' + s.slice(best + 1);
+}
+
+/**
+ * Long sections are split at their inner pauses so no single shot has to be
+ * stretched (default: at most `maxShot` seconds); the text is divided at word
+ * boundaries in proportion to the time.
+ */
+export function splitLong(sections: Section[], speech: Span[], maxShot = 7): Section[] {
+  const out: Section[] = [];
+  const cut = (s: Section) => {
+    if (s.end - s.start <= maxShot) { out.push(s); return; }
+    const pauses = speech.slice(0, -1).map((p, i) => (p.end + speech[i + 1].start) / 2).filter((p) => p > s.start + 1.5 && p < s.end - 1.5);
+    const mid = (s.start + s.end) / 2;
+    const at = pauses.length ? pauses.reduce((a, b) => (Math.abs(b - mid) < Math.abs(a - mid) ? b : a)) : mid;
+    const words = s.text.split(/\s+/).filter(Boolean);
+    const k = Math.round(words.length * ((at - s.start) / (s.end - s.start)));
+    const a = { ...s, end: +at.toFixed(3), text: words.slice(0, Math.max(1, k)).join(' ') };
+    const b = { ...s, start: +at.toFixed(3), text: words.slice(Math.max(1, k)).join(' ') || s.text };
+    if (!s.text) { a.text = ''; b.text = ''; }
+    cut(a); cut(b);
+  };
+  sections.forEach(cut);
+  return out.map((s, i) => ({ ...s, index: i }));
 }

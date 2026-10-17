@@ -4,7 +4,9 @@
 // Usage: node tests/voice-video.mjs [outDir]
 import { chromium } from 'playwright-core';
 import { createServer } from 'vite';
-import { writeFileSync } from 'node:fs';
+import { writeFileSync, readFileSync, mkdtempSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { tmpdir } from 'node:os';
 const out = process.argv[2];
 const server = await createServer({ server: { port: 5191 }, logLevel: 'error' });
 await server.listen();
@@ -47,7 +49,7 @@ for (const [dur, n] of [[16, 5], [45, 10], [90, 10]]) {
   check(`${dur} s: ${r.speech} phrases detected`, r.speech === n, String(r.speech));
   check(`${dur} s: no storyboard errors`, !r.issues.some((i) => i.level === 'error'), JSON.stringify(r.issues));
   check(`${dur} s: shots cover the film`, r.shots[0].start === 0 && Math.abs(r.shots[r.shots.length - 1].end - r.duration) < 0.01 && r.shots.every((s, i) => i === 0 || s.start <= r.shots[i - 1].end));
-  check(`${dur} s: no shot twice in a row`, r.shots.every((s, i) => i === 0 || s.shot !== r.shots[i - 1].shot), r.shots.map((s) => s.shot).join(' '));
+  check(`${dur} s: no shot repeated within three`, r.shots.every((s, i) => (i === 0 || s.shot !== r.shots[i - 1].shot) && (i < 2 || s.shot !== r.shots[i - 2].shot)), r.shots.map((s) => s.shot).join(' '));
   // after the old 16 s cutoff the picture keeps changing (not frozen, not blank)
   const late = r.sig.filter((_, i) => r.times[i] > 16);
   if (late.length > 2) check(`${dur} s: picture develops after 16 s`, new Set(late.map((v) => Math.round(v / 5000))).size >= Math.min(4, late.length - 1), `${late.length} frames`);
@@ -72,12 +74,12 @@ for (const [dur, n] of [[16, 5], [45, 10], [90, 10]]) {
   await page.locator('.vv .prop', { hasText: 'Брэнд' }).locator('input').fill('HR OFFICE MASTER PACK');
   await page.getByRole('button', { name: 'Storyboard гаргах' }).tap();
   const items = await page.locator('.vv-plan li').count();
-  check('UI: storyboard lists every phrase', items === 10, String(items));
+  check('UI: storyboard lists every phrase', items >= 10, String(items));
   await page.locator('.vv button.primary', { hasText: 'Видео үүсгэх' }).tap();
   await page.waitForTimeout(2500);
   const st = await page.evaluate(() => { const p = window.__motionforge.store.state.project; return { d: p.duration, shots: p.layers.filter((l) => l.type === 'scene3d').length, subs: p.layers.filter((l) => l.type === 'text').length, voice: p.audio.find((a) => a.assetId.startsWith('asset:'))?.duration }; });
   check('UI: project follows the voice', Math.abs(st.d - 45.6) < 0.05 && Math.abs(st.voice - 45) < 0.05, JSON.stringify(st));
-  check('UI: shots and subtitles created', st.shots === 10 && st.subs >= 10, JSON.stringify(st));
+  check('UI: shots and subtitles created', st.shots >= 10 && st.subs >= 10, JSON.stringify(st));
   await page.locator('.cap-top .export-btn').tap();
   await page.waitForSelector('.export-form');
   await page.locator('.export-form .prop', { hasText: 'Resolution' }).locator('select').selectOption({ index: 3 });
@@ -89,6 +91,21 @@ for (const [dur, n] of [[16, 5], [45, 10], [90, 10]]) {
   const res = await page.locator('.sheet-body').innerText();
   check('UI: full-length export with the voice', /✓ verified/.test(res) && /136[78] frames/.test(res) && /Sound: included/.test(res), res.split('\n').slice(0, 3).join(' | '));
   await ctx.close();
+}
+// reference analysis: a generated clip with three known shots (cuts at 2 s and 4 s)
+{
+  const dir = mkdtempSync(`${tmpdir()}/mf-ref-`), f = `${dir}/ref.webm`;
+  const ff = spawnSync('ffmpeg', ['-nostdin', '-v', 'error', '-y', '-f', 'lavfi', '-i', 'color=c=#e9494b:s=320x180:d=2', '-f', 'lavfi', '-i', 'color=c=#1d4ed8:s=320x180:d=2', '-f', 'lavfi', '-i', 'testsrc=s=320x180:d=2', '-filter_complex', '[0][1][2]concat=n=3:v=1:a=0,fps=25', '-c:v', 'libvpx-vp9', '-b:v', '300k', f]);
+  if (ff.status === 0) {
+    const r = await p.evaluate(async (data) => {
+      const { analyzeReference } = await import('/src/engine/refAnalysis.ts');
+      const blob = await (await fetch('data:video/webm;base64,' + data)).blob();
+      const x = await analyzeReference(new File([blob], 'ref.webm', { type: 'video/webm' }));
+      return { cuts: x.cuts, shots: x.shots.length, palette: x.palette, accent: x.accent, sheet: x.sheet.length };
+    }, readFileSync(f).toString('base64'));
+    check('reference: cuts found at 2 s and 4 s', r.cuts.length === 2 && Math.abs(r.cuts[0] - 2) <= 0.3 && Math.abs(r.cuts[1] - 4) <= 0.3, JSON.stringify(r.cuts));
+    check('reference: palette and contact sheet', r.palette.length >= 3 && r.sheet > 1000, `${r.accent} ${r.palette.join(' ')}`);
+  } else check('reference: ffmpeg available to build the test clip', false, String(ff.stderr));
 }
 check('no page errors', errors.length === 0, errors.slice(0, 3).join(' | '));
 console.log(results.join('\n'));

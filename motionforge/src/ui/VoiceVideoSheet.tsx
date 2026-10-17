@@ -6,6 +6,7 @@ import { engine } from '../state/engine';
 import { getStore } from '../state/store';
 import type { AspectId } from '../engine/types';
 import { Sheet, toast } from './controls';
+import { analyzeReference, type RefProfile } from '../engine/refAnalysis';
 
 const fmtT = (s: number) => `${Math.floor(s / 60)}:${(s % 60).toFixed(1).padStart(4, '0')}`;
 const SHOT_MN: Record<string, string> = { dock: 'Апп + курсор', brand: 'Брэнд дэлбэрэлт', search: 'Хайлт + бичих', cards: 'Хувилбарууд', grid: 'Загварын сүлжээ', roll: 'Үгийн жагсаалт', title: 'Гарчиг', features: 'Давуу талууд', stat: 'Тоо / үнэ', cta: 'Коммент CTA' };
@@ -23,6 +24,9 @@ export function VoiceVideoSheet({ onClose, onCreated }: { onClose: () => void; o
   const [subs, setSubs] = useState(true);
   const [music, setMusic] = useState(true);
   const [result, setResult] = useState<VoiceVideoResult | null>(null);
+  const [ref, setRef] = useState<RefProfile | null>(null);
+  const [useRef, setUseRef] = useState(true);
+  const [accent2, setAccent2] = useState('#18b4ff');
 
   const pickVoice = async (f: File) => {
     setBusy('Дууг уншиж байна…'); setResult(null);
@@ -38,9 +42,18 @@ export function VoiceVideoSheet({ onClose, onCreated }: { onClose: () => void; o
     for (const f of Array.from(fs).slice(0, 8)) out.push(await new Promise<string>((res) => { const r = new FileReader(); r.onload = () => res(String(r.result)); r.readAsDataURL(f); }));
     setImages(out); setResult(null);
   };
+  const pickRef = async (f: File) => {
+    setBusy('Жишээ видеог шинжилж байна… 0%'); setResult(null);
+    try {
+      const r = await analyzeReference(f, (p) => setBusy(`Жишээ видеог шинжилж байна… ${Math.round(p * 100)}%`));
+      setRef(r);
+      if (useRef) { setAccent(r.accent); setAccent2(r.accent2); }
+    } catch (e) { toast((e as Error).message, 'error'); }
+    setBusy('');
+  };
   const plan = () => {
     if (!voice) return;
-    setResult(buildVoiceProject({ voice, script, brand: brand.trim() || 'YOUR BRAND', accent, images, outro, aspect, subtitles: subs, music, name: brand.trim() ? `${brand.trim()} — voice video` : undefined }));
+    setResult(buildVoiceProject({ voice, script, brand: brand.trim() || 'YOUR BRAND', accent, accent2, pace: ref && useRef ? Math.min(7, Math.max(1.8, ref.avgShot)) : undefined, images, outro, aspect, subtitles: subs, music, name: brand.trim() ? `${brand.trim()} — voice video` : undefined }));
   };
   const create = async () => {
     if (!result) return;
@@ -62,10 +75,22 @@ export function VoiceVideoSheet({ onClose, onCreated }: { onClose: () => void; o
           <input type="file" accept="audio/*,video/*,.mp3,.m4a,.wav,.aac,.mp4,.mov" hidden onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) pickVoice(f); }} />
         </label>
         {busy && <p className="hint">{busy}</p>}
+        <label className="file-btn">{ref ? `🎞 ${ref.name}` : '🎞 Жишээ видео (заавал биш)…'}
+          <input type="file" accept="video/*,.mp4,.mov,.webm" hidden onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) pickRef(f); }} />
+        </label>
+        {ref && (
+          <div className="vv-ref">
+            <img src={ref.sheet} alt="Жишээ видеоны хэсгүүд" />
+            <p className="hint">{ref.duration.toFixed(1)} сек · {ref.shots.length} хэсэг · дундаж {ref.avgShot.toFixed(1)} сек · гэрэлтэлт {Math.round(ref.brightness * 100)}% · өнгө {Math.round(ref.saturation * 100)}%</p>
+            <div className="vv-pal">{ref.palette.map((c) => <button key={c} style={{ background: c }} title={c} onClick={() => { setAccent(c); setResult(null); }} />)}</div>
+            <label className="vv-check"><input type="checkbox" checked={useRef} onChange={(e) => { setUseRef(e.target.checked); if (e.target.checked) { setAccent(ref.accent); setAccent2(ref.accent2); } setResult(null); }} /> Жишээний өнгө, хэмнэлийг ашиглах</label>
+            <p className="hint">Зөвхөн кадр, өнгө, хэсэг солигдох цэгийг хэмждэг. Видеоны агуулгыг ойлгодоггүй, юу ч хуулахгүй.</p>
+          </div>
+        )}
         <label className="vv-l">Скрипт — нэг мөрөнд нэг өгүүлбэр / санаа</label>
         <textarea className="vv-script" rows={7} value={script} placeholder={'Офист ажилладаг уу?\nЭнэ багц танд их хэрэг болно.\n…\n«1» гэж коммент бичээрэй.'} onChange={(e) => { setScript(e.target.value); setResult(null); }} />
         <div className="prop"><label>Брэнд</label><input value={brand} placeholder="HR OFFICE MASTER PACK" onChange={(e) => { setBrand(e.target.value); setResult(null); }} /></div>
-        <div className="prop"><label>Өнгө</label><input type="color" value={accent} onChange={(e) => { setAccent(e.target.value); setResult(null); }} /></div>
+        <div className="prop"><label>Өнгө</label><input type="color" value={accent} onChange={(e) => { setAccent(e.target.value); setResult(null); }} /><input type="color" value={accent2} onChange={(e) => { setAccent2(e.target.value); setResult(null); }} /></div>
         <div className="prop"><label>Зураг ({images.length})</label><label className="file-btn">Бүтээгдэхүүн / баримтын зураг…<input type="file" accept="image/*" multiple hidden onChange={(e) => { if (e.target.files) pickImages(e.target.files); e.target.value = ''; }} /></label></div>
         <div className="prop"><label>Хэмжээ</label><select value={aspect} onChange={(e) => { setAspect(e.target.value as AspectId); setResult(null); }}><option value="9:16">9:16 Reels</option><option value="1:1">1:1</option><option value="4:5">4:5</option><option value="16:9">16:9</option></select></div>
         <div className="prop"><label>Төгсгөл</label><select value={outro} onChange={(e) => { setOutro(+e.target.value); setResult(null); }}><option value={0}>Яриатай зэрэг дуусна</option><option value={0.6}>+0.6 сек</option><option value={1.5}>+1.5 сек</option><option value={3}>+3 сек</option></select></div>

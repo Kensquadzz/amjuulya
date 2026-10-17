@@ -476,3 +476,6 @@ input[type='color'] { width: 44px; height: 34px; padding: 0; border: 1px solid v
 .vv-plan { margin: 0; padding-left: 22px; display: flex; flex-direction: column; gap: 6px; font-size: 14px; }
 .vv-plan .t { font-variant-numeric: tabular-nums; color: var(--dim); }
 .vv-plan small { display: block; color: var(--faint); }
+.vv-ref img { width: 100%; border-radius: 10px; display: block; }
+.vv-pal { display: flex; gap: 8px; }
+.vv-pal button { width: 36px; height: 36px; border-radius: 50%; border: 2px solid #fff3; padding: 0; }

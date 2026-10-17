@@ -4,7 +4,7 @@
 // caption box, and the plan is validated for coverage and repetition.
 import type { AspectId, AudioClip, Layer, Project } from './types';
 import { makeScene3D, makeShape, makeText, newProject } from './project';
-import { alignScript, captionCues, detectSpeech, planShots, validatePlan, type PcmLike, type PlannedShot, type Span, type StoryIssue } from './storyboard';
+import { alignScript, captionCues, detectSpeech, planShots, splitLong, validatePlan, type PcmLike, type PlannedShot, type Span, type StoryIssue } from './storyboard';
 import { sfxById } from './sfx';
 import { uid } from './util';
 
@@ -14,6 +14,10 @@ export interface VoiceVideoOptions {
   script: string;
   brand: string;
   accent: string;
+  /** second colour (typed-text highlight, glows) */
+  accent2?: string;
+  /** typical shot length in seconds (e.g. measured from a reference video) */
+  pace?: number;
   images: string[];
   /** seconds of picture after the voice ends (ending policy) */
   outro: number;
@@ -30,7 +34,8 @@ const quoted = (s: string) => s.match(/[«"“']([^»"”']{1,24})[»"”']/)?.[
 export function buildVoiceProject(o: VoiceVideoOptions): VoiceVideoResult {
   const speech = detectSpeech(o.voice.buffer);
   const lines = o.script.split('\n').map((l) => l.trim()).filter(Boolean);
-  const sections = alignScript(lines, speech, o.voice.duration);
+  const pace = o.pace ?? 4;
+  const sections = splitLong(alignScript(lines, speech, o.voice.duration, pace), speech, Math.max(4, pace * 1.8));
   const plan = planShots(sections);
   // leading / trailing silence belong to the first / last section (nothing is cut)
   if (plan.length) { plan[0].start = 0; plan[plan.length - 1].end = o.voice.duration; }
@@ -45,7 +50,7 @@ export function buildVoiceProject(o: VoiceVideoOptions): VoiceVideoResult {
     const start = i === 0 ? 0 : s.start;
     const end = i === plan.length - 1 ? D : Math.min(D, plan[i + 1].start + XF);
     const params: Record<string, string | number> = {
-      shot: s.shot, title: s.text || o.brand, sub: '', items: '', brand: o.brand, accent: o.accent, seed: i,
+      shot: s.shot, title: s.text || o.brand, sub: '', items: '', brand: o.brand, accent: o.accent, accent2: o.accent2 ?? '#18b4ff', seed: i,
     };
     if (s.shot === 'cta') { params.sub = quoted(s.text) ?? (/\d/.test(s.text) ? s.text.match(/\d+/)![0] : o.brand); params.hint = 'Сэтгэгдэл бичих...'; }
     if (s.shot === 'search') params.hint = 'Хайх...';

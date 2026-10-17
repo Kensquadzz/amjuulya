@@ -252,12 +252,14 @@ describe('voice-over drives the video', () => {
       expect(r.project.duration).toBeCloseTo(dur + 0.6, 1);
       expect(r.issues.filter((x) => x.level === 'error')).toEqual([]);
       const shots = r.project.layers.filter((l) => l.type === 'scene3d') as any[];
-      expect(shots.length).toBe(n);
+      expect(shots.length).toBeGreaterThanOrEqual(n); // long phrases may be split into two shots
+      expect(Math.max(...shots.map((l: any) => l.end - l.start))).toBeLessThan(8.5);
       expect(shots[0].start).toBe(0);
       expect(shots[shots.length - 1].end).toBeCloseTo(r.project.duration, 2);
       for (let i = 1; i < shots.length; i++) {
         expect(shots[i].start).toBeLessThanOrEqual(shots[i - 1].end); // no holes
         expect(shots[i].params.shot).not.toBe(shots[i - 1].params.shot); // no back-to-back repeats
+        if (i > 1) expect(shots[i].params.shot).not.toBe(shots[i - 2].params.shot);
       }
       // the part after the old 16 s cutoff is developed with new sections
       if (dur > 16) expect(shots.filter((s) => s.start > 16).length).toBeGreaterThanOrEqual(3);

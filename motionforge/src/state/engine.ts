@@ -5,7 +5,13 @@ import { Player } from '../engine/player';
 import { keyframeAt, upsertKeyframe, removeKeyframe, getPath, setPath, resolveLayer } from '../engine/keyframes';
 import type { KfValue, Layer, PreviewQuality } from '../engine/types';
 import { getStore } from './store';
-import { liveAudio } from '../engine/audio';
+import { getBuffer, liveAudio } from '../engine/audio';
+import type { Project } from '../engine/types';
+
+/** Decode/synthesise every clip ahead of time so the first Play starts on cue. */
+function warmAudio(p: Project) {
+  for (const c of p.audio ?? []) getBuffer(c.assetId).catch(() => {});
+}
 
 export const QUALITY_SCALE: Record<PreviewQuality, number> = { low: 0.34, medium: 0.5, high: 0.75 };
 export const QUALITY_DENSITY: Record<PreviewQuality, number> = { low: 0.4, medium: 0.7, high: 1 };
@@ -25,11 +31,13 @@ class Engine {
     const store = getStore();
     this.player.setProject(store.state.project);
     let last = store.state.project;
+    warmAudio(last);
     const unsubStore = store.subscribe(() => {
       if (store.state.project !== last) {
         const audioChanged = store.state.project.audio !== last.audio;
         last = store.state.project;
         this.player?.setProject(last);
+        if (audioChanged) warmAudio(last);
         if (audioChanged && this.player?.playing) liveAudio.start(last, this.player.time);
       }
     });

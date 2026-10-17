@@ -125,8 +125,40 @@ class LiveAudio {
   private sources: AudioBufferSourceNode[] = [];
   private gen = 0;
 
+  private keepAlive: HTMLAudioElement | null = null;
+
+  get activeSources() { return this.sources.length; }
+  get state() { return this.ctx?.state ?? 'none'; }
+
+  /**
+   * iOS mutes Web Audio while the ring/silent switch is on, unless the page's
+   * audio session is "playback" (what video players use). Safari 17+ exposes
+   * navigator.audioSession; older iOS switches category once an HTML media
+   * element is playing, so a silent looping <audio> is started as a fallback.
+   */
+  private forcePlaybackSession() {
+    const nav = navigator as Navigator & { audioSession?: { type: string } };
+    try { if (nav.audioSession) nav.audioSession.type = 'playback'; } catch { /* unsupported */ }
+    if (!this.keepAlive) {
+      // 0.1 s of silence as a WAV data URI
+      const n = 4410, b = new DataView(new ArrayBuffer(44 + n * 2));
+      const w = (o: number, t: string) => { for (let i = 0; i < t.length; i++) b.setUint8(o + i, t.charCodeAt(i)); };
+      w(0, 'RIFF'); b.setUint32(4, 36 + n * 2, true); w(8, 'WAVE'); w(12, 'fmt '); b.setUint32(16, 16, true); b.setUint16(20, 1, true);
+      b.setUint16(22, 1, true); b.setUint32(24, 44100, true); b.setUint32(28, 88200, true); b.setUint16(32, 2, true); b.setUint16(34, 16, true);
+      w(36, 'data'); b.setUint32(40, n * 2, true);
+      const url = URL.createObjectURL(new Blob([b.buffer], { type: 'audio/wav' }));
+      const a = new Audio(url);
+      a.loop = true;
+      a.setAttribute('playsinline', '');
+      a.preload = 'auto';
+      this.keepAlive = a;
+    }
+    this.keepAlive.play().catch(() => { /* not allowed outside a gesture; retried on next tap */ });
+  }
+
   /** Must run inside a user gesture on iOS (play button tap). */
   unlock() {
+    this.forcePlaybackSession();
     if (!this.ctx) {
       const AC = window.AudioContext || (window as any).webkitAudioContext;
       if (!AC) return;

@@ -5,6 +5,7 @@ import { storage } from './engine/storage';
 import { normalizeProject } from './engine/project';
 import { sampleProject } from './engine/templates';
 import { engine } from './state/engine';
+import { liveAudio } from './engine/audio';
 import './fonts.css';
 import './styles.css';
 
@@ -21,7 +22,7 @@ async function boot() {
   if (!project) project = sampleProject();
   const store = initStore(project);
   // debugging / automated-test hook (read-only access to app internals)
-  (window as any).__motionforge = { store, engine };
+  (window as any).__motionforge = { store, engine, liveAudio };
   storage.requestPersistence();
   createRoot(document.getElementById('root')!).render(<App />);
 }

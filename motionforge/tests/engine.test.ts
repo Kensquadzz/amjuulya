@@ -116,7 +116,7 @@ describe('shaders', () => {
 
 describe('projects', () => {
   it('templates build valid projects', () => {
-    expect(TEMPLATES.length).toBe(44);
+    expect(TEMPLATES.length).toBe(45);
     for (const t of TEMPLATES) {
       const b = t.build();
       expect(b.layers.length, t.id).toBeGreaterThan(0);

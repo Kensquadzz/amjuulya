@@ -18,6 +18,7 @@ import { ensureFont } from './fonts';
 import { hexToVec3 } from './color';
 import { BUILTIN_UNIFORMS, defaultParams, parseShaderParams } from './shaderParams';
 import { TextureStore, type TexParam } from './textures';
+import { ModelHost } from './model3d';
 import type { BlendMode, Layer, Project, ShaderLayer, ShapeLayer } from './types';
 
 const COMPOSITE_FS = `#version 300 es
@@ -88,6 +89,8 @@ export class Renderer {
   private temp: Target | null = null;
   private small: Target | null = null;
   private tex: TextureStore | null = null;
+  /** Three.js host for 3D model layers (created on first use) */
+  private models: ModelHost | null = null;
   private layerTex: WebGLTexture | null = null;
   private quad: { vao: WebGLVertexArrayObject; buf: WebGLBuffer } | null = null;
   private compositeProg: { p: WebGLProgram; u: Record<string, WebGLUniformLocation | null> } | null = null;
@@ -278,6 +281,7 @@ export class Renderer {
       case 'shape': drawShape(env, L); break;
       case 'image': drawImageLayer(env, L); break;
       case 'particles': drawParticles(env, L); break;
+      case 'model3d': (this.models ??= new ModelHost(() => this.onNeedsRedraw?.())).draw(ctx, L, env); break;
       case 'text': {
         ensureFont(cssFont(L, 64), () => this.onNeedsRedraw?.(), L.text || 'A');
         if (textNeedsIsolation(L)) {
@@ -425,6 +429,7 @@ export class Renderer {
 
     // release programs of layers that no longer exist
     const ids = new Set(project.layers.map((l) => l.id));
+    this.models?.sweep(ids);
     for (const [id, e] of this.programs) {
       if (!ids.has(id)) {
         if (e.program) gl.deleteProgram(e.program);
@@ -546,6 +551,7 @@ export class Renderer {
   /** Release the GL context entirely (export renderers). */
   /** Load every picture and build every text/logo field the project's shaders use (exports await this). */
   async prepareTextures(p: Project) {
+    if (p.layers.some((l) => l.type === 'model3d')) await (this.models ??= new ModelHost(() => this.onNeedsRedraw?.())).prepare(p);
     if (!this.tex) return;
     const items: Parameters<TextureStore['prepare']>[0] = [];
     for (const l of p.layers) {
@@ -586,7 +592,12 @@ export class Renderer {
     return null;
   }
 
+  /** What the editor shows about a model layer (load state, animation clips). */
+  modelInfo(l: import('./types').ModelLayer) { return this.models?.info(l) ?? { ready: false, clips: [] }; }
+
   destroy() {
+    this.models?.dispose();
+    this.models = null;
     this.dispose();
     this.gl?.getExtension('WEBGL_lose_context')?.loseContext();
     this.layerCanvas.width = this.layerCanvas.height = 1;

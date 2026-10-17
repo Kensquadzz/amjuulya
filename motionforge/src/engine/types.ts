@@ -42,7 +42,7 @@ export type Tracks = Record<string, Keyframe[]>;
 
 export type BlendMode = 'normal' | 'add' | 'screen' | 'multiply';
 
-export type LayerType = 'text' | 'shape' | 'image' | 'shader' | 'background' | 'particles';
+export type LayerType = 'text' | 'shape' | 'image' | 'shader' | 'background' | 'particles' | 'model3d';
 
 export interface LayerBase {
   id: string;
@@ -219,7 +219,50 @@ export interface ShaderLayer extends LayerBase {
   params: Record<string, ParamValue>;
 }
 
-export type Layer = TextLayer | ShapeLayer | ImageLayer | BackgroundLayer | ParticleLayer | ShaderLayer;
+export type ModelPrimitive = 'phone' | 'can' | 'knot' | 'sphere' | 'cube';
+
+/**
+ * Real 3D model rendered with Three.js (PBR materials, studio environment,
+ * soft contact shadow). The whole frame is the layer; x / y / scale /
+ * rotation / opacity move that frame like any other layer. Camera, light and
+ * model rotation are ordinary numeric properties, so they take keyframes.
+ */
+export interface ModelLayer extends LayerBase {
+  type: 'model3d';
+  /** GLB / self-contained GLTF as a data URL; '' shows `primitive` */
+  src: string;
+  fileName?: string;
+  primitive: ModelPrimitive;
+  /** picture on the phone screen / can label (built-in models) */
+  texture: string;
+  /** replace the model's own materials with color / metalness / roughness */
+  materialOverride: boolean;
+  color: string;
+  metalness: number;
+  roughness: number;
+  /** camera azimuth and elevation around the model (degrees) */
+  orbit: number;
+  elevation: number;
+  /** camera distance in model radii (1 = tight framing) */
+  distance: number;
+  fov: number;
+  /** model rotation (degrees), turntable speed (degrees per second), bobbing */
+  rotY: number;
+  tiltX: number;
+  spin: number;
+  float: number;
+  /** lighting */
+  env: 'studio' | 'soft' | 'night';
+  light: number;
+  lightColor: string;
+  exposure: number;
+  shadow: number;
+  /** animation clip of a GLB (-1 = none) and its playback speed */
+  clip: number;
+  clipSpeed: number;
+}
+
+export type Layer = TextLayer | ShapeLayer | ImageLayer | BackgroundLayer | ParticleLayer | ShaderLayer | ModelLayer;
 
 export interface AudioClip {
   id: string;

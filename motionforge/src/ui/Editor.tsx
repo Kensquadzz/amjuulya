@@ -24,10 +24,12 @@ import { TEXT_ANIM_NAMES, useLang, type StrKey } from './i18n';
 import { layerThumb } from './thumbs';
 import { useThumb } from './TemplatesPanel';
 import type { EasingId, IconId } from '../engine/types';
+import { CameraSheet, LightSheet, MaterialSheet, Model3DAddSheet, ModelSheet } from './Model3DPanels';
 
 type Panel =
   | null | 'templates' | 'audio' | 'effects' | 'stickers' | 'ratio' | 'background' | 'pro'
-  | 'textEdit' | 'font' | 'style' | 'textAnim' | 'position' | 'motion' | 'shadow' | 'color' | 'adjust' | 'all' | 'clip';
+  | 'textEdit' | 'font' | 'style' | 'textAnim' | 'position' | 'motion' | 'shadow' | 'color' | 'adjust' | 'all' | 'clip'
+  | 'add3d' | 'model' | 'camera' | 'light' | 'material';
 
 interface Tool { id: string; icon: string; label: StrKey; run: () => void; danger?: boolean }
 
@@ -48,7 +50,7 @@ export function Editor({ onHome, onExport }: { onHome: () => void; onExport: () 
 
   // close a selection-bound panel when the selection goes away
   useEffect(() => {
-    const needsLayer: Panel[] = ['textEdit', 'font', 'style', 'textAnim', 'position', 'motion', 'shadow', 'color', 'adjust', 'all'];
+    const needsLayer: Panel[] = ['textEdit', 'font', 'style', 'textAnim', 'position', 'motion', 'shadow', 'color', 'adjust', 'all', 'model', 'camera', 'light', 'material'];
     if (!sel && needsLayer.includes(panel)) setPanel(null);
     if (!clip && panel === 'clip') setPanel(null);
   }, [sel, clip, panel]);
@@ -71,6 +73,7 @@ export function Editor({ onHome, onExport }: { onHome: () => void; onExport: () 
     { id: 'image', icon: '🖼', label: 'tImage', run: () => fileRef.current?.click() },
     { id: 'effects', icon: '✦', label: 'tEffects', run: () => setPanel('effects') },
     { id: 'stickers', icon: '◎', label: 'tStickers', run: () => setPanel('stickers') },
+    { id: '3d', icon: '◈', label: 't3D', run: () => setPanel('add3d') },
     { id: 'ratio', icon: '▭', label: 'tRatio', run: () => setPanel('ratio') },
     { id: 'bg', icon: '▤', label: 'tBackground', run: () => setPanel('background') },
     { id: 'pro', icon: '⚙', label: 'tPro', run: () => setPanel('pro') },
@@ -106,6 +109,14 @@ export function Editor({ onHome, onExport }: { onHome: () => void; onExport: () 
       ...common(sel)];
     else if (sel.type === 'shape') tools = [back,
       { id: 'color', icon: '🎨', label: 'cColor', run: () => setPanel('color') },
+      { id: 'anim', icon: '✺', label: 'cAnim', run: () => setPanel('motion') },
+      { id: 'pos', icon: '✥', label: 'cPosition', run: () => setPanel('position') },
+      ...common(sel)];
+    else if (sel.type === 'model3d') tools = [back,
+      { id: 'model', icon: '◈', label: 'cModel', run: () => setPanel('model') },
+      { id: 'camera', icon: '🎥', label: 'cCamera', run: () => setPanel('camera') },
+      { id: 'light', icon: '💡', label: 'cLight', run: () => setPanel('light') },
+      { id: 'material', icon: '🎨', label: 'cMaterial', run: () => setPanel('material') },
       { id: 'anim', icon: '✺', label: 'cAnim', run: () => setPanel('motion') },
       { id: 'pos', icon: '✥', label: 'cPosition', run: () => setPanel('position') },
       ...common(sel)];
@@ -180,6 +191,11 @@ export function Editor({ onHome, onExport }: { onHome: () => void; onExport: () 
       {panel === 'shadow' && sel?.type === 'image' && <ShadowSheet l={sel} onClose={() => setPanel(null)} />}
       {panel === 'color' && sel?.type === 'shape' && <ShapeColorSheet l={sel} onClose={() => setPanel(null)} />}
       {panel === 'adjust' && sel?.type === 'shader' && <ToolSheet title={sel.name} onClose={() => setPanel(null)}><ShaderParamControls l={sel} t={engine.frameTime()} /></ToolSheet>}
+      {panel === 'add3d' && <Model3DAddSheet onClose={() => setPanel(null)} />}
+      {panel === 'model' && sel?.type === 'model3d' && <ModelSheet l={sel} onClose={() => setPanel(null)} />}
+      {panel === 'camera' && sel?.type === 'model3d' && <CameraSheet l={sel} onClose={() => setPanel(null)} />}
+      {panel === 'light' && sel?.type === 'model3d' && <LightSheet l={sel} onClose={() => setPanel(null)} />}
+      {panel === 'material' && sel?.type === 'model3d' && <MaterialSheet l={sel} onClose={() => setPanel(null)} />}
       {panel === 'clip' && clip && <ToolSheet title={clip.name} onClose={() => setPanel(null)}><ClipEditor clip={clip} /></ToolSheet>}
     </div>
   );

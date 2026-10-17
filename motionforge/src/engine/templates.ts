@@ -5,7 +5,7 @@ import { makeBackground, makeParticles, makeShader, makeShape, makeText, newProj
 import type { AspectId, AudioClip, EasingId, Keyframe, KfValue, Layer, Project } from './types';
 import { REEL_TEMPLATES } from './templates-reels';
 import { NEON_TEMPLATES } from './templates-neon';
-import { CINEMATIC_TEMPLATES } from './templates-cinematic';
+import { CINEMATIC_TEMPLATES, MODEL_TEMPLATES } from './templates-cinematic';
 
 export type TemplateCategory =
   | 'Cinematic 3D' | 'Reels'
@@ -32,6 +32,7 @@ const D = 6;
 
 export const TEMPLATES: Template[] = [
   ...CINEMATIC_TEMPLATES,
+  ...MODEL_TEMPLATES,
   ...NEON_TEMPLATES,
   ...REEL_TEMPLATES,
   {

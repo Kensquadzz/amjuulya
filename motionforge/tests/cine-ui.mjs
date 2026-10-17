@@ -24,7 +24,7 @@ await page.waitForTimeout(800);
 await page.locator('.chip', { hasText: 'Cinematic 3D' }).first().tap();
 await page.waitForTimeout(400);
 const cards = await page.locator('.tpl-main b').allInnerTexts();
-check('library lists 12 cinematic films', cards.length === 12, cards.join(' | '));
+check('library lists 12 cinematic films + the Three.js model film', cards.length === 13, cards.join(' | '));
 await page.waitForTimeout(6000);
 await shot('c1-library');
 

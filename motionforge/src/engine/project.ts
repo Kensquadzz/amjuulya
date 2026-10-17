@@ -5,7 +5,7 @@ import { shaderById, BLANK_SHADER } from './shaders/library';
 import { defaultParams } from './shaderParams';
 import { LEGACY_SHADERS, fingerprint } from './shaders/legacy';
 import type {
-  BackgroundLayer, ImageLayer, Layer, LayerBase, LayerType, ParticleLayer, Project, ShaderLayer, ShapeLayer, TextAnim, TextLayer, TextPresetId,
+  BackgroundLayer, ImageLayer, Layer, LayerBase, LayerType, ModelLayer, ParticleLayer, Project, ShaderLayer, ShapeLayer, TextAnim, TextLayer, TextPresetId,
 } from './types';
 
 const base = <T extends LayerType>(type: T, name: string, duration: number): LayerBase & { type: T } => ({
@@ -99,6 +99,19 @@ export function makeShader(duration: number, shaderId: string, patch: Partial<Sh
   };
 }
 
+export function makeModel(duration: number, patch: Partial<ModelLayer> = {}): ModelLayer {
+  return {
+    ...base('model3d', '3D model', duration),
+    src: '', primitive: 'phone', texture: '',
+    materialOverride: false, color: '#c9ced6', metalness: 0.9, roughness: 0.25,
+    orbit: 25, elevation: 12, distance: 0.92, fov: 32,
+    rotY: 0, tiltX: 0, spin: 20, float: 0.5,
+    env: 'studio', light: 1, lightColor: '#fff4e8', exposure: 1, shadow: 0.55,
+    clip: 0, clipSpeed: 1,
+    ...patch,
+  };
+}
+
 export function makeLayer(type: LayerType, duration: number): Layer {
   switch (type) {
     case 'text': return makeText(duration);
@@ -107,6 +120,7 @@ export function makeLayer(type: LayerType, duration: number): Layer {
     case 'background': return makeBackground(duration);
     case 'particles': return makeParticles(duration);
     case 'shader': return makeShader(duration, 'custom');
+    case 'model3d': return makeModel(duration);
   }
 }
 

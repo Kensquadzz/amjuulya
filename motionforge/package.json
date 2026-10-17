@@ -10,7 +10,7 @@
     "preview": "vite preview --host",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:e2e": "node tests/e2e.mjs && node tests/app.mjs test-results && node tests/cap.mjs && node tests/cine-ui.mjs",
+    "test:e2e": "node tests/e2e.mjs && node tests/app.mjs test-results && node tests/cap.mjs && node tests/cine-ui.mjs && node tests/three-ui.mjs && node tests/model.mjs",
     "icons": "node tests/icons.mjs",
     "fonts": "node scripts/build-fonts.mjs",
     "assets": "node scripts/copy-ort.mjs"
@@ -40,11 +40,13 @@
     "mediabunny": "^1.61.5",
     "onnxruntime-web": "^1.30.0",
     "react": "^19.3.1",
-    "react-dom": "^19.3.1"
+    "react-dom": "^19.3.1",
+    "three": "^0.181.0"
   },
   "devDependencies": {
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
+    "@types/three": "^0.181.0",
     "@vitejs/plugin-react": "^6.1.2",
     "playwright-core": "^1.64.1",
     "typescript": "^7.0.2",

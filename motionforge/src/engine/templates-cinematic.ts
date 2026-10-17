@@ -4,9 +4,9 @@
 // design and an ending. Timings are fractions of the duration, so every
 // template can be built at 10, 15 or 20 seconds (or any length).
 import { uid } from './util';
-import { makeShader, makeText } from './project';
+import { makeBackground, makeModel, makeShader, makeText } from './project';
 import { sfxById } from './sfx';
-import type { AudioClip, Layer, ShaderLayer, TextLayer } from './types';
+import type { AudioClip, Keyframe, Layer, ModelLayer, ShaderLayer, TextLayer } from './types';
 import type { Template } from './templates';
 
 type Built = ReturnType<Template['build']>;
@@ -309,4 +309,41 @@ export const CINEMATIC_TEMPLATES: Template[] = [
   cine('cine-watch', 'Premium Watch Commercial', ['#030406', '#0d2a4a'], watch, 15),
   cine('cine-devices', 'Floating Device Showcase', ['#e9e6ef', '#6b3dff'], devices, 14),
   cine('cine-event', 'Futuristic Event Promo', ['#04020a', '#ff2bd6'], eventPromo, 15),
+];
+
+// ================================================================ Three.js model showcase
+/** Turntable film for the user's own GLB (ships with a built-in phone). */
+function modelShowcase(d: number): Built {
+  const at = (f: number) => f * d;
+  const kf = (f: number, v: number, ease: Keyframe['ease'] = 'easeInOutCubic'): Keyframe => ({ id: uid(), t: +(f * d).toFixed(3), v, ease });
+  const model: ModelLayer = makeModel(d, {
+    name: 'Your 3D model', primitive: 'phone', spin: 0, float: 0.6, env: 'studio', shadow: 0.6,
+    tracks: {
+      orbit: [kf(0, -80), kf(0.62, 20), kf(1, 40, 'linear')],
+      distance: [kf(0, 1.8, 'easeOutCubic'), kf(0.4, 0.95), kf(0.85, 0.9, 'linear'), kf(1, 1.0)],
+      elevation: [kf(0, 30), kf(0.6, 8), kf(1, 12, 'linear')],
+      rotY: [kf(0.62, 0), kf(0.82, 360)],
+    },
+  });
+  const layers: Layer[] = [
+    makeBackground(d, { name: 'Studio backdrop', mode: 'radial', colorA: '#2a2f3d', colorB: '#08090c' }),
+    model,
+    kicker(d, 0.05, 0.3, 'Introducing', { y: 0.1 }),
+    T(d, 0.3, 0.58, 'Built in three dimensions', { y: 0.1, fontSize: 48, fontWeight: 700, anim: { preset: 'fadeRise', unit: 'word', stagger: 0.1 } as any }),
+    T(d, 0.84, 1, 'Your Product', { y: 0.1, fontSize: 84, fontWeight: 800, anim: { preset: 'blurReveal', unit: 'all', out: { enabled: false } } as any }),
+    T(d, 0.88, 1, 'Available now', { y: 0.9, fontSize: 34, fontWeight: 500, letterSpacing: 0.14, uppercase: true, color: '#cfd6e6', anim: { preset: 'spacing', unit: 'all', out: { enabled: false } } as any }),
+    makeShader(d, 'bloom', { name: 'Glow', params: { u_threshold: 0.7, u_radius: 16, u_intensity: 0.35, u_tint: '#ffffff' } as any }),
+  ];
+  const audio = [
+    bed('padBright', d, 0.45),
+    sfx('whoosh', 0.1, { volume: 0.5 }),
+    sfx('rec-slide-whoosh', at(0.6), { volume: 0.5 }),
+    sfx('rec-blade-whoosh', at(0.62), { volume: 0.5 }),
+    sfx('softHit', at(0.84), { volume: 0.6 }),
+  ];
+  return { background: '#08090c', duration: d, layers, audio };
+}
+
+export const MODEL_TEMPLATES: Template[] = [
+  { id: 'three-model', name: 'Your 3D Model (Three.js)', categories: ['Cinematic 3D'], swatch: ['#08090c', '#cfd6e6'], durations: [10, 12, 15, 20], defaultDuration: 12, build: (o) => modelShowcase(o?.duration ?? 12) },
 ];

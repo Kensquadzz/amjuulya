@@ -42,6 +42,12 @@ const MN = {
   kfNone: 'Энэ мөчид keyframe алга. ◆ дарж нэмнэ.', kfSteps: '1) Playhead-ээ зөөнө 2) утгаа өөрчилнө 3) ◆ дарна — бусад мөчид дахин хийхэд хөдөлгөөн үүснэ.',
   eLinear: 'Шулуун', eIn: 'Удаан эхлэх', eOut: 'Удаан дуусах', eInOut: 'Зөөлөн', eBack: 'Хэтрэлттэй', eHold: 'Үсрэх (hold)',
   fit: 'Дэлгэцэнд тааруулах',
+  t3D: '3D', m3dTitle: '3D модель', m3dUpload: 'GLB / GLTF файл оруулах…', m3dSamples: 'Бэлэн 3D загвар', m3dHint: 'Өөрийн 3D файлаа (GLB эсвэл бүх зүйлээ агуулсан GLTF) оруулна уу. Draco шахалттай файл дэмжигдэхгүй.',
+  m3dPhone: 'Утас', m3dCan: 'Лааз', m3dKnot: 'Хром зангилаа', m3dSphere: 'Сувдан бөмбөлөг', m3dCube: 'Шоо',
+  cModel: 'Модель', cCamera: 'Камер', cLight: 'Гэрэл', cMaterial: 'Материал',
+  camPresets: 'Камерын хөдөлгөөн', pTurntable: 'Эргэлдэх тавцан', pOrbit: 'Тойрч илрүүлэх', pPush: 'Ойртох', pHero: 'Баатарлаг налуу', pStatic: 'Хөдөлгөөнгүй',
+  m3dScreen: 'Дэлгэц / шошгоны зураг', m3dClip: 'Моделийн анимэйшн', m3dNoClip: 'Анимэйшн байхгүй', m3dOverride: 'Өөрийн материал ашиглах', m3dEnv: 'Орчин',
+  envStudio: 'Студи', envSoft: 'Зөөлөн', envNight: 'Шөнийн неон', m3dTooBig: 'Файл хэт том байна (30 MB хүртэл).',
   posHint: '☝ Preview дээр хуруугаар чирж зөөнө, хоёр хуруугаар томруулж эргүүлнэ. ◆ товч тухайн мөчид keyframe тавина.',
 };
 
@@ -80,6 +86,12 @@ const EN: typeof MN = {
   kfNone: 'No keyframe at the playhead. Tap ◆ to add one.', kfSteps: '1) Move the playhead 2) change a value 3) tap ◆ — repeat at another time to animate.',
   eLinear: 'Linear', eIn: 'Ease in', eOut: 'Ease out', eInOut: 'Ease in-out', eBack: 'Overshoot', eHold: 'Hold',
   fit: 'Fit to screen',
+  t3D: '3D', m3dTitle: '3D model', m3dUpload: 'Upload GLB / GLTF…', m3dSamples: 'Ready-made 3D models', m3dHint: 'Bring your own 3D file (GLB, or a self-contained GLTF). Draco-compressed files are not supported.',
+  m3dPhone: 'Phone', m3dCan: 'Can', m3dKnot: 'Chrome knot', m3dSphere: 'Pearl', m3dCube: 'Cube',
+  cModel: 'Model', cCamera: 'Camera', cLight: 'Light', cMaterial: 'Material',
+  camPresets: 'Camera moves', pTurntable: 'Turntable', pOrbit: 'Orbit reveal', pPush: 'Push in', pHero: 'Hero tilt', pStatic: 'Still',
+  m3dScreen: 'Screen / label picture', m3dClip: 'Model animation', m3dNoClip: 'No animation', m3dOverride: 'Use my own material', m3dEnv: 'Environment',
+  envStudio: 'Studio', envSoft: 'Soft', envNight: 'Night neon', m3dTooBig: 'File is too large (up to 30 MB).',
   posHint: '☝ Drag on the preview to move, pinch with two fingers to scale and rotate. ◆ sets a keyframe at the playhead.',
 };
 

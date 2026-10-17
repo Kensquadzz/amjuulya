@@ -11,6 +11,22 @@ const COMMON: PropDef[] = [
   { path: 'opacity', label: 'Opacity', kind: 'num', min: 0, max: 1, step: 0.01 },
 ];
 
+/** Keyframable 3D camera / model / light properties (shared with the simple editor). */
+export const MODEL_PROPS: PropDef[] = [
+  { path: 'orbit', label: 'Camera orbit', kind: 'num', min: -360, max: 360, step: 0.5 },
+  { path: 'elevation', label: 'Camera height', kind: 'num', min: -80, max: 80, step: 0.5 },
+  { path: 'distance', label: 'Camera distance', kind: 'num', min: 0.4, max: 6, step: 0.01 },
+  { path: 'fov', label: 'Lens (field of view)', kind: 'num', min: 10, max: 90, step: 0.5 },
+  { path: 'rotY', label: 'Model turn', kind: 'num', min: -720, max: 720, step: 0.5 },
+  { path: 'tiltX', label: 'Model tilt', kind: 'num', min: -90, max: 90, step: 0.5 },
+  { path: 'spin', label: 'Turntable speed (°/s)', kind: 'num', min: -180, max: 180, step: 1 },
+  { path: 'float', label: 'Float', kind: 'num', min: 0, max: 3, step: 0.01 },
+  { path: 'light', label: 'Light', kind: 'num', min: 0, max: 3, step: 0.01 },
+  { path: 'exposure', label: 'Exposure', kind: 'num', min: 0.2, max: 3, step: 0.01 },
+  { path: 'shadow', label: 'Shadow', kind: 'num', min: 0, max: 1, step: 0.01 },
+  { path: 'lightColor', label: 'Light colour', kind: 'color' },
+];
+
 export function animatableProps(l: Layer): PropDef[] {
   switch (l.type) {
     case 'text':
@@ -53,6 +69,8 @@ export function animatableProps(l: Layer): PropDef[] {
         { path: 'y', label: 'Center Y', kind: 'num', min: 0, max: 1, step: 0.001 },
         { path: 'scale', label: 'Radius', kind: 'num', min: 0.05, max: 4, step: 0.01 },
       ];
+    case 'model3d':
+      return [...COMMON, ...MODEL_PROPS];
     case 'particles':
       return [
         { path: 'opacity', label: 'Opacity', kind: 'num', min: 0, max: 1, step: 0.01 },
@@ -83,4 +101,4 @@ export function propLabel(l: Layer, path: string) {
   return animatableProps(l).find((p) => p.path === path)?.label ?? path;
 }
 
-export const LAYER_ICON: Record<Layer['type'], string> = { text: 'T', shape: '◻', image: '▣', shader: '✦', background: '▤', particles: '∴' };
+export const LAYER_ICON: Record<Layer['type'], string> = { text: 'T', shape: '◻', image: '▣', shader: '✦', background: '▤', particles: '∴', model3d: '◈' };

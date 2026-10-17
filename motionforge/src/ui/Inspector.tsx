@@ -11,6 +11,7 @@ import { autoRemoveBg, cutOutLayer, restoreOriginal, setAutoRemoveBg, setLayerIm
 import { useState } from 'react';
 import { ColorProp, NumProp, Section, SelectProp, ToggleProp, KfButton, toast } from './controls';
 import { loadImageFile } from './images';
+import { MODEL_PROPS } from './props';
 
 const EASE_OPTS = (Object.keys(EASING_LABELS) as EasingId[]).map((id) => ({ value: id, label: EASING_LABELS[id] }));
 const BLEND_OPTS = [
@@ -27,6 +28,14 @@ export function Inspector({ onOpenCode }: { onOpenCode: () => void }) {
       <LayerHeader layer={layer} />
       {layer.type === 'text' && <TextProps l={layer} t={t} />}
       {layer.type === 'shader' && <ShaderProps l={layer} t={t} onOpenCode={onOpenCode} />}
+      {layer.type === 'model3d' && (
+        <Section title={`3D model · ${layer.src ? layer.fileName ?? 'GLB' : layer.primitive}`}>
+          {MODEL_PROPS.map((p) => p.kind === 'color'
+            ? <ColorProp key={p.path} layer={layer} path={p.path} label={p.label} t={t} />
+            : <NumProp key={p.path} layer={layer} path={p.path} label={p.label} min={p.min!} max={p.max!} step={p.step!} t={t} />)}
+          <SelectProp layer={layer} path="env" label="Environment" t={t} options={[{ value: 'studio', label: 'Studio' }, { value: 'soft', label: 'Soft' }, { value: 'night', label: 'Night neon' }]} />
+        </Section>
+      )}
       {layer.type === 'shape' && (
         <Section title="Shape">
           <SelectProp layer={layer} path="shape" label="Kind" t={t} options={['rect', 'circle', 'ring', 'line', 'triangle', 'cross', 'swoosh', 'barcode', 'glassTile', 'search'].map((v) => ({ value: v, label: v }))} />

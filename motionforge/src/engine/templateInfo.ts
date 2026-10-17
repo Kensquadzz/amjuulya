@@ -1,6 +1,7 @@
 // Short descriptions and the most representative moment ("hero time") of each
 // template, used for gallery thumbnails and the preview sheet.
 export const TEMPLATE_INFO: Record<string, { desc: string; at?: number; scenes?: number }> = {
+  'three-model': { desc: 'A real 3D model rendered with Three.js: studio light, contact shadow, an orbit reveal and a full turn. Swap in your own GLB / GLTF (product, logo, device) under Model; camera, light and material are editable.', at: 9.5 },
   'cine-liquid-glass': { desc: 'Refractive glass drops flow and merge in a colour field, then pour into your brand mark in solid glass. Thick-glass refraction with dispersion. Edit the brand, palette, glass tint and camera.', at: 11.5 },
   'cine-product-orbit': { desc: 'Studio turntable for a product can: macro on the rim, a full camera orbit with a glossy floor, three feature call-outs and a hero end card. Wrap your own label artwork around it.', at: 5.5 },
   'cine-chrome-logo': { desc: 'Your logo (text or picture) as bevelled chrome rising from smoke; a light streak races across it and the final frame lands with a glint.', at: 9.0 },

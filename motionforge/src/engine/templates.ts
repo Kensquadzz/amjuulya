@@ -264,7 +264,7 @@ export function sampleProject(aspect: AspectId = '9:16'): Project {
       tracks: { 'params.u_intensity': [kf(0, 0, 'easeOutCubic'), kf(1.5, 1.2)], 'params.u_lightX': [kf(0, 0.3), kf(4, 0.7), kf(8, 0.3)] },
     }),
     makeText(d, {
-      name: 'Title', text: 'MOTIONFORGE', fontFamily: 'Space Grotesk', fontWeight: 700, fontSize: 118, letterSpacing: 0.04, color: '#ffffff', glow: 24, glowColor: '#ff2238', y: 0.42,
+      name: 'Title', text: 'MOTIONFORGE', fontFamily: 'Space Grotesk', fontWeight: 700, fontSize: 96, letterSpacing: 0.04, color: '#ffffff', glow: 24, glowColor: '#ff2238', y: 0.42,
       end: 4.2, anim: { preset: 'spacing', delay: 0.3, intensity: 1, out: { enabled: true, duration: 0.5, stagger: 0.015 } } as any,
     }),
     makeText(d, {

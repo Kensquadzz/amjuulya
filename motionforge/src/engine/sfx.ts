@@ -3,7 +3,7 @@
 // licensing), deterministic for a given (preset, seed), and regenerated on
 // load — so projects stay small and never reference external files.
 
-export type SfxCategory = 'Transitions' | 'Hits' | 'UI' | 'Risers' | 'Magic' | 'Ambience';
+export type SfxCategory = 'Transitions' | 'Hits' | 'UI' | 'Risers' | 'Magic' | 'Ambience' | 'Music';
 
 export interface SfxPreset {
   id: string;
@@ -191,6 +191,84 @@ function pad(ctx: OfflineAudioContext, out: AudioNode, rnd: () => number, d: num
   sub.connect(sg).connect(master);
 }
 
+function kick(ctx: OfflineAudioContext, out: AudioNode, t: number, level = 1) {
+  const o = tone(ctx, 'sine', 150, t, 0.5);
+  o.frequency.exponentialRampToValueAtTime(42, t + 0.12);
+  const g = ctx.createGain();
+  env(g.gain, t, 0.002, level, 0.42);
+  o.connect(g).connect(out);
+}
+
+function snare(ctx: OfflineAudioContext, out: AudioNode, rnd: () => number, t: number, level = 0.6) {
+  const n = noise(ctx, 0.3, rnd);
+  const bp = ctx.createBiquadFilter();
+  bp.type = 'bandpass';
+  bp.frequency.value = 1900;
+  bp.Q.value = 0.7;
+  const g = ctx.createGain();
+  env(g.gain, t, 0.001, level, 0.2);
+  n.connect(bp).connect(g).connect(out);
+  n.start(t);
+  const o = tone(ctx, 'triangle', 190, t, 0.15);
+  const og = ctx.createGain();
+  env(og.gain, t, 0.001, level * 0.5, 0.1);
+  o.connect(og).connect(out);
+}
+
+function hat(ctx: OfflineAudioContext, out: AudioNode, rnd: () => number, t: number, level = 0.25, open = false) {
+  const n = noise(ctx, 0.25, rnd);
+  const hp = ctx.createBiquadFilter();
+  hp.type = 'highpass';
+  hp.frequency.value = 7500;
+  const g = ctx.createGain();
+  env(g.gain, t, 0.001, level, open ? 0.2 : 0.045);
+  n.connect(hp).connect(g).connect(out);
+  n.start(t);
+}
+
+function beat(ctx: OfflineAudioContext, out: AudioNode, rnd: () => number, bpm: number, bars: number, style: 'lofi' | 'drive') {
+  const beatLen = 60 / bpm;
+  const room = withReverb(ctx, out, rnd, 0.18, 1.2);
+  const bassNotes = style === 'lofi' ? [55, 55, 49, 41.2] : [55, 65.4, 49, 58.3];
+  for (let bar = 0; bar < bars; bar++) {
+    const t0 = bar * beatLen * 4;
+    for (let b = 0; b < 4; b++) {
+      const t = t0 + b * beatLen;
+      if (b === 0 || b === 2 || (style === 'drive')) kick(ctx, room, t, style === 'drive' ? 0.9 : 1);
+      if (b === 1 || b === 3) snare(ctx, room, rnd, t, style === 'lofi' ? 0.45 : 0.6);
+      hat(ctx, room, rnd, t + beatLen / 2, 0.18, style === 'drive' && b === 3);
+      hat(ctx, room, rnd, t, 0.1);
+    }
+    // bass
+    const f = bassNotes[bar % bassNotes.length];
+    const o = tone(ctx, style === 'lofi' ? 'triangle' : 'sawtooth', f, t0, beatLen * 4);
+    const lp = ctx.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.value = style === 'lofi' ? 400 : 700;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.linearRampToValueAtTime(0.22, t0 + 0.02);
+    g.gain.setValueAtTime(0.22, t0 + beatLen * 4 - 0.05);
+    g.gain.linearRampToValueAtTime(0.0001, t0 + beatLen * 4);
+    o.connect(lp).connect(g).connect(room);
+  }
+}
+
+function sweep(ctx: OfflineAudioContext, out: AudioNode, rnd: () => number, d: number, f0: number, f1: number, level = 1) {
+  const n = noise(ctx, d, rnd);
+  const bp = ctx.createBiquadFilter();
+  bp.type = 'bandpass';
+  bp.Q.value = 2.5;
+  bp.frequency.setValueAtTime(f0, 0);
+  bp.frequency.exponentialRampToValueAtTime(f1, d);
+  const g = ctx.createGain();
+  g.gain.setValueAtTime(0.0001, 0);
+  g.gain.exponentialRampToValueAtTime(level, d * (f1 > f0 ? 0.95 : 0.1));
+  g.gain.exponentialRampToValueAtTime(0.0001, d);
+  n.connect(bp).connect(g).connect(out);
+  n.start(0);
+}
+
 export const SFX: SfxPreset[] = [
   { id: 'whoosh', label: 'Whoosh', category: 'Transitions', duration: 0.9, build: (c, o, r) => whoosh(c, o, r, 0.9) },
   { id: 'whooshFast', label: 'Fast whoosh', category: 'Transitions', duration: 0.45, build: (c, o, r) => whoosh(c, o, r, 0.45, 400, 5200) },
@@ -311,8 +389,76 @@ export const SFX: SfxPreset[] = [
       }
     },
   },
+  // ---- more transitions
+  { id: 'swoosh', label: 'Swoosh (airy)', category: 'Transitions', duration: 0.6, build: (c, o, r) => whoosh(c, o, r, 0.6, 600, 4200) },
+  { id: 'swish', label: 'Swish (very fast)', category: 'Transitions', duration: 0.2, build: (c, o, r) => whoosh(c, o, r, 0.2, 1500, 9000, false) },
+  {
+    id: 'zoomIn', label: 'Zoom in', category: 'Transitions', duration: 0.9,
+    build: (c, o, r) => { sweep(c, o, r, 0.85, 300, 6000, 1.2); const t = tone(c, 'sine', 180, 0, 0.85); t.frequency.exponentialRampToValueAtTime(900, 0.85); const g = c.createGain(); g.gain.setValueAtTime(0.0001, 0); g.gain.exponentialRampToValueAtTime(0.25, 0.8); g.gain.exponentialRampToValueAtTime(0.0001, 0.88); t.connect(g).connect(o); },
+  },
+  {
+    id: 'zoomOut', label: 'Zoom out', category: 'Transitions', duration: 0.9,
+    build: (c, o, r) => { sweep(c, o, r, 0.85, 6000, 250, 1.2); const t = tone(c, 'sine', 900, 0, 0.85); t.frequency.exponentialRampToValueAtTime(160, 0.85); const g = c.createGain(); env(g.gain, 0, 0.01, 0.25, 0.8); t.connect(g).connect(o); },
+  },
+  {
+    id: 'spinWhoosh', label: 'Spin whoosh', category: 'Transitions', duration: 1.0,
+    build: (c, o, r) => {
+      const n = noise(c, 1, r, true);
+      const bp = c.createBiquadFilter(); bp.type = 'bandpass'; bp.Q.value = 1.4; bp.frequency.setValueAtTime(500, 0); bp.frequency.exponentialRampToValueAtTime(3000, 0.6); bp.frequency.exponentialRampToValueAtTime(700, 1);
+      const trem = tone(c, 'sine', 9, 0, 1); trem.frequency.linearRampToValueAtTime(22, 1);
+      const tg = c.createGain(); tg.gain.value = 0.5;
+      const g = c.createGain(); g.gain.setValueAtTime(0.0001, 0); g.gain.linearRampToValueAtTime(0.9, 0.5); g.gain.exponentialRampToValueAtTime(0.0001, 1);
+      trem.connect(tg).connect(g.gain);
+      n.connect(bp).connect(g).connect(o); n.start(0);
+    },
+  },
+  { id: 'whooshHit', label: 'Whoosh → hit', category: 'Transitions', duration: 2.2, build: (c, o, r) => { whoosh(c, o, r, 0.7, 250, 4000); hit(c, o, r, 0.62, 140, 40, 1.4, 0.9, 1500); } },
+  { id: 'glitchSwipe', label: 'Glitch swipe', category: 'Transitions', duration: 0.7, build: (c, o, r) => { whoosh(c, o, r, 0.45, 800, 6000, false); let t = 0.05; while (t < 0.6) { const len = 0.015 + r() * 0.03; const q = tone(c, 'square', 200 + r() * 2400, t, len); const g = c.createGain(); g.gain.setValueAtTime(0.12, t); g.gain.setValueAtTime(0, t + len); q.connect(g).connect(o); t += len + r() * 0.04; } } },
+  {
+    id: 'tapeStop', label: 'Tape stop', category: 'Transitions', duration: 1.1,
+    build: (c, o) => { for (const f of [220, 277.2, 329.6]) { const t = tone(c, 'sawtooth', f, 0, 1.05); t.frequency.exponentialRampToValueAtTime(f * 0.12, 1.0); const lp = c.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.setValueAtTime(3000, 0); lp.frequency.exponentialRampToValueAtTime(200, 1); const g = c.createGain(); g.gain.setValueAtTime(0.12, 0); g.gain.exponentialRampToValueAtTime(0.0001, 1.05); t.connect(lp).connect(g).connect(o); } },
+  },
+  { id: 'shutter', label: 'Camera shutter', category: 'Transitions', duration: 0.3, build: (c, o, r) => { click(c, o, r, 0.005, 0.9); click(c, o, r, 0.09, 0.7); const n = noise(c, 0.12, r); const hp = c.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 3000; const g = c.createGain(); env(g.gain, 0.01, 0.002, 0.25, 0.08); n.connect(hp).connect(g).connect(o); n.start(0.01); } },
+  // ---- more hits
+  { id: 'punch', label: 'Punch', category: 'Hits', duration: 0.6, build: (c, o, r) => { kick(c, o, 0.005, 1); const n = noise(c, 0.1, r); const lp = c.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 2500; const g = c.createGain(); env(g.gain, 0.005, 0.001, 0.5, 0.07); n.connect(lp).connect(g).connect(o); n.start(0.005); } },
+  { id: 'cinematicBoom', label: 'Cinematic boom', category: 'Hits', duration: 4, build: (c, o, r) => { const room = withReverb(c, o, r, 0.6, 3.5); hit(c, room, r, 0.01, 90, 30, 3.2, 1, 900); } },
+  {
+    id: 'bassDrop', label: 'Bass drop (808)', category: 'Hits', duration: 2.2,
+    build: (c, o) => { const t = tone(c, 'sine', 110, 0.01, 2.1); t.frequency.exponentialRampToValueAtTime(36, 1.6); const g = c.createGain(); env(g.gain, 0.01, 0.005, 1, 2.0); const ws = c.createWaveShaper(); const cv = new Float32Array(512); for (let i = 0; i < 512; i++) { const x = (i / 511) * 2 - 1; cv[i] = Math.tanh(x * 3); } ws.curve = cv; t.connect(ws).connect(g).connect(o); },
+  },
+  { id: 'clap', label: 'Clap', category: 'Hits', duration: 0.5, build: (c, o, r) => { for (const dt of [0, 0.012, 0.024]) snare(c, o, r, 0.005 + dt, 0.5); } },
+  { id: 'heartbeat', label: 'Heartbeat', category: 'Hits', duration: 1.2, build: (c, o) => { kick(c, o, 0.01, 0.9); kick(c, o, 0.24, 0.6); } },
+  // ---- more UI
+  { id: 'tap', label: 'Tap', category: 'UI', duration: 0.1, build: (c, o) => { const t = tone(c, 'sine', 900, 0.002, 0.08); t.frequency.exponentialRampToValueAtTime(500, 0.05); const g = c.createGain(); env(g.gain, 0.002, 0.001, 0.6, 0.06); t.connect(g).connect(o); } },
+  { id: 'toggle', label: 'Toggle switch', category: 'UI', duration: 0.2, build: (c, o, r) => { click(c, o, r, 0.002, 0.6); const t = tone(c, 'sine', 1600, 0.02, 0.1); const g = c.createGain(); env(g.gain, 0.02, 0.002, 0.3, 0.07); t.connect(g).connect(o); } },
+  { id: 'bubble', label: 'Bubble pop', category: 'UI', duration: 0.3, build: (c, o) => { const t = tone(c, 'sine', 300, 0.005, 0.25); t.frequency.exponentialRampToValueAtTime(1400, 0.09); const g = c.createGain(); env(g.gain, 0.005, 0.01, 0.7, 0.15); t.connect(g).connect(o); } },
+  { id: 'success', label: 'Success chime', category: 'UI', duration: 1.4, build: (c, o, r) => { const room = withReverb(c, o, r, 0.4, 1.5); [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => bell(c, room, 0.02 + i * 0.09, f, 0.9, 0.22)); } },
+  { id: 'error', label: 'Error buzz', category: 'UI', duration: 0.6, build: (c, o) => { for (const t0 of [0.01, 0.22]) { const t = tone(c, 'square', 160, t0, 0.16); const lp = c.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 1200; const g = c.createGain(); g.gain.setValueAtTime(0.15, t0); g.gain.setValueAtTime(0, t0 + 0.15); t.connect(lp).connect(g).connect(o); } } },
+  { id: 'scroll', label: 'Scroll ticks', category: 'UI', duration: 1.0, build: (c, o, r) => { for (let i = 0; i < 12; i++) click(c, o, r, 0.01 + i * 0.07 * (1 + i * 0.03), 0.3); } },
+  { id: 'clockTick', label: 'Clock tick (4s)', category: 'UI', duration: 4.1, build: (c, o, r) => { for (let i = 0; i < 8; i++) { const t = tone(c, 'sine', i % 2 ? 1500 : 1200, i * 0.5 + 0.01, 0.05); const g = c.createGain(); env(g.gain, i * 0.5 + 0.01, 0.001, 0.4, 0.04); t.connect(g).connect(o); click(c, o, r, i * 0.5 + 0.01, 0.2); } } },
+  { id: 'notify', label: 'Marimba notification', category: 'UI', duration: 1.0, build: (c, o) => { [880, 1318.5].forEach((f, i) => { const t = tone(c, 'sine', f, 0.01 + i * 0.11, 0.5); const g = c.createGain(); env(g.gain, 0.01 + i * 0.11, 0.002, 0.4, 0.45); t.connect(g).connect(o); const t2 = tone(c, 'sine', f * 4, 0.01 + i * 0.11, 0.1); const g2 = c.createGain(); env(g2.gain, 0.01 + i * 0.11, 0.001, 0.12, 0.06); t2.connect(g2).connect(o); }); } },
+  // ---- more risers
+  { id: 'downlifter', label: 'Downlifter', category: 'Risers', duration: 2.0, build: (c, o, r) => { sweep(c, o, r, 2, 7000, 150, 1.4); const t = tone(c, 'sawtooth', 660, 0, 2); t.frequency.exponentialRampToValueAtTime(80, 2); const lp = c.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.setValueAtTime(5000, 0); lp.frequency.exponentialRampToValueAtTime(200, 2); const g = c.createGain(); env(g.gain, 0, 0.02, 0.2, 1.95); t.connect(lp).connect(g).connect(o); } },
+  {
+    id: 'tensionRiser', label: 'Tension riser (5s)', category: 'Risers', duration: 5.1,
+    build: (c, o, r) => {
+      const d = 5;
+      sweep(c, o, r, d, 200, 8000, 0.9);
+      for (const f of [110, 116.5]) { const t = tone(c, 'sawtooth', f, 0, d); t.frequency.exponentialRampToValueAtTime(f * 4, d); const lp = c.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.setValueAtTime(300, 0); lp.frequency.exponentialRampToValueAtTime(5000, d); const g = c.createGain(); g.gain.setValueAtTime(0.0001, 0); g.gain.exponentialRampToValueAtTime(0.14, d); g.gain.setValueAtTime(0.0001, d + 0.01); t.connect(lp).connect(g).connect(o); }
+    },
+  },
+  { id: 'sweepUp', label: 'Filter sweep up', category: 'Risers', duration: 1.5, build: (c, o, r) => sweep(c, o, r, 1.5, 200, 9000, 1.3) },
+  // ---- more magic
+  { id: 'chime', label: 'Chime arpeggio', category: 'Magic', duration: 2.4, build: (c, o, r) => { const room = withReverb(c, o, r, 0.55, 2.4); [1046.5, 1318.5, 1568, 2093, 2637].forEach((f, i) => bell(c, room, 0.02 + i * 0.08, f, 1.6, 0.14)); } },
+  { id: 'twinkle', label: 'Twinkle', category: 'Magic', duration: 1.2, build: (c, o, r) => { const room = withReverb(c, o, r, 0.5, 1.2); for (let i = 0; i < 6; i++) bell(c, room, 0.02 + i * 0.12, 2637 + (i % 2) * 500, 0.4, 0.1); } },
+  { id: 'magicWand', label: 'Magic wand', category: 'Magic', duration: 2.0, build: (c, o, r) => { sweep(c, o, r, 0.6, 1000, 9000, 0.8); const room = withReverb(c, o, r, 0.6, 1.8); for (let i = 0; i < 10; i++) bell(c, room, 0.3 + r() * 0.8, 2000 + r() * 3000, 0.6, 0.08); } },
+  { id: 'shine', label: 'Shine (ding)', category: 'Magic', duration: 1.8, build: (c, o, r) => { const room = withReverb(c, o, r, 0.5, 1.8); bell(c, room, 0.01, 2349.3, 1.6, 0.3); bell(c, room, 0.01, 3520, 1.2, 0.12); } },
   { id: 'padDark', label: 'Ambient pad — dark (12s)', category: 'Ambience', duration: 12, build: (c, o, r) => pad(c, o, r, 12, [110, 164.81, 196, 246.94, 261.63], 900) },
   { id: 'padBright', label: 'Ambient pad — bright (12s)', category: 'Ambience', duration: 12, build: (c, o, r) => pad(c, o, r, 12, [130.81, 196, 246.94, 293.66, 329.63], 1900) },
+  { id: 'padWarm', label: 'Ambient pad — warm (12s)', category: 'Ambience', duration: 12, build: (c, o, r) => pad(c, o, r, 12, [87.31, 130.81, 174.61, 220, 261.63], 1200) },
+  { id: 'droneDeep', label: 'Deep drone (12s)', category: 'Ambience', duration: 12, build: (c, o, r) => pad(c, o, r, 12, [55, 82.41, 110], 500) },
+  { id: 'beatLofi', label: 'Lo-fi beat 85 BPM (11s)', category: 'Music', duration: 11.3, build: (c, o, r) => beat(c, o, r, 85, 4, 'lofi') },
+  { id: 'beatDrive', label: 'Driving beat 120 BPM (8s)', category: 'Music', duration: 8.0, build: (c, o, r) => beat(c, o, r, 120, 4, 'drive') },
 ];
 
 export const sfxById = (id: string) => SFX.find((s) => s.id === id);
@@ -332,7 +478,7 @@ export async function renderSfx(id: string, seed = 1): Promise<AudioBuffer> {
   p.build(ctx, master, prng(seed * 7919 + id.length));
   const buf = await ctx.startRendering();
   // peak-normalise so every effect sits at a consistent level in the mix
-  const target = p.category === 'Ambience' ? 0.45 : p.category === 'UI' ? 0.6 : 0.8;
+  const target = p.category === 'Ambience' ? 0.45 : p.category === 'Music' ? 0.7 : p.category === 'UI' ? 0.6 : 0.8;
   let peak = 0;
   for (let c = 0; c < buf.numberOfChannels; c++) { const d = buf.getChannelData(c); for (let i = 0; i < d.length; i++) peak = Math.max(peak, Math.abs(d[i])); }
   if (peak > 1e-4) {

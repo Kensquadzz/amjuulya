@@ -231,6 +231,8 @@ export interface AudioClip {
   fadeIn: number;
   fadeOut: number;
   muted?: boolean;
+  /** background music bed or a sound effect (derived when missing) */
+  role?: 'music' | 'sfx';
 }
 
 export interface Project {

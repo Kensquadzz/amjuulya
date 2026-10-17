@@ -113,6 +113,7 @@ export const storage = {
   deletePreset: (id: string) => del('presets', id),
   saveAsset: (a: StoredAsset) => put('assets', a),
   getAsset: (id: string) => get<StoredAsset>('assets', id),
+  listAssets: () => all<StoredAsset>('assets').then((l) => l.sort((a, b) => b.createdAt - a.createdAt)),
   deleteAsset: (id: string) => del('assets', id),
   async estimate() {
     try {

@@ -179,6 +179,7 @@ await page.locator('select[aria-label="Aspect ratio"]').selectOption('9:16');
 // 12 templates apply
 await tab('Presets');
 await page.locator('.tpl-main', { hasText: 'Red Glow Grid' }).tap();
+await page.getByRole('button', { name: 'Use this template' }).tap();
 await wait(800);
 st = await S();
 check('template applies', st.name === 'Red Glow Grid' && st.layers.length === 3);
@@ -190,7 +191,7 @@ check('save as custom preset', (await page.locator('.tpl-main', { hasText: 'My P
 
 // 12b audio: add a sound effect from the picker; it shows in the list and on the timeline
 await tab('Audio');
-await page.getByRole('button', { name: '＋ Sound effect' }).tap();
+await page.getByRole('button', { name: '＋ Add sound effect' }).tap();
 await page.getByRole('button', { name: 'Add Whoosh', exact: true }).tap();
 await wait(600);
 await page.getByRole('button', { name: 'Close' }).tap();

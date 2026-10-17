@@ -112,9 +112,28 @@ function drawBarcode(ctx: CanvasRenderingContext2D, l: ShapeLayer, w: number, h:
   }
 }
 
-/** Vector icons drawn in a unit box (-0.5..0.5). Stroked/filled with the current styles. */
-export function iconPath(ctx: CanvasRenderingContext2D, icon: IconId): 'stroke' | 'fill' | 'both' {
-  ctx.beginPath();
+/** Path builder that scales unit-box coordinates to pixels. Drawing in real
+ *  pixel space (instead of ctx.scale(tiny)) keeps shadows and gradients
+ *  consistent on Safari. */
+function scaledPath(ctx: CanvasRenderingContext2D, s: number) {
+  return {
+    moveTo: (x: number, y: number) => ctx.moveTo(x * s, y * s),
+    lineTo: (x: number, y: number) => ctx.lineTo(x * s, y * s),
+    arc: (x: number, y: number, r: number, a0: number, a1: number) => ctx.arc(x * s, y * s, r * s, a0, a1),
+    quadraticCurveTo: (a: number, b: number, x: number, y: number) => ctx.quadraticCurveTo(a * s, b * s, x * s, y * s),
+    bezierCurveTo: (a: number, b: number, c: number, d: number, x: number, y: number) => ctx.bezierCurveTo(a * s, b * s, c * s, d * s, x * s, y * s),
+    roundRect: (x: number, y: number, w: number, h: number, r: number) => {
+      if (ctx.roundRect) ctx.roundRect(x * s, y * s, w * s, h * s, r * s);
+      else ctx.rect(x * s, y * s, w * s, h * s);
+    },
+    closePath: () => ctx.closePath(),
+  };
+}
+
+/** Vector icons designed in a unit box (-0.5..0.5), emitted at `size` pixels around the origin. */
+export function iconPath(c2d: CanvasRenderingContext2D, icon: IconId, size: number): 'stroke' | 'fill' | 'both' {
+  c2d.beginPath();
+  const ctx = scaledPath(c2d, size);
   switch (icon) {
     case 'music':
       ctx.moveTo(-0.12, 0.22); ctx.lineTo(-0.12, -0.28); ctx.lineTo(0.28, -0.36); ctx.lineTo(0.28, 0.14);
@@ -123,7 +142,7 @@ export function iconPath(ctx: CanvasRenderingContext2D, icon: IconId): 'stroke' 
       ctx.moveTo(0.28 + 0.11, 0.16); ctx.arc(0.2, 0.16, 0.11, 0, Math.PI * 2);
       return 'stroke';
     case 'image':
-      ctx.roundRect?.(-0.36, -0.3, 0.72, 0.6, 0.1);
+      ctx.roundRect(-0.36, -0.3, 0.72, 0.6, 0.1);
       ctx.moveTo(-0.3, 0.22); ctx.lineTo(-0.08, -0.02); ctx.lineTo(0.06, 0.12); ctx.lineTo(0.16, 0.02); ctx.lineTo(0.3, 0.2);
       ctx.moveTo(0.2, -0.12); ctx.arc(0.13, -0.12, 0.07, 0, Math.PI * 2);
       return 'stroke';
@@ -160,7 +179,7 @@ export function iconPath(ctx: CanvasRenderingContext2D, icon: IconId): 'stroke' 
       ctx.bezierCurveTo(-0.26, -0.3, -0.12, -0.3, -0.04, 0.02); ctx.bezierCurveTo(0.04, 0.32, 0.2, 0.32, 0.38, -0.06);
       return 'stroke';
     case 'chat':
-      ctx.roundRect?.(-0.36, -0.3, 0.72, 0.48, 0.16);
+      ctx.roundRect(-0.36, -0.3, 0.72, 0.48, 0.16);
       ctx.moveTo(-0.14, 0.18); ctx.lineTo(-0.22, 0.34); ctx.lineTo(0.02, 0.18);
       return 'stroke';
     case 'play':
@@ -223,19 +242,27 @@ function drawGlassTile(env: Env2D, l: ShapeLayer, w: number, h: number) {
   if (l.icon && l.icon !== 'none') {
     const s = Math.min(w, h) * 0.62;
     ctx.save();
-    ctx.scale(s, s);
-    const g = ctx.createLinearGradient(-0.4, -0.4, 0.4, 0.4);
+    ctx.lineWidth = 0.075 * s;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    // pass 1: soft glow in a solid colour
+    ctx.shadowColor = c2;
+    ctx.shadowBlur = 14 * k * l.scale;
+    ctx.strokeStyle = rgba(c2, 0.9);
+    ctx.fillStyle = rgba(c2, 0.9);
+    let mode = iconPath(ctx, l.icon, s);
+    if (mode !== 'stroke') ctx.fill();
+    if (mode !== 'fill') ctx.stroke();
+    // pass 2: crisp gradient glyph, no shadow
+    ctx.shadowColor = 'transparent';
+    ctx.shadowBlur = 0;
+    const g = ctx.createLinearGradient(-0.4 * s, -0.4 * s, 0.4 * s, 0.4 * s);
     g.addColorStop(0, '#ffffff');
     g.addColorStop(0.45, c2);
     g.addColorStop(1, l.stroke);
-    ctx.lineWidth = 0.075;
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
     ctx.strokeStyle = g;
     ctx.fillStyle = g;
-    ctx.shadowColor = c2;
-    ctx.shadowBlur = 14 * k * l.scale;
-    const mode = iconPath(ctx, l.icon);
+    mode = iconPath(ctx, l.icon, s);
     if (mode !== 'stroke') ctx.fill();
     if (mode !== 'fill') ctx.stroke();
     ctx.restore();
@@ -261,14 +288,19 @@ export function drawShape(env: Env2D, l: ShapeLayer) {
   }
   if (l.shape === 'search') {
     // stroked magnifier icon sized by w
-    const s = w;
     ctx.save();
-    ctx.scale(s, s);
-    ctx.lineWidth = Math.max(0.02, (l.strokeWidth * k) / s);
+    ctx.lineWidth = Math.max(1, l.strokeWidth * k);
     ctx.lineCap = 'round';
     ctx.strokeStyle = l.stroke;
-    if (l.glow > 0) { ctx.shadowColor = l.stroke; ctx.shadowBlur = l.glow * k; }
-    iconPath(ctx, 'search');
+    if (l.glow > 0) {
+      ctx.shadowColor = l.stroke;
+      ctx.shadowBlur = l.glow * k;
+      iconPath(ctx, 'search', w);
+      ctx.stroke();
+      ctx.shadowColor = 'transparent';
+      ctx.shadowBlur = 0;
+    }
+    iconPath(ctx, 'search', w);
     ctx.stroke();
     ctx.restore();
     ctx.restore();

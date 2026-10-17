@@ -343,3 +343,33 @@ export async function restoreAssets(assets: Record<string, { name: string; mime:
     await storage.saveAsset({ id: key.replace(/^asset:/, ''), name: a.name, mime: a.mime, blob, size: blob.size, duration: a.duration, createdAt: Date.now() });
   }
 }
+
+/** Is this clip the background music bed (pads, beats, imported songs) or a sound effect? */
+export function clipRole(c: AudioClip): 'music' | 'sfx' {
+  if (c.role) return c.role;
+  if (c.assetId.startsWith('sfx:')) {
+    const cat = sfxById(c.assetId.split(':')[1])?.category;
+    return cat === 'Ambience' || cat === 'Music' ? 'music' : 'sfx';
+  }
+  return c.duration > 6 ? 'music' : 'sfx';
+}
+
+/** Render one sound effect to an MP3 file. */
+export async function sfxToMp3(id: string) {
+  return encodeMp3(await getBuffer(`sfx:${id}`), 192);
+}
+
+/** Every sound effect as MP3s in one ZIP (organised in category folders). */
+export async function allSfxZip(onProgress?: (done: number, total: number) => void): Promise<Blob> {
+  const { SFX } = await import('./sfx');
+  const { makeZip } = await import('./zip');
+  const files: { name: string; data: Blob }[] = [];
+  for (let i = 0; i < SFX.length; i++) {
+    const s = SFX[i];
+    onProgress?.(i, SFX.length);
+    const safe = s.label.replace(/[^\w\- ()]+/g, '').replace(/\s+/g, ' ').trim();
+    files.push({ name: `MotionForge SFX/${s.category}/${safe}.mp3`, data: await sfxToMp3(s.id) });
+  }
+  onProgress?.(SFX.length, SFX.length);
+  return makeZip(files);
+}

@@ -8,6 +8,8 @@ import { getStore, useStore } from '../state/store';
 import { LAYER_ICON } from './props';
 import { Sheet, toast } from './controls';
 import { setLayerImageFromFile } from './imageActions';
+import { useThumb } from './TemplatesPanel';
+import { effectThumb } from './thumbs';
 
 export function LayersPanel({ onEdit }: { onEdit: () => void }) {
   const layers = useStore((s) => s.project.layers);
@@ -116,15 +118,24 @@ function EffectPicker({ onPick, onClose }: { onPick: (id: string) => void; onClo
         <div key={c} className="fx-cat">
           <h3>{c}</h3>
           <div className="fx-grid">
-            {SHADERS.filter((s) => s.category === c).map((s) => (
-              <button key={s.id} className="fx-item" onClick={() => onPick(s.id)}>
-                <b>{s.kind === 'filter' ? '⧉ ' : ''}{s.name}</b>
-                <small>{s.description}</small>
-              </button>
-            ))}
+            {SHADERS.filter((s) => s.category === c).map((s) => <FxItem key={s.id} id={s.id} onPick={onPick} />)}
           </div>
         </div>
       ))}
     </Sheet>
+  );
+}
+
+function FxItem({ id, onPick }: { id: string; onPick: (id: string) => void }) {
+  const s = SHADERS.find((x) => x.id === id)!;
+  const { src, ref } = useThumb(() => effectThumb(id), id);
+  return (
+    <div ref={ref}>
+      <button className="fx-item" onClick={() => onPick(id)} style={{ width: '100%' }}>
+        {src ? <img className="fx-thumb" src={src} alt="" /> : <span className="fx-thumb" />}
+        <b>{s.kind === 'filter' ? '⧉ ' : ''}{s.name}</b>
+        <small>{s.description}</small>
+      </button>
+    </div>
   );
 }

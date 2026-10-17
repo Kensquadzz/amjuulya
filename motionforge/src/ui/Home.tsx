@@ -7,6 +7,8 @@ import { getStore, useStore } from '../state/store';
 import { TemplatesPanel } from './TemplatesPanel';
 import { setLang, useLang } from './i18n';
 import { toast } from './controls';
+import { restoreAssets } from '../engine/audio';
+import { uid } from '../engine/util';
 
 export function Home({ onOpen }: { onOpen: () => void }) {
   const { t, lang } = useLang();
@@ -34,6 +36,25 @@ export function Home({ onOpen }: { onOpen: () => void }) {
     onOpen();
   };
 
+  // a .motionforge.json file (Projects → Export JSON, or a project someone sent you)
+  const importFile = async (f: File) => {
+    try {
+      const raw = JSON.parse(await f.text());
+      const p = normalizeProject(raw);
+      await restoreAssets(raw._assets);
+      await storage.saveProject(getStore().state.project).catch(() => {});
+      const fresh = { ...p, id: uid(), updatedAt: Date.now() };
+      getStore().load(fresh);
+      await storage.saveProject(fresh);
+      getStore().markSaved();
+      engine.player?.seek(0);
+      toast(`${t('imported')}: ${p.name}`, 'ok');
+      onOpen();
+    } catch (e) {
+      toast(`${t('importFailed')}: ${(e as Error).message}`, 'error');
+    }
+  };
+
   return (
     <div className="home">
       <header className="home-top">
@@ -48,6 +69,11 @@ export function Home({ onOpen }: { onOpen: () => void }) {
           <span className="plus">＋</span>
           <span>{t('newProject')}</span>
         </button>
+        <label className="open-file">
+          <span className="plus">⤓</span>
+          <span>{t('openProjectFile')}</span>
+          <input type="file" accept="application/json,.json" hidden onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) importFile(f); }} />
+        </label>
         {picking && (
           <div className="ratio-grid">
             {(Object.keys(ASPECTS) as AspectId[]).map((a) => {

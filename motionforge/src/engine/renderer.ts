@@ -19,6 +19,7 @@ import { hexToVec3 } from './color';
 import { BUILTIN_UNIFORMS, defaultParams, parseShaderParams } from './shaderParams';
 import { TextureStore, type TexParam } from './textures';
 import { ModelHost } from './model3d';
+import { Scene2DHost } from './scene2d';
 import type { BlendMode, Layer, Project, ShaderLayer, ShapeLayer } from './types';
 
 const COMPOSITE_FS = `#version 300 es
@@ -91,6 +92,7 @@ export class Renderer {
   private tex: TextureStore | null = null;
   /** Three.js host for 3D model layers (created on first use) */
   private models: ModelHost | null = null;
+  private scenes2d: Scene2DHost | null = null;
   private layerTex: WebGLTexture | null = null;
   private quad: { vao: WebGLVertexArrayObject; buf: WebGLBuffer } | null = null;
   private compositeProg: { p: WebGLProgram; u: Record<string, WebGLUniformLocation | null> } | null = null;
@@ -282,7 +284,10 @@ export class Renderer {
       case 'image': drawImageLayer(env, L); break;
       case 'particles': drawParticles(env, L); break;
       case 'model3d': (this.models ??= new ModelHost(() => this.onNeedsRedraw?.())).draw(ctx, L, env); break;
-      case 'scene3d': { const h = (this.models ??= new ModelHost(() => this.onNeedsRedraw?.())); h.scale = this.heavyScale; h.drawScene(ctx, L, env); break; }
+      case 'scene3d': {
+        if (Scene2DHost.is(L)) { (this.scenes2d ??= new Scene2DHost(() => this.onNeedsRedraw?.())).draw(ctx, L, env); break; }
+        const h = (this.models ??= new ModelHost(() => this.onNeedsRedraw?.())); h.scale = this.heavyScale; h.drawScene(ctx, L, env); break;
+      }
       case 'text': {
         ensureFont(cssFont(L, 64), () => this.onNeedsRedraw?.(), L.text || 'A');
         if (textNeedsIsolation(L)) {
@@ -552,7 +557,8 @@ export class Renderer {
   /** Release the GL context entirely (export renderers). */
   /** Load every picture and build every text/logo field the project's shaders use (exports await this). */
   async prepareTextures(p: Project) {
-    if (p.layers.some((l) => l.type === 'model3d' || l.type === 'scene3d')) await (this.models ??= new ModelHost(() => this.onNeedsRedraw?.())).prepare(p);
+    if (p.layers.some((l) => l.type === 'model3d' || (l.type === 'scene3d' && !Scene2DHost.is(l)))) await (this.models ??= new ModelHost(() => this.onNeedsRedraw?.())).prepare(p);
+    if (p.layers.some((l) => l.type === 'scene3d' && Scene2DHost.is(l))) await (this.scenes2d ??= new Scene2DHost(() => this.onNeedsRedraw?.())).prepare(p);
     if (!this.tex) return;
     const items: Parameters<TextureStore['prepare']>[0] = [];
     for (const l of p.layers) {
@@ -598,6 +604,7 @@ export class Renderer {
 
   destroy() {
     this.models?.dispose();
+    this.scenes2d?.dispose();
     this.models = null;
     this.dispose();
     this.gl?.getExtension('WEBGL_lose_context')?.loseContext();

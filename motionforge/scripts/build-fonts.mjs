@@ -13,6 +13,8 @@ const FONTS = [
   ['manrope', [200, 300, 400, 500, 600, 700, 800], false],
   ['syne', [400, 500, 600, 700, 800], false],
   ['oswald', [300, 400, 500, 600, 700], false],
+  ['roboto-condensed', [300, 400, 500, 600, 700, 800], true],
+  ['orelega-one', [400], false],
   ['bebas-neue', [400], false],
   ['playfair-display', [400, 500, 600, 700, 800, 900], true],
   ['instrument-serif', [400], true],

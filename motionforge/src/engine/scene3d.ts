@@ -38,11 +38,22 @@ export interface SceneInstance {
   dispose(): void;
 }
 
+/** A 2D motion-graphics scene: plain Canvas 2D, no Three.js (see scene2d.ts). */
+export interface Scene2DInstance {
+  prepare(params: Record<string, number | string>): Promise<void>;
+  /** paint the frame into ctx, which is W x H composition pixels */
+  draw(ctx: CanvasRenderingContext2D, f: FrameState): void;
+  dispose(): void;
+}
+
 export interface SceneDef {
   id: string;
   name: string;
   params: SceneParam[];
-  create(kit: SceneKit): SceneInstance;
+  /** Three.js scene */
+  create?(kit: SceneKit): SceneInstance;
+  /** or a Canvas 2D scene */
+  create2d?(kit: { redraw: () => void }): Scene2DInstance;
 }
 
 export const sceneDefaults = (d: SceneDef) => Object.fromEntries(d.params.map((p) => [p.key, p.def])) as Record<string, number | string>;

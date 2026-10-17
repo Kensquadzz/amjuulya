@@ -4,6 +4,7 @@ import { productOrbit } from './productOrbit';
 import { chromeLogo } from './chromeLogo';
 import { liquidGlass } from './liquidGlass';
 import { floatingUI } from './floatingUI';
+import { hrPack } from './hrPack';
 
-export const SCENES3D: SceneDef[] = [productOrbit, chromeLogo, liquidGlass, floatingUI];
+export const SCENES3D: SceneDef[] = [productOrbit, chromeLogo, liquidGlass, floatingUI, hrPack];
 export const sceneById = (id: string) => SCENES3D.find((s) => s.id === id);

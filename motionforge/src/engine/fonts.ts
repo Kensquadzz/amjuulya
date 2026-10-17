@@ -13,6 +13,8 @@ export const FONTS: FontDef[] = [
   { family: 'Manrope', stack: '"Manrope", "Helvetica Neue", Arial, sans-serif', weights: [200, 300, 400, 500, 600, 700, 800], italic: false, cyrillic: true },
   { family: 'Syne', stack: '"Syne", "Unbounded", "Helvetica Neue", Arial, sans-serif', weights: [400, 500, 600, 700, 800], italic: false, cyrillic: false },
   { family: 'Oswald', stack: '"Oswald", "Arial Narrow", sans-serif', weights: [300, 400, 500, 600, 700], italic: false, cyrillic: true },
+  { family: 'Roboto Condensed', stack: '"Roboto Condensed", "Oswald", "Arial Narrow", sans-serif', weights: [300, 400, 500, 600, 700, 800], italic: true, cyrillic: true },
+  { family: 'Orelega One', stack: '"Orelega One", "Playfair Display", Georgia, serif', weights: [400], italic: false, cyrillic: true },
   { family: 'Bebas Neue', stack: '"Bebas Neue", "Oswald", Impact, "Arial Narrow", sans-serif', weights: [400], italic: false, cyrillic: false },
   { family: 'Playfair Display', stack: '"Playfair Display", Georgia, "Times New Roman", serif', weights: [400, 500, 600, 700, 800, 900], italic: true, cyrillic: true },
   { family: 'Instrument Serif', stack: '"Instrument Serif", "Playfair Display", Georgia, serif', weights: [400], italic: true, cyrillic: false },

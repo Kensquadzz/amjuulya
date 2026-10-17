@@ -102,7 +102,7 @@ export class ModelHost {
   /** Exports and thumbnails: load Three.js, every model and every scene's assets before frame 0. */
   async prepare(p: Project) {
     const ls = p.layers.filter((l): l is ModelLayer => l.type === 'model3d');
-    const ss = p.layers.filter((l): l is SceneLayer => l.type === 'scene3d');
+    const ss = p.layers.filter((l): l is SceneLayer => l.type === 'scene3d' && !sceneById(l.scene)?.create2d);
     if (!ls.length && !ss.length) return;
     this.mods = await loadThree();
     this.renderer();
@@ -123,6 +123,7 @@ export class ModelHost {
     const def = sceneById(l.scene);
     if (!def) return null;
     const { THREE, RoundedBoxGeometry, toCreasedNormals, MarchingCubes } = this.mods!;
+    if (!def.create) return null;
     const inst = def.create({ THREE, RoundedBoxGeometry, toCreasedNormals, MarchingCubes, renderer: this.renderer(), redraw: () => this.onReady() });
     const e = { id: l.scene, inst, ready: false, error: undefined as string | undefined, wait: Promise.resolve() };
     e.wait = inst.prepare(this.params(l)).catch((err) => { e.error = String(err?.message ?? err); }).finally(() => { e.ready = true; this.onReady(); });

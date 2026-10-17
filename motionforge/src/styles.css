@@ -435,6 +435,8 @@ input[type='color'] { width: 44px; height: 34px; padding: 0; border: 1px solid v
 .home-body { padding: 4px 14px calc(var(--sab) + 24px); max-width: 900px; width: 100%; margin: 0 auto; }
 .new-project { width: 100%; min-height: 84px; display: flex; align-items: center; justify-content: center; gap: 12px; font-size: 19px; font-weight: 700; border-radius: 16px; border: 0; color: #fff; background: var(--accent); }
 .new-project .plus { font-size: 30px; line-height: 1; }
+.open-file { width: 100%; min-height: 56px; margin-top: 10px; display: flex; align-items: center; justify-content: center; gap: 10px; font-size: 16px; font-weight: 600; border-radius: 14px; border: 1px solid var(--line, #2a3040); color: var(--text, #f5f7fa); background: var(--panel2, #202532); cursor: pointer; }
+.open-file .plus { font-size: 20px; }
 .continue { width: 100%; display: flex; align-items: center; gap: 12px; margin: 10px 0 4px; padding: 10px 12px; border-radius: 14px; text-align: left; }
 .continue .cbadge { width: 44px; height: 44px; border-radius: 12px; background: #fff; color: #000; display: grid; place-items: center; font-size: 18px; flex: 0 0 auto; }
 .continue .ctext { display: flex; flex-direction: column; min-width: 0; }

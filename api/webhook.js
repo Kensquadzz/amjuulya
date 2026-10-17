@@ -282,6 +282,12 @@ const KEYWORDS = {
 // ==========================================
 
 export default async function handler(req, res) {
+  const host = req.headers?.["x-forwarded-host"] || req.headers?.host;
+  if (host) BASE_URL = `https://${host}`;
+
+  // Удирдлагын хуудас: /api/webhook?panel=ADMIN_KEY
+  if (req.query?.panel !== undefined) return handlePanel(req, res);
+
   if (req.method === "GET") {
     // Оношилгоо: хөтчөөр /api/webhook?diag=1 нээхэд AI ажиллаж байгаа эсэхийг харуулна (нууц мэдээлэл харуулахгүй)
     if (req.query.diag) return res.status(200).json(await diagnose());
@@ -320,6 +326,7 @@ export default async function handler(req, res) {
       if (!isNewComment || value.from?.id === pageId) continue;
 
       console.log("Comment:", value.comment_id, value.message);
+      if (!(await botEnabled())) continue;
       await safe(() => handleComment(value.comment_id));
     }
 
@@ -357,6 +364,9 @@ async function handleMessagingEvent(event, pageId) {
     if (text.trim() === "#bot") return resumeUser(customerId);
     if (text.trim() === "#stop") return pauseUser(customerId, 24 * 30);
     await pauseUser(customerId, HUMAN_PAUSE_HOURS);
+    await kvDel(`resumed:${customerId}`);
+    // AI дараа нь таны бичсэнийг "засах" гэж оролдохгүйн тулд санана
+    await rememberAdminText(customerId, event.message.text);
 
     if (isAdminConfirmation(text)) {
       const value =
@@ -374,6 +384,21 @@ async function handleMessagingEvent(event, pageId) {
     }
     return;
   }
+
+  // Админы команд (#admin, #on, #off, #status) — админы хувийн чатад бот хариулахгүй
+  const rawText = event.message?.text?.trim() || "";
+  if (rawText.startsWith("#") || senderId === (await adminPsid())) {
+    if (await handleAdminCommand(senderId, rawText)) return;
+  }
+
+  // Бот унтраалттай бол хэнд ч хариулахгүй
+  if (!(await botEnabled())) {
+    console.log("Bot is OFF — skipped:", senderId);
+    return;
+  }
+
+  // Like 👍, стикерт хариулахгүй
+  if (event.message?.sticker_id) return;
 
   // Админ энэ хүнтэй ярьж байгаа бол бот оролцохгүй
   if (await isPaused(senderId)) {
@@ -454,6 +479,16 @@ async function handleText(psid, pageId, raw) {
       `📧 Имэйл хүлээн авлаа: ${email[0]}\n\n` +
         "Төлбөрийн баримтын screenshot-оо илгээсэн бол болоо. " +
         "Админ төлбөрийг шалгаад энэ имэйл рүү илгээнэ ✅"
+    );
+  }
+
+  // Админтай холбогдох хүсэлт → шууд админд шилжүүлнэ
+  if (/(админ|admin|оператор|operator|хүнтэй ярь|hun?tei yari)/i.test(text)) {
+    return handOff(
+      psid,
+      "Админтай холбогдохыг хүссэн",
+      raw,
+      "Админд мэдэгдлээ 🙏 Удахгүй энд хариулна."
     );
   }
 
@@ -698,16 +733,22 @@ OFFICE PACK-ИЙН ТУХАЙ:
 - Тодорхой баримт байгаа эсэхийг асуувал (жишээ "ажлаас халах тушаал бий юу") — жагсаалтаас хайж, байгаа бол яг нэрийг нь, аль PACK-д байгааг хэл. Байхгүй бол үнэнээр нь хэл.
 - Жагсаалтад байхгүй бүтээгдэхүүн, үнэ, хямдрал, урамшуулал, хугацааг ХЭЗЭЭ Ч зохиож болохгүй. Жагсаалтад байхгүй бүтээгдэхүүн асуувал (жишээ нь CapCut) "одоогоор байхгүй" гэж шууд хэлээд, байгаа бүтээгдэхүүнээс тохирохыг санал болго — үүнд [[HUMAN]] бүү бич.
 - Файлыг өөрөө илгээж, жишээ файл хавсаргаж чадахгүй. Жишээ харахыг хүсвэл админ илгээнэ гэж хэл.
-- Төлбөр баталгаажуулах, мөнгө буцаах, гомдол зэрэгт "админ удахгүй хариулна" гэж хэл.
-- Бүтээгдэхүүнтэй холбоогүй сэдвээр бол эелдгээр товч хариулаад бүтээгдэхүүн рүү чиглүүл.
+- Төлбөр баталгаажуулах, мөнгө буцаах, гомдол зэрэгт "админ удахгүй хариулна" гэж хэлээд [[HUMAN]].
+- Хэрэглэгч юу хүсч байгааг ойлгохгүй бол таамаглаж бүү хариул — нэг богино тодруулах асуулт асуу.
 - Аль нь тохирохыг асуувал хэрэгцээг нь сонсоод тохирохыг санал болго. Олон PACK хэрэгтэй бол MASTER PACK-ийг санал болго.
 - Хэрэглэгчийн ЯГ бичсэн зүйлд нь хариул. Яриан дээр цэс аль хэдийн илгээгдсэн бол цэсийг дахин бүү давт.
 - Хэрэглэгч доромжилсон, уурласан ч тайван, эелдэг хэвээр бай.
 - Canva урилга / файл имэйлээр ирээгүй гэвэл: уучлалт гуйж, Spam/Promotions хавтсаа шалгах, Canva урилгыг Accept дарах хэрэгтэйг хэлээд, ямар имэйл өгснийг асуу. Төгсгөлд [[HUMAN]] бич.
 - Гомдол, уурласан, мөнгө буцаах, "хүнтэй ярья" гэвэл: уучлалт гуйж, админ удахгүй холбогдоно гэж хэлээд төгсгөлд [[HUMAN]] бич.
 
+АДМИНЫ МЕССЕЖҮҮД (МАШ ЧУХАЛ):
+- Ярианд "[АДМИН]" гэж эхэлсэн мессежийг пэйжийн админ (хүн) гараар бичсэн. Админы хэлсэн үнэ, үйлчилгээ, тохиролцоо, амлалтыг ХЭЗЭЭ Ч бүү үгүйсгэ, "алдаа байсан" гэж бүү хэл, уучлалт бүү гуй, бүү засварла.
+- Каталогт байхгүй үйлчилгээ, тусгай захиалгын яриа (жишээ нь видео хийлгэх, дизайн, лого, өөр үнэтэй тохиролцоо) явж байвал — энэ нь админы ажил. Юу ч бүү бич, зөвхөн [[HUMAN]].
+- Хэрэглэгч "за", "ok", "ойлголоо", "баярлалаа" гэх мэт товч хариу бичсэн бол, энэ нь таны асуултын хариу биш бол [[SKIP]].
+
 ТОВЧ ХАРУУЛАХ (хариултын хамгийн төгсгөлд дээд тал нь НЭГИЙГ бич, хэрэглэгчид харагдахгүй):
-- [[HUMAN]] — админд мэдэгдэнэ. ЗӨВХӨН гомдол, эрх/файл ирээгүй, мөнгө буцаах, "хүнтэй ярья" гэсэн үед
+- [[SKIP]] — хэрэглэгчид юу ч илгээхгүй (хариу шаардлагагүй үед)
+- [[HUMAN]] — админд мэдэгдэж, энэ хүн дээр ботыг түр зогсооно. Гомдол, эрх/файл ирээгүй, мөнгө буцаах, тусгай захиалга, админы яриа үргэлжилж байгаа үед. Текст бичвэл хэрэглэгчид илгээгдэнэ; тусгай захиалга/админы ярианд текстгүй зөвхөн [[HUMAN]] бич.
 - [[MENU]] — бүх бүтээгдэхүүний цэсийг харуулах (зөвхөн анхны мэндчилгээ эсвэл "юу байгаа вэ" гэж асуувал)
 - [[PRODUCT:ID]] — нэг бүтээгдэхүүний карт (үнэ, агуулга, АВАХ товч). Карт өөрөө үнэ, агуулгыг харуулдаг тул энэ үед текстээ 1 өгүүлбэрээс хэтрүүлэхгүй, үнэ, дэлгэрэнгүйг бүү давт.
 - [[LIST:ID]] — PACK-ийн бүх файлын нэрсийг илгээх (MASTER бол 4 PACK бүгд)
@@ -720,9 +761,22 @@ async function handleAI(psid, pageId, raw) {
 
   await senderAction(psid, "typing_on");
 
-  const history = await recentMessages(psid, 12);
+  const [history, admins] = await Promise.all([recentMessages(psid, 12), adminTexts(psid)]);
+  for (const m of history) m.admin = m.fromPage && admins.has(normText(m.text));
   // Бот/админ энэ хүнд өмнө нь бичсэн эсэх — бичсэн бол цэсийг дахин бүү илгээ
   const talkedBefore = history.some((m) => m.fromPage);
+
+  // "за", "ok", "баярлалаа", 👍 гэх мэт — өмнө нь асуулт асуугаагүй бол хариулахгүй
+  const lastPage = [...history].reverse().find((m) => m.fromPage);
+  if (ACK_RE.test(raw) && !(lastPage && !lastPage.admin && /[?？]\s*$/.test(lastPage.text || ""))) {
+    console.log("Ack — no reply:", psid, raw);
+    return;
+  }
+  // Хамгийн сүүлд админ бичсэн бол бот оролцохгүй (админы яриа үргэлжилж байна)
+  if (lastPage?.admin && Date.now() - lastPage.at < 24 * 3600 * 1000 && !(await kvGet(`resumed:${psid}`))) {
+    console.log("Admin conversation — bot stays quiet:", psid);
+    return pauseUser(psid, HUMAN_PAUSE_HOURS);
+  }
 
   let reply = "";
   if (!apiKey) {
@@ -731,24 +785,24 @@ async function handleAI(psid, pageId, raw) {
     reply = await askClaude(apiKey, buildMessages(history, raw));
   }
 
-  // AI ажиллахгүй бол: анх удаа бичсэн хүнд цэс, бусад үед товч хариу + админд мэдэгдэл
+  // AI ажиллахгүй бол: анх удаа бичсэн хүнд цэс, бусад үед хэрэглэгчид юу ч бичихгүй, админд мэдэгдэнэ
   if (!reply) {
     if (!talkedBefore) return sendMenu(psid);
-    await sendText(psid, "Уучлаарай, бичсэнийг тань хүлээн авлаа 🙏 Админ удахгүй хариулна.");
-    // Ижил мессежийг давтахгүйн тулд 1 цаг чимээгүй
-    await pauseUser(psid, 1);
-    return notifyAdmin(psid, "AI хариулж чадсангүй", raw);
+    return notifyAdmin(psid, "Бот хариулж чадсангүй", raw);
   }
 
   // Төгсгөлийн товчны тэмдэглэгээ
-  const marker = reply.match(/\[\[(MENU|HUMAN|PRODUCT:(\w+)|BUY:(\w+)|LIST:(\w+))\]\]/);
+  const marker = reply.match(/\[\[(MENU|HUMAN|SKIP|PRODUCT:(\w+)|BUY:(\w+)|LIST:(\w+))\]\]/);
   // Messenger markdown-ыг үргэлж зөв харуулдаггүй тул ** арилгана
   const text = reply.replace(/\[\[[^\]]*\]\]/g, "").replace(/\*\*/g, "").trim();
 
+  if (marker?.[1] === "SKIP") {
+    console.log("AI chose not to reply:", psid, raw);
+    return;
+  }
+
   if (marker?.[1] === "HUMAN") {
-    // Бот ярилцсаар байна; админ гараар бичмэгц л бот зогсоно
-    await sendText(psid, text || "Уучлаарай 🙏 Админ удахгүй холбогдоно.");
-    return notifyAdmin(psid, "Хүн шаардлагатай (гомдол/асуудал)", raw);
+    return handOff(psid, "Админ хариулах хэрэгтэй", raw, text);
   }
 
   if (marker?.[4] && PRODUCTS[marker[4]]) {
@@ -773,8 +827,12 @@ async function handleAI(psid, pageId, raw) {
     });
   }
 
-  return sendText(psid, text || "Админ удахгүй хариулна 🙏");
+  if (text) return sendText(psid, text);
 }
+
+// Товч зөвшөөрөл, талархал, emoji
+const ACK_RE =
+  /^(за+|заа|zaa*|ok+|ок+|okey|okay|ойлгосон|ойлголоо|oilgoson|oilgoloo|баярлалаа|bayrlalaa|bayarlalaa|thanks?|thank you|thx|[\s👍🙏❤️♥️😊🙂👌🥰😍]+)[\s.!,)]*$/iu;
 
 // Claude-ийн хүсэлтийн бие. Haiku 5.5 зэрэг 5.x model-ууд хариулахаасаа өмнө
 // "бодож" токен зарцуулдаг (adaptive thinking, max_tokens-д тооцогдоно), тиймээс
@@ -797,6 +855,11 @@ async function diagnose() {
     time: new Date().toISOString(),
     anthropicKey: key ? `тохируулсан (${key.length} тэмдэгт, ${key.startsWith("sk-ant-") ? "sk-ant- эхлэлтэй" : "ЭХЛЭЛ БУРУУ"})` : "БАЙХГҮЙ",
     pageToken: process.env.META_PAGE_ACCESS_TOKEN ? "тохируулсан" : "БАЙХГҮЙ",
+    botEnabled: await botEnabled(),
+    redis: hasRedis ? "холбогдсон" : "БАЙХГҮЙ",
+    adminKey: ADMIN_KEY ? "тохируулсан" : "БАЙХГҮЙ",
+    telegram: process.env.TELEGRAM_BOT_TOKEN ? "тохируулсан" : "БАЙХГҮЙ",
+    webhookFields: await webhookFields(),
     systemPromptChars: systemPrompt().length,
     models: [],
   };
@@ -880,7 +943,7 @@ function buildMessages(history, current) {
   const msgs = [];
   for (const m of history) {
     const role = m.fromPage ? "assistant" : "user";
-    const text = (m.text || "").trim();
+    const text = (m.admin ? "[АДМИН] " : "") + (m.text || "").trim();
     if (!text) continue;
     const last = msgs[msgs.length - 1];
     if (last && last.role === role) last.content += "\n" + text;
@@ -905,7 +968,7 @@ async function recentMessages(psid, limit) {
   try {
     const url =
       `${GRAPH}/me/conversations?platform=messenger&user_id=${psid}` +
-      `&fields=messages.limit(${limit}){message,from}&access_token=${token}`;
+      `&fields=messages.limit(${limit}){message,from,created_time}&access_token=${token}`;
     const response = await fetch(url);
     if (!response.ok) {
       console.error("Conversation fetch error:", await response.text());
@@ -915,7 +978,7 @@ async function recentMessages(psid, limit) {
     const items = data.data?.[0]?.messages?.data || [];
     return items
       .reverse()
-      .map((m) => ({ text: m.message, fromPage: m.from?.id !== psid }));
+      .map((m) => ({ text: m.message, fromPage: m.from?.id !== psid, at: Date.parse(m.created_time) || 0 }));
   } catch (error) {
     console.error("Conversation fetch failed:", error);
     return [];
@@ -935,58 +998,467 @@ async function lastQuotedPrice(psid) {
 }
 
 // ==========================================
-// АДМИН РУУ ШИЛЖҮҮЛЭХ (human takeover)
-// Админ гараар бичих эсвэл AI [[HUMAN]] гэвэл тухайн хүн дээр бот түр зогсоно.
-// UPSTASH_REDIS_REST_URL/TOKEN тохируулбал төлөв найдвартай хадгалагдана,
-// эс бөгөөс зөвхөн серверийн санах ойд (заримдаа мартагдаж болно).
+// ХАДГАЛАЛТ (Redis) — ботын төлөвийг найдвартай санах
+// Vercel → Storage → Upstash Redis холбоход KV_REST_API_URL/TOKEN автоматаар нэмэгдэнэ.
+// Redis байхгүй бол серверийн санах ойд хадгална (Vercel дээр мартагддаг — найдваргүй).
 // ==========================================
 
-const HUMAN_PAUSE_HOURS = Number(process.env.HUMAN_PAUSE_HOURS || 6);
-const pausedUntil = new Map();
-const hasRedis = !!(process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN);
+const KV_URL = process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL;
+const KV_TOKEN = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN;
+const hasRedis = !!(KV_URL && KV_TOKEN);
+const mem = new Map(); // fallback: key -> { v, exp }
 
 async function redis(cmd) {
-  const response = await fetch(process.env.UPSTASH_REDIS_REST_URL, {
+  const response = await fetch(KV_URL, {
     method: "POST",
-    headers: { Authorization: `Bearer ${process.env.UPSTASH_REDIS_REST_TOKEN}` },
+    headers: { Authorization: `Bearer ${KV_TOKEN}` },
     body: JSON.stringify(cmd),
   });
-  return (await response.json()).result;
+  const data = await response.json();
+  if (data.error) throw new Error(data.error);
+  return data.result;
+}
+
+function memGet(key) {
+  const item = mem.get(key);
+  if (!item) return null;
+  if (item.exp && item.exp < Date.now()) {
+    mem.delete(key);
+    return null;
+  }
+  return item.v;
+}
+
+async function kvGet(key) {
+  if (hasRedis) {
+    try {
+      return await redis(["GET", key]);
+    } catch (e) {
+      console.error("Redis GET error:", e);
+    }
+  }
+  return memGet(key);
+}
+
+async function kvSet(key, value, ttlSec) {
+  mem.set(key, { v: String(value), exp: ttlSec ? Date.now() + ttlSec * 1000 : 0 });
+  if (!hasRedis) return;
+  const cmd = ["SET", key, String(value)];
+  if (ttlSec) cmd.push("EX", String(Math.ceil(ttlSec)));
+  await redis(cmd).catch((e) => console.error("Redis SET error:", e));
+}
+
+async function kvDel(key) {
+  mem.delete(key);
+  if (hasRedis) await redis(["DEL", key]).catch((e) => console.error("Redis DEL error:", e));
+}
+
+// Жагсаалтын эхэнд нэмж, max хүртэл таслана
+async function kvPush(key, value, max, ttlSec) {
+  const list = [value, ...(memGet(key) || [])].slice(0, max);
+  mem.set(key, { v: list, exp: ttlSec ? Date.now() + ttlSec * 1000 : 0 });
+  if (!hasRedis) return;
+  try {
+    await redis(["LPUSH", key, value]);
+    await redis(["LTRIM", key, "0", String(max - 1)]);
+    if (ttlSec) await redis(["EXPIRE", key, String(ttlSec)]);
+  } catch (e) {
+    console.error("Redis LPUSH error:", e);
+  }
+}
+
+async function kvList(key, n) {
+  if (hasRedis) {
+    try {
+      return (await redis(["LRANGE", key, "0", String(n - 1)])) || [];
+    } catch (e) {
+      console.error("Redis LRANGE error:", e);
+    }
+  }
+  return (memGet(key) || []).slice(0, n);
+}
+
+// ==========================================
+// БОТ АСААХ / УНТРААХ, ТҮР ЗОГСООХ
+// ==========================================
+
+const HUMAN_PAUSE_HOURS = Number(process.env.HUMAN_PAUSE_HOURS || 12);
+const ADMIN_KEY = process.env.ADMIN_KEY || "";
+let BASE_URL = "https://www.amjuulya.mn";
+
+async function botEnabled() {
+  if (process.env.BOT_ENABLED === "false") return false;
+  return (await kvGet("cfg:enabled")) !== "0";
+}
+
+async function setBotEnabled(on) {
+  await kvSet("cfg:enabled", on ? "1" : "0");
 }
 
 async function pauseUser(psid, hours) {
-  const until = Date.now() + hours * 3600 * 1000;
-  pausedUntil.set(psid, until);
-  if (hasRedis) {
-    await redis(["SET", `pause:${psid}`, String(until), "EX", String(Math.ceil(hours * 3600))]).catch((e) =>
-      console.error("Redis error:", e)
-    );
-  }
+  await kvSet(`pause:${psid}`, Date.now() + hours * 3600 * 1000, hours * 3600);
 }
 
 async function resumeUser(psid) {
-  pausedUntil.delete(psid);
-  if (hasRedis) await redis(["DEL", `pause:${psid}`]).catch((e) => console.error("Redis error:", e));
+  await kvDel(`pause:${psid}`);
+  // Админ сүүлд бичсэн байсан ч бот дахин хариулж эхэлнэ
+  await kvSet(`resumed:${psid}`, Date.now(), 24 * 3600);
+}
+
+async function pausedUntil(psid) {
+  const v = Number(await kvGet(`pause:${psid}`));
+  return v > Date.now() ? v : 0;
 }
 
 async function isPaused(psid) {
-  if (hasRedis) {
-    const value = await redis(["GET", `pause:${psid}`]).catch(() => null);
-    if (value) return Number(value) > Date.now();
-  }
-  return (pausedUntil.get(psid) || 0) > Date.now();
+  return (await pausedUntil(psid)) > 0;
 }
 
-// ADMIN_PSID тохируулбал админд Messenger-ээр мэдэгдэнэ
-async function notifyAdmin(psid, reason, userText) {
-  const admin = process.env.ADMIN_PSID;
+// Админы гараар бичсэн мессежүүдийг санана — AI тэдгээрийг "засахгүй"
+const normText = (t) => String(t || "").replace(/\s+/g, " ").trim().slice(0, 300);
+
+async function rememberAdminText(psid, text) {
+  if (!text) return;
+  await kvPush(`admintxt:${psid}`, normText(text), 30, 30 * 24 * 3600);
+}
+
+async function adminTexts(psid) {
+  return new Set(await kvList(`admintxt:${psid}`, 30));
+}
+
+async function adminPsid() {
+  return process.env.ADMIN_PSID || (await kvGet("admin:psid")) || "";
+}
+
+// ==========================================
+// АДМИНД МЭДЭГДЭЛ (Telegram ба/эсвэл Messenger)
+// ==========================================
+
+async function customerName(psid) {
+  const cached = await kvGet(`name:${psid}`);
+  if (cached) return cached;
+  try {
+    const r = await fetch(
+      `${GRAPH}/${psid}?fields=first_name,last_name&access_token=${process.env.META_PAGE_ACCESS_TOKEN}`
+    );
+    if (!r.ok) return "Хэрэглэгч";
+    const j = await r.json();
+    const name = [j.first_name, j.last_name].filter(Boolean).join(" ") || "Хэрэглэгч";
+    await kvSet(`name:${psid}`, name, 7 * 24 * 3600);
+    return name;
+  } catch {
+    return "Хэрэглэгч";
+  }
+}
+
+const panelUrl = () => (ADMIN_KEY ? `${BASE_URL}/api/webhook?panel=${encodeURIComponent(ADMIN_KEY)}` : "");
+
+// Telegram: TELEGRAM_BOT_TOKEN тохируулаад ботдоо /start бичихэд chat автоматаар олдоно
+async function telegramChatId() {
+  if (process.env.TELEGRAM_CHAT_ID) return process.env.TELEGRAM_CHAT_ID;
+  const saved = await kvGet("tg:chat");
+  if (saved) return saved;
+  const token = process.env.TELEGRAM_BOT_TOKEN;
+  if (!token) return "";
+  try {
+    const r = await fetch(`https://api.telegram.org/bot${token}/getUpdates`);
+    const j = await r.json();
+    const updates = j.result || [];
+    for (let i = updates.length - 1; i >= 0; i--) {
+      const chat = updates[i].message?.chat || updates[i].my_chat_member?.chat;
+      if (chat?.id) {
+        await kvSet("tg:chat", chat.id);
+        return String(chat.id);
+      }
+    }
+  } catch (e) {
+    console.error("Telegram getUpdates failed:", e);
+  }
+  return "";
+}
+
+async function sendTelegram(text) {
+  const token = process.env.TELEGRAM_BOT_TOKEN;
+  if (!token) return { ok: false, why: "TELEGRAM_BOT_TOKEN тохируулаагүй" };
+  const chatId = await telegramChatId();
+  if (!chatId) return { ok: false, why: "Telegram ботдоо /start гэж бичээгүй байна" };
+  try {
+    const r = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ chat_id: chatId, text, disable_web_page_preview: true }),
+    });
+    const j = await r.json();
+    return j.ok ? { ok: true } : { ok: false, why: j.description || "Telegram алдаа" };
+  } catch (e) {
+    return { ok: false, why: String(e) };
+  }
+}
+
+async function sendAdminMessenger(text) {
+  const admin = await adminPsid();
+  if (!admin) return { ok: false, why: "Messenger админ бүртгээгүй" };
+  const ok = await sendText(admin, text);
+  return ok
+    ? { ok: true }
+    : { ok: false, why: "Messenger илгээгдсэнгүй (24 цагийн дотор пэйж рүү бичээгүй байж магадгүй)" };
+}
+
+async function notifyAdmin(psid, reason, userText, { paused = false } = {}) {
   console.log("ADMIN NEEDED:", psid, reason, userText);
-  if (!admin || admin === psid) return;
-  await sendText(
-    admin,
-    `🔔 Анхаарах чат\nШалтгаан: ${reason}\nХэрэглэгч: "${String(userText).slice(0, 300)}"\nPSID: ${psid}\n\n` +
-      `Page Inbox-оос хариулна уу. Ботыг дахин асаах бол тэр чатад "#bot" гэж бичнэ.`
+
+  // Нэг хүний нэг шалтгаанаар 15 минутад нэгээс олон мэдэгдэл илгээхгүй
+  const dedupeKey = `notif:${psid}:${reason}`;
+  if (await kvGet(dedupeKey)) return;
+  await kvSet(dedupeKey, "1", 15 * 60);
+
+  const name = await customerName(psid);
+  await kvPush(
+    "handoffs",
+    JSON.stringify({ psid, name, reason, text: String(userText).slice(0, 300), at: Date.now() }),
+    30
   );
+
+  const panel = panelUrl();
+  const text =
+    `🔔 Mongol AI — админ хэрэгтэй\n\n` +
+    `👤 ${name}\n` +
+    `📌 ${reason}\n` +
+    `💬 "${String(userText).slice(0, 300)}"\n` +
+    (paused ? `🤖 Бот энэ хүн дээр ${HUMAN_PAUSE_HOURS} цаг зогслоо\n` : "") +
+    `\n➡️ Хариулах: https://business.facebook.com/latest/inbox/all` +
+    (panel ? `\n⚙️ Удирдлага: ${panel}` : "");
+
+  const results = await Promise.all([sendTelegram(text), sendAdminMessenger(text)]);
+  if (!results.some((r) => r.ok)) console.error("Admin notification not delivered:", results);
+}
+
+// Хэрэглэгчийг админд шилжүүлэх: (сонголтоор) хариу бичиж, бот зогсоод, админд мэдэгдэнэ
+async function handOff(psid, reason, userText, replyText) {
+  if (replyText) await sendText(psid, replyText);
+  await pauseUser(psid, HUMAN_PAUSE_HOURS);
+  await notifyAdmin(psid, reason, userText, { paused: true });
+}
+
+// ==========================================
+// АДМИНЫ КОМАНД (өөрийн хувийн Messenger-ээс пэйж рүү бичнэ)
+//   #admin <ADMIN_KEY>  → энэ Messenger-ийг админ болгож бүртгэнэ
+//   #off / #on          → бүх ботыг унтраах / асаах
+//   #status             → төлөв харах
+// ==========================================
+
+async function handleAdminCommand(psid, raw) {
+  const text = raw.trim();
+  const lower = text.toLowerCase();
+
+  if (lower.startsWith("#admin")) {
+    const key = text.slice(6).trim();
+    if (!ADMIN_KEY || key !== ADMIN_KEY) {
+      await sendText(psid, "❌ Нууц үг буруу байна.");
+      return true;
+    }
+    await kvSet("admin:psid", psid);
+    await sendText(
+      psid,
+      "✅ Та админ боллоо. Админ хэрэгтэй чат гарахад энд мэдэгдэл ирнэ.\n\n" +
+        "Командууд:\n#off — ботыг унтраах\n#on — ботыг асаах\n#status — төлөв\n\n" +
+        (panelUrl() ? `⚙️ Удирдлага: ${panelUrl()}` : "")
+    );
+    return true;
+  }
+
+  if (psid !== (await adminPsid())) return false;
+
+  if (lower === "#off") {
+    await setBotEnabled(false);
+    await sendText(psid, "⏸️ Бот УНТАРЛАА. Хэрэглэгчдэд автоматаар хариулахгүй. Асаах бол #on");
+  } else if (lower === "#on") {
+    await setBotEnabled(true);
+    await sendText(psid, "▶️ Бот АСЛАА. Хэрэглэгчдэд автоматаар хариулна.");
+  } else {
+    await sendText(
+      psid,
+      `Бот: ${(await botEnabled()) ? "▶️ АСААЛТТАЙ" : "⏸️ УНТРААЛТТАЙ"}\n` +
+        `Хадгалалт: ${hasRedis ? "Redis ✅" : "⚠️ Redis байхгүй"}\n\n` +
+        "#off — унтраах, #on — асаах" +
+        (panelUrl() ? `\n⚙️ ${panelUrl()}` : "")
+    );
+  }
+  // Админы хувийн чатад бот AI-аар хариулахгүй
+  return true;
+}
+
+// ==========================================
+// УДИРДЛАГЫН ХУУДАС: /api/webhook?panel=ADMIN_KEY
+// ==========================================
+
+const esc = (s) =>
+  String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+
+const ubTime = (ts) =>
+  new Date(Number(ts)).toLocaleString("en-GB", {
+    timeZone: "Asia/Ulaanbaatar",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+
+// Meta webhook-ийн subscribed_fields (message_echoes байгаа эсэх)
+async function webhookFields() {
+  const token = process.env.META_PAGE_ACCESS_TOKEN;
+  try {
+    const [appRes, subRes] = await Promise.all([
+      fetch(`${GRAPH}/app?access_token=${token}`),
+      fetch(`${GRAPH}/me/subscribed_apps?access_token=${token}`),
+    ]);
+    const app = await appRes.json();
+    const sub = await subRes.json();
+    if (sub.error) return { error: sub.error.message };
+    const mine = (sub.data || []).find((a) => a.id === app.id) || (sub.data || [])[0];
+    return { fields: mine?.subscribed_fields || [] };
+  } catch (e) {
+    return { error: String(e) };
+  }
+}
+
+async function fixWebhookFields() {
+  const current = await webhookFields();
+  if (current.error) return current.error;
+  const fields = [...new Set([...current.fields, "messages", "messaging_postbacks", "message_echoes"])];
+  const r = await fetch(
+    `${GRAPH}/me/subscribed_apps?subscribed_fields=${fields.join(",")}&access_token=${process.env.META_PAGE_ACCESS_TOKEN}`,
+    { method: "POST" }
+  );
+  const j = await r.json();
+  return j.success ? "" : j.error?.message || "Тохиргоо хийгдсэнгүй";
+}
+
+async function handlePanel(req, res) {
+  const key = String(req.query.panel || "");
+  if (!ADMIN_KEY) {
+    return res
+      .status(200)
+      .send("Удирдлагын хуудсыг ашиглахын тулд Vercel дээр ADMIN_KEY (нууц үг) тохируулаад Redeploy хийнэ үү.");
+  }
+  if (key !== ADMIN_KEY) return res.status(403).send("Нууц үг буруу");
+
+  const self = `?panel=${encodeURIComponent(key)}`;
+
+  if (req.method === "POST") {
+    const b = req.body || {};
+    let msg = "";
+    if (b.action === "on") await setBotEnabled(true);
+    if (b.action === "off") await setBotEnabled(false);
+    if (b.action === "resume" && b.psid) await resumeUser(b.psid);
+    if (b.action === "pause" && b.psid) await pauseUser(b.psid, 24 * 30);
+    if (b.action === "test") {
+      const text = "✅ Mongol AI: туршилтын мэдэгдэл. Мэдэгдэл зөв ажиллаж байна.";
+      const [tg, ms] = await Promise.all([sendTelegram(text), sendAdminMessenger(text)]);
+      msg = `Telegram: ${tg.ok ? "илгээгдлээ ✅" : tg.why} · Messenger: ${ms.ok ? "илгээгдлээ ✅" : ms.why}`;
+    }
+    if (b.action === "fixhook") {
+      const err = await fixWebhookFields();
+      msg = err ? `Webhook: ${err}` : "Webhook тохиргоо засагдлаа ✅";
+    }
+    res.statusCode = 303;
+    res.setHeader("Location", self + (msg ? `&msg=${encodeURIComponent(msg)}` : ""));
+    return res.end();
+  }
+
+  const [enabled, hook, tgChat, admin, rawHandoffs] = await Promise.all([
+    botEnabled(),
+    webhookFields(),
+    process.env.TELEGRAM_BOT_TOKEN ? telegramChatId() : Promise.resolve(""),
+    adminPsid(),
+    kvList("handoffs", 20),
+  ]);
+
+  const seen = new Set();
+  const handoffs = [];
+  for (const raw of rawHandoffs) {
+    try {
+      const h = JSON.parse(raw);
+      if (seen.has(h.psid)) continue;
+      seen.add(h.psid);
+      h.pausedUntil = await pausedUntil(h.psid);
+      handoffs.push(h);
+    } catch {}
+  }
+
+  const echoOk = hook.fields?.includes("message_echoes");
+  const form = (action, label, cls = "", psid = "") =>
+    `<form method="post" action="${self}"><input type="hidden" name="action" value="${action}">` +
+    (psid ? `<input type="hidden" name="psid" value="${esc(psid)}">` : "") +
+    `<button class="${cls}">${label}</button></form>`;
+
+  const row = (ok, label, detail) =>
+    `<div class="row"><span class="dot ${ok ? "ok" : "bad"}"></span><div><b>${label}</b><small>${detail}</small></div></div>`;
+
+  const notice = req.query.msg ? `<div class="notice">${esc(req.query.msg)}</div>` : "";
+
+  const html = `<!doctype html><html lang="mn"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Mongol AI бот</title>
+<style>
+:root{--bg:#f4f5f7;--card:#fff;--ink:#16181d;--muted:#6b7280;--line:#e5e7eb;--ok:#16a34a;--bad:#dc2626;--brand:#2563eb}
+@media (prefers-color-scheme:dark){:root{--bg:#0f1115;--card:#181b21;--ink:#eef0f3;--muted:#9aa3af;--line:#2a2f37}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 -apple-system,system-ui,sans-serif}
+main{max-width:560px;margin:0 auto;padding:16px}h1{font-size:20px;margin:4px 0 14px}h2{font-size:15px;margin:22px 0 8px;color:var(--muted);font-weight:600}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:10px}
+.status{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.big{font-size:18px;font-weight:700}.on{color:var(--ok)}.off{color:var(--bad)}
+button{font:inherit;font-weight:600;border:0;border-radius:10px;padding:10px 14px;background:var(--brand);color:#fff;cursor:pointer;width:100%}
+button.stop{background:var(--bad)}button.go{background:var(--ok)}button.ghost{background:transparent;color:var(--brand);border:1px solid var(--line)}
+form{margin:0}.status form{width:auto}.status button{width:auto;padding:12px 18px}
+.row{display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-top:1px solid var(--line)}.row:first-child{border-top:0}
+.row small{display:block;color:var(--muted)}.dot{width:10px;height:10px;border-radius:50%;margin-top:6px;flex:none}.dot.ok{background:var(--ok)}.dot.bad{background:var(--bad)}
+.h-top{display:flex;justify-content:space-between;gap:8px}.h-top small{color:var(--muted)}
+.quote{margin:6px 0 10px;color:var(--muted);word-wrap:break-word}.tag{display:inline-block;font-size:12px;padding:2px 8px;border-radius:99px;background:var(--bg);margin-top:4px}
+.actions{display:flex;gap:8px}.actions form{flex:1}
+.notice{background:#fef3c7;color:#78350f;border-radius:10px;padding:10px 12px;margin-bottom:10px}
+.empty{color:var(--muted);text-align:center;padding:18px}
+</style></head><body><main>
+<h1>🤖 Mongol AI бот</h1>
+${notice}
+<div class="card status">
+  <div><div class="big ${enabled ? "on" : "off"}">${enabled ? "▶️ Асаалттай" : "⏸️ Унтраалттай"}</div>
+  <small style="color:var(--muted)">${enabled ? "Хэрэглэгчдэд автоматаар хариулж байна" : "Бот хэнд ч хариулахгүй — та өөрөө хариулна"}</small></div>
+  ${enabled ? form("off", "Унтраах", "stop") : form("on", "Асаах", "go")}
+</div>
+${process.env.BOT_ENABLED === "false" ? `<div class="notice">Vercel дээр BOT_ENABLED=false тохируулсан тул бот үргэлж унтраалттай.</div>` : ""}
+
+<h2>Админ хүлээж буй чатууд</h2>
+${
+  handoffs.length
+    ? handoffs
+        .map(
+          (h) => `<div class="card"><div class="h-top"><b>${esc(h.name)}</b><small>${ubTime(h.at)}</small></div>
+<div class="tag">${esc(h.reason)}</div><div class="quote">“${esc(h.text)}”</div>
+<div class="actions">${
+            h.pausedUntil
+              ? form("resume", "🤖 Ботыг буцааж асаах", "ghost", h.psid)
+              : form("pause", "🔕 Энэ хүн дээр бот зогсоох", "ghost", h.psid)
+          }</div>
+<small style="color:var(--muted)">${h.pausedUntil ? `Бот зогссон: ${ubTime(h.pausedUntil)} хүртэл` : "Бот энэ хүнтэй ярилцаж байна"}</small></div>`
+        )
+        .join("")
+    : `<div class="card empty">Одоогоор хүлээгдэж буй чат алга</div>`
+}
+
+<h2>Тохиргоо</h2>
+<div class="card">
+${row(hasRedis, "Хадгалалт (Redis)", hasRedis ? "Холбогдсон — бот төлөвөө мартахгүй" : "Байхгүй — бот таныг гараар бичсэнийг мартаж, дундуур орно. Vercel → Storage → Upstash Redis холбоно уу.")}
+${row(echoOk, "Админы мессеж таних (message_echoes)", hook.error ? esc(hook.error) : echoOk ? "Идэвхтэй — та бичихэд бот тэр хүн дээр зогсоно" : "Идэвхгүй — доорх товчоор засна уу")}
+${row(!!tgChat, "Telegram мэдэгдэл", process.env.TELEGRAM_BOT_TOKEN ? (tgChat ? "Холбогдсон" : "Telegram ботдоо /start гэж бичнэ үү") : "Тохируулаагүй (TELEGRAM_BOT_TOKEN)")}
+${row(!!admin, "Messenger мэдэгдэл", admin ? "Бүртгэлтэй (24 цагийн дотор пэйж рүү бичсэн үед ирнэ)" : "Хувийн Messenger-ээсээ пэйж рүү “#admin нууцүг” гэж бичнэ")}
+</div>
+<div class="actions">${form("test", "🔔 Тест мэдэгдэл", "ghost")}${echoOk ? "" : form("fixhook", "🔧 Webhook засах", "ghost")}</div>
+</main></body></html>`;
+
+  res.setHeader("Content-Type", "text/html; charset=utf-8");
+  res.setHeader("Cache-Control", "no-store");
+  return res.status(200).send(html);
 }
 
 // ==========================================

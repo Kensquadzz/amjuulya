@@ -6,9 +6,9 @@ import { parseShaderParams } from '../src/engine/shaderParams';
 import { parseShaderLog, precheckFragment } from '../src/engine/gl';
 import { makeText, makeShader, normalizeProject } from '../src/engine/project';
 import { unitProgress, globalProgress, TEXT_PRESETS } from '../src/engine/text';
-import { SHADERS } from '../src/engine/shaders/library';
+import { SHADERS, shaderById } from '../src/engine/shaders/library';
 import { TEMPLATES, sampleProject } from '../src/engine/templates';
-import type { Keyframe } from '../src/engine/types';
+import type { Keyframe, ShaderLayer } from '../src/engine/types';
 
 const k = (t: number, v: number | string, e: Keyframe['ease'] = 'linear'): Keyframe => ({ id: String(t), t, v, ease: e });
 
@@ -131,5 +131,48 @@ describe('projects', () => {
   });
   it('rejects non-project JSON', () => {
     expect(() => normalizeProject({ foo: 1 })).toThrow();
+  });
+});
+
+describe('built-in shader upgrades', () => {
+  it('replaces an unedited older built-in shader source with the current one', async () => {
+    const { LEGACY_SHADERS, fingerprint } = await import('../src/engine/shaders/legacy');
+    const { execSync } = await import('node:child_process');
+    // the bloom source as first shipped (before the mip-chain rewrite)
+    const old = execSync('git show a0c7965:./src/engine/shaders/library.ts', { encoding: 'utf8' });
+    const m = old.match(/const BLOOM = `\$\{FILTER_H\}([\s\S]*?)`;/)!;
+    const H = old.match(/const H = `([\s\S]*?)`;/)![1];
+    const oldBloom = `${H}uniform sampler2D u_input; // everything composited below this layer\n${m[1]}`;
+    expect(LEGACY_SHADERS[fingerprint(oldBloom)]).toBe('bloom');
+    const p = normalizeProject({ ...sampleProject(), layers: [{ ...makeShader(5, 'bloom'), source: oldBloom, params: { u_radius: 30 } }] });
+    const l = p.layers[0] as ShaderLayer;
+    expect(l.source).toBe(shaderById('bloom')!.source);
+    expect(l.params.u_radius).toBe(30); // the user's settings survive the upgrade
+  });
+
+  it('keeps user-edited shader sources untouched', () => {
+    const src = shaderById('bloom')!.source.replace('Glow / bloom', 'my bloom');
+    const p = normalizeProject({ ...sampleProject(), layers: [{ ...makeShader(5, 'bloom'), source: src }] });
+    expect((p.layers[0] as ShaderLayer).source).toBe(src);
+  });
+
+  it('legacy table covers every shader source in the last commit', async () => {
+    const { LEGACY_SHADERS, fingerprint } = await import('../src/engine/shaders/legacy');
+    const { execSync } = await import('node:child_process');
+    const fs = await import('node:fs');
+    // load HEAD's library.ts and check each of its sources is current or listed
+    // (after editing a built-in shader, run: node scripts/legacy-shaders.mjs)
+    const dir = 'tests/.tmp-head/shaders';
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync('tests/.tmp-head/types.ts', 'export type BlendMode = string;\n');
+    fs.writeFileSync(`${dir}/library.ts`, execSync('git show HEAD:./src/engine/shaders/library.ts', { encoding: 'utf8' }));
+    try {
+      const head = await import('./.tmp-head/shaders/library');
+      const cur = new Set(SHADERS.map((s) => fingerprint(s.source)));
+      const stale = head.SHADERS.filter((s: { source: string }) => !cur.has(fingerprint(s.source)) && !(fingerprint(s.source) in LEGACY_SHADERS)).map((s: { id: string }) => s.id);
+      expect(stale).toEqual([]);
+    } finally {
+      fs.rmSync('tests/.tmp-head', { recursive: true, force: true });
+    }
   });
 });

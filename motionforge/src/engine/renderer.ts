@@ -501,6 +501,34 @@ export class Renderer {
   }
 
   /** Release the GL context entirely (export renderers). */
+  /**
+   * Confirm the GPU and 2D buffers really have the requested size. Browsers
+   * may silently clamp a WebGL drawing buffer, and iOS Safari blanks 2D
+   * canvases past its canvas-memory limit; either would make a "4K" export
+   * an upscale (or lose layers), so exports refuse to start instead.
+   */
+  verifySize(): string | null {
+    const gl = this.gl;
+    if (gl && (gl.drawingBufferWidth !== this.width || gl.drawingBufferHeight !== this.height)) {
+      return `This device's GPU gave a ${gl.drawingBufferWidth}×${gl.drawingBufferHeight} buffer instead of ${this.width}×${this.height}. Choose a lower resolution.`;
+    }
+    for (const c of [this.lctx, this.ictx, this.mctx]) {
+      try {
+        c.save();
+        c.setTransform(1, 0, 0, 1, 0, 0);
+        c.fillStyle = '#ffffff';
+        c.fillRect(this.width - 1, this.height - 1, 1, 1);
+        const px = c.getImageData(this.width - 1, this.height - 1, 1, 1).data;
+        c.clearRect(this.width - 1, this.height - 1, 1, 1);
+        c.restore();
+        if (px[3] === 0) throw new Error('blank');
+      } catch {
+        return `This device ran out of canvas memory at ${this.width}×${this.height}. Close other tabs or choose a lower resolution.`;
+      }
+    }
+    return null;
+  }
+
   destroy() {
     this.dispose();
     this.gl?.getExtension('WEBGL_lose_context')?.loseContext();

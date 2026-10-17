@@ -153,9 +153,10 @@ export function ExportSheet({ onClose }: { onClose: () => void }) {
           <video src={url} controls playsInline loop muted autoPlay className={`result-video ar-${project.aspect.replace(':', 'x')}`} />
           <p>
             <b>{result.filename}</b><br />
-            {mb(result.blob.size)} · {result.width}×{result.height} · {result.frames} frames · {result.mimeType} · {(result.elapsedMs / 1000).toFixed(1)}s
+            {mb(result.blob.size)} · {result.width}×{result.height}{result.verified?.[0] === result.width && result.verified?.[1] === result.height ? ' ✓ verified' : ''} · {result.frames} frames · {result.mimeType} · {(result.elapsedMs / 1000).toFixed(1)}s
           </p>
           <p className="hint">Sound: {result.audio === 'included' ? `included${result.audioCodec ? ` (${result.audioCodec.toUpperCase()})` : ''}` : result.audio === 'dropped' ? 'not included' : 'none in this project'}{result.filename.endsWith('.mov') ? ' — saved as MOV because this device cannot encode AAC; it plays in Photos and every Apple app.' : ''}</p>
+          {result.warnings?.map((w) => <div key={w} className="notice">{w}</div>)}
           {result.audio === 'dropped' && <div className="notice">This device could not encode audio for the chosen format, so the video has no sound. Choose an MP4 format, or the real-time MediaRecorder format.</div>}
           {result.droppedFrames ? <div className="notice">{result.droppedFrames} of {result.frames} frames were dropped because this device could not render in real time. Try 540p, Low preview quality, or the WebCodecs format.</div> : null}
           <div className="row-btns">

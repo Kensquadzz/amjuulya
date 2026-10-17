@@ -3,6 +3,7 @@ import { uid } from './util';
 import { presetById } from './text';
 import { shaderById, BLANK_SHADER } from './shaders/library';
 import { defaultParams } from './shaderParams';
+import { LEGACY_SHADERS, fingerprint } from './shaders/legacy';
 import type {
   BackgroundLayer, ImageLayer, Layer, LayerBase, LayerType, ParticleLayer, Project, ShaderLayer, ShapeLayer, TextAnim, TextLayer, TextPresetId,
 } from './types';
@@ -146,7 +147,17 @@ export function normalizeProject(raw: any): Project {
         merged.anim = { ...dflt.anim, ...(l.anim ?? {}), out: { ...dflt.anim.out, ...(l.anim?.out ?? {}) } };
         merged.cursor = { ...dflt.cursor, ...(l.cursor ?? {}) };
       }
-      if (l.type === 'shader') merged.params = { ...defaultParams(merged.source), ...(l.params ?? {}) };
+      if (l.type === 'shader') {
+        // an unedited copy of an older built-in shader picks up the current
+        // version (quality fixes); edited sources never match and stay as-is
+        const id = typeof merged.source === 'string' ? LEGACY_SHADERS[fingerprint(merged.source)] : undefined;
+        const def = id ? shaderById(id) : undefined;
+        if (def) {
+          if (merged.draft === merged.source) delete merged.draft;
+          merged.source = def.source;
+        }
+        merged.params = { ...defaultParams(merged.source), ...(l.params ?? {}) };
+      }
       return merged as Layer;
     });
   return out;

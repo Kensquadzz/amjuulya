@@ -27,6 +27,9 @@ uniform vec2 u_mouse;
 uniform float u_progress;
 in vec2 v_uv;
 out vec4 fragColor;
+// pixels per 1080p reference pixel: keeps pixel-sized details (grain,
+// scanlines, stars, RGB split) the same size at 720p, 1080p and 4K
+#define MF_PX (min(u_resolution.x, u_resolution.y) / 1080.0)
 `;
 
 const NOISE = `
@@ -157,7 +160,7 @@ void main() {
   float n = fbm(p + u_warp * q + vec2(t * 0.1, 0.0));
   vec3 col = mix(u_colorA, u_colorB, smoothstep(0.25, 0.75, n));
   col = mix(col, u_colorC, smoothstep(0.55, 0.95, q.x * n * 1.6));
-  col += (hash12(gl_FragCoord.xy + fract(u_time) * 100.0) - 0.5) * u_grain;
+  col += (hash12(floor(gl_FragCoord.xy / MF_PX) + fract(u_time) * 100.0) - 0.5) * u_grain;
   fragColor = vec4(col, 1.0);
 }
 `;
@@ -211,8 +214,8 @@ void main() {
   vec3 iri = 0.5 + 0.5 * cos(6.2831 * (n * u_shift + vec3(0.0, 0.33, 0.67) + t * 0.05));
   vec3 col = mix(u_colorA, u_colorB, n) * 0.55 + iri * 0.6;
   col *= 0.65 + 0.35 * smoothstep(0.3, 0.8, n);
-  col *= 1.0 - u_scan * 0.4 * (0.5 + 0.5 * sin(gl_FragCoord.y * 1.6));
-  float sparkle = step(0.997, hash12(floor(gl_FragCoord.xy / 3.0) + floor(u_time * 8.0)));
+  col *= 1.0 - u_scan * 0.4 * (0.5 + 0.5 * sin(gl_FragCoord.y / MF_PX * 1.6));
+  float sparkle = step(0.997, hash12(floor(gl_FragCoord.xy / (3.0 * MF_PX)) + floor(u_time * 8.0)));
   col += sparkle * 0.8;
   fragColor = vec4(col * u_intensity, 1.0);
 }
@@ -422,8 +425,11 @@ void main() {
   // glass depth: brighter near the edges, deeper in the middle
   float edge = smoothstep(-0.22, 0.0, d);
   col *= 0.78 + 0.4 * edge;
-  float rim = exp(-abs(d + 0.004) / 0.0035) * (0.35 + 0.65 * clamp(0.5 - q.x * 0.5 + q.y * 0.5, 0.0, 1.0));
-  vec3 card = col + vec3(1.0) * rim * 0.9;
+  float lit = 0.35 + 0.65 * clamp(0.5 - q.x * 0.5 + q.y * 0.5, 0.0, 1.0);
+  float rim = exp(-abs(d + 0.004) / 0.0035) * lit;
+  // crisp glass edge line on top of the soft rim, ~1.5 output px of anti-aliasing at any size
+  float rimLine = (1.0 - smoothstep(0.0016, 0.0016 + px, abs(d + 0.0032))) * lit;
+  vec3 card = col + vec3(1.0) * (rim * 0.65 + rimLine * 0.75);
   float g = exp(-max(d, 0.0) / 0.09) * u_glow * (1.0 - inside);
   vec3 glowC = mix(u_colorC, u_colorB, clamp(q.x * 0.5 + 0.5, 0.0, 1.0));
   float a = clamp(inside + g * 0.85, 0.0, 1.0);
@@ -463,7 +469,9 @@ void main() {
   float inside = 1.0 - smoothstep(-px, px, d);
   float a = atan(p.y, p.x * b.y / b.x);
   vec3 neon = cyc(a / 6.2831 + u_time * u_hueSpeed);
-  float core = 1.0 - smoothstep(u_thickness * 0.4, u_thickness, abs(d));
+  // crisp core: solid across the rim, anti-aliased over ~1.5 output pixels at any
+  // resolution (the old 0.4..1.0 ramp scaled with the frame and looked soft at 4K)
+  float core = 1.0 - smoothstep(u_thickness * 0.75 - px, u_thickness * 0.75 + px, abs(d));
   float halo = exp(-abs(d) / (u_thickness * 3.0));
   float outer = exp(-max(d, 0.0) / 0.05) * (1.0 - inside) * u_glow;
   float under = exp(-length((p - vec2(0.0, -b.y * 0.2)) / vec2(b.x * 1.25, b.y * 3.2))) * u_glow * 0.55;
@@ -535,7 +543,7 @@ void main() {
   float inside = 1.0 - smoothstep(-px, px, d);
   vec3 col = u_bg;
   // stars
-  vec2 g = floor(gl_FragCoord.xy / 3.0);
+  vec2 g = floor(gl_FragCoord.xy / (3.0 * MF_PX));
   float st = step(0.9965, h21(g)) * (0.4 + 0.6 * sin(u_time * 2.0 + h21(g + 3.0) * 30.0));
   col += vec3(st) * u_stars * (1.0 - inside);
   float side = clamp((p.x - c.x) / u_radius * 0.5 + 0.5, 0.0, 1.0);
@@ -543,6 +551,7 @@ void main() {
   // outer atmosphere and bright rim
   col += atmo * exp(-max(d, 0.0) / 0.15) * u_glow * (1.0 - inside) * 1.1;
   col += mix(atmo, vec3(1.0), 0.55) * exp(-abs(d) / 0.004) * u_glow;
+  col += mix(atmo, vec3(1.0), 0.75) * (1.0 - smoothstep(0.0012, 0.0012 + px, abs(d))) * u_glow * 0.5;
   // surface with inner rim light
   vec3 surf = u_surface + atmo * exp(d / 0.07) * 0.8 * u_glow + atmo * exp(d / 0.45) * 0.12;
   col = mix(col, surf, inside);
@@ -642,14 +651,14 @@ void main() {
   float bon = step(1.0 - u_blocks * 0.3 * g, bh);
   vec2 boff = bon * (vec2(h2(blk * 3.1 + frame), h2(blk * 7.3 + frame)) - 0.5) * 0.12;
   vec2 uv2 = uv + vec2(shift, 0.0) + boff;
-  float split = u_rgbSplit / u_resolution.x * (0.25 + g);
+  float split = u_rgbSplit * MF_PX / u_resolution.x * (0.25 + g);
   vec3 col;
   col.r = texture(u_input, uv2 + vec2(split, 0.0)).r;
   col.g = texture(u_input, uv2).g;
   col.b = texture(u_input, uv2 - vec2(split, split * 0.3)).b;
   col = mix(col, 1.0 - col, bon * step(0.7, h2(blk + 9.0)) * step(0.5, g));
-  col += (h2(gl_FragCoord.xy + frame) - 0.5) * u_noise * (0.2 + g * 0.6);
-  col *= 1.0 - u_scanlines * 0.35 * (0.5 + 0.5 * sin(gl_FragCoord.y * 3.14159 * 0.5));
+  col += (h2(floor(gl_FragCoord.xy / MF_PX) + frame) - 0.5) * u_noise * (0.2 + g * 0.6);
+  col *= 1.0 - u_scanlines * 0.35 * (0.5 + 0.5 * sin(gl_FragCoord.y / MF_PX * 3.14159 * 0.5));
   fragColor = vec4(col, 1.0);
 }
 `;
@@ -723,8 +732,8 @@ void main() {
   vec2 d = v_uv - 0.5;
   col *= 1.0 - u_vignette * dot(d, d) * 1.6;
   float f = floor(u_time * 24.0);
-  col += (h2(gl_FragCoord.xy + f * 17.0) - 0.5) * u_grain;
-  col *= 1.0 - u_scanlines * 0.3 * (0.5 + 0.5 * sin(gl_FragCoord.y * 2.0));
+  col += (h2(floor(gl_FragCoord.xy / MF_PX) + f * 17.0) - 0.5) * u_grain;
+  col *= 1.0 - u_scanlines * 0.3 * (0.5 + 0.5 * sin(gl_FragCoord.y / MF_PX * 2.0));
   col *= 1.0 - u_flicker * h2(vec2(f, 1.0));
   fragColor = vec4(col, 1.0);
 }
@@ -746,7 +755,7 @@ void main() {
   float band = smoothstep(0.0, 0.08, abs(fract(uv.y - u_time * u_roll * 0.2) - 0.5) - 0.38);
   float jit = (vnoise(vec2(uv.y * 80.0, u_time * 20.0)) - 0.5) * u_jitter * 0.01 * (1.0 - band * 0.8 + 0.2);
   uv.x += jit;
-  float s = u_rgb / u_resolution.x;
+  float s = u_rgb * MF_PX / u_resolution.x;
   vec3 col = vec3(texture(u_input, uv + vec2(s, 0.0)).r, texture(u_input, uv).g, texture(u_input, uv - vec2(s, 0.0)).b);
   col *= 1.0 - u_strength * (0.5 + 0.5 * sin(uv.y * u_lines * 3.14159));
   col *= 0.85 + 0.15 * band;

@@ -9,7 +9,7 @@
 // (Safari: MP4, Chrome/Firefox: WebM). Slow devices may drop frames.
 //
 // The file extension always matches the real container; nothing is renamed.
-import { AudioBufferSource, BufferTarget, CanvasSource, MovOutputFormat, Mp4OutputFormat, Output, Quality, WebMOutputFormat, canEncodeAudio, canEncodeVideo, type AudioCodec, type VideoCodec } from 'mediabunny';
+import { ALL_FORMATS, AudioBufferSource, BlobSource, BufferTarget, CanvasSource, Input, MovOutputFormat, Mp4OutputFormat, Output, Quality, WebMOutputFormat, canEncodeAudio, canEncodeVideo, type AudioCodec, type VideoCodec } from 'mediabunny';
 import { mixdown } from './audio';
 import { Renderer } from './renderer';
 import { ASPECTS, type Project } from './types';
@@ -43,6 +43,20 @@ export interface ExportResult {
   /** what happened to the soundtrack */
   audio: 'none' | 'included' | 'dropped';
   audioCodec?: string;
+  /** problems that did not stop the export (e.g. a font fell back) */
+  warnings?: string[];
+  /** frame size read back from the finished file */
+  verified?: [number, number];
+}
+
+async function probeSize(blob: Blob): Promise<[number, number] | null> {
+  try {
+    const input = new Input({ formats: ALL_FORMATS, source: new BlobSource(blob) });
+    const v = await input.getPrimaryVideoTrack();
+    const out: [number, number] | null = v ? [v.displayWidth, v.displayHeight] : null;
+    input.dispose();
+    return out;
+  } catch { return null; } // some MediaRecorder WebM files carry no size header
 }
 
 export interface Capabilities {
@@ -116,6 +130,18 @@ async function loadFonts(p: Project) {
   await document.fonts.ready;
 }
 
+/** Text layers whose web font did not load (they would render in a fallback font). */
+function missingFonts(p: Project): string[] {
+  if (!document.fonts?.check) return [];
+  const out = new Set<string>();
+  for (const l of p.layers) {
+    if (l.type !== 'text') continue;
+    const font = `${l.italic ? 'italic ' : ''}${l.fontWeight} 64px "${l.fontFamily}"`;
+    try { if (!document.fonts.check(font, l.text || 'A')) out.add(`${l.fontFamily} ${l.fontWeight}`); } catch { /* invalid family name */ }
+  }
+  return [...out].map((f) => `Font "${f}" was not available, so a fallback font was used.`);
+}
+
 async function loadImages(p: Project) {
   await Promise.all(
     p.layers.filter((l) => l.type === 'image' && l.src).map((l) => new Promise<void>((res) => {
@@ -162,6 +188,10 @@ export async function exportVideo(
   document.body.appendChild(canvas);
   const renderer = new Renderer(canvas, { preserveDrawingBuffer: true });
   renderer.setSize(width, height);
+  // render natively at the target size or not at all — never upscale silently
+  const sizeErr = renderer.verifySize();
+  if (sizeErr) { renderer.destroy(); canvas.remove(); throw new Error(sizeErr); }
+  const warnings = missingFonts(project);
   // compile every shader up-front so failures surface before encoding
   for (const l of project.layers) {
     if (l.type !== 'shader') continue;
@@ -186,8 +216,14 @@ export async function exportVideo(
     }
   }
   try {
-    if (s.method === 'webcodecs') return await viaWebCodecs();
-    return await viaMediaRecorder();
+    const res = s.method === 'webcodecs' ? await viaWebCodecs() : await viaMediaRecorder();
+    // read the finished file back: the size we report is the size it really has
+    const real = await probeSize(res.blob);
+    if (real) {
+      res.verified = real;
+      if (real[0] !== width || real[1] !== height) (res.warnings ??= []).push(`The encoder wrote ${real[0]}×${real[1]} instead of ${width}×${height}.`);
+    }
+    return res;
   } finally {
     renderer.destroy();
     canvas.remove();
@@ -253,7 +289,7 @@ export async function exportVideo(
       blob: new Blob([buf], { type: mimeType }),
       filename: `${safeName(project.name)}-${width}x${height}.${container}`,
       mimeType, width, height, frames, method: 'webcodecs', elapsedMs: performance.now() - t0,
-      audio: !mix ? 'none' : audioCodec ? 'included' : 'dropped', audioCodec: audioCodec ?? undefined,
+      audio: !mix ? 'none' : audioCodec ? 'included' : 'dropped', audioCodec: audioCodec ?? undefined, warnings,
     };
   }
 
@@ -336,7 +372,7 @@ export async function exportVideo(
     return {
       blob, filename: `${safeName(project.name)}-${width}x${height}.${ext}`, mimeType: type.split(';')[0], width, height, frames,
       method: 'mediarecorder', droppedFrames: dropped, elapsedMs: performance.now() - t0,
-      audio: mix ? 'included' : 'none',
+      audio: mix ? 'included' : 'none', warnings,
     };
   }
 }

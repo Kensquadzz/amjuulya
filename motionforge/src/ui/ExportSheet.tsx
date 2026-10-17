@@ -33,6 +33,9 @@ export function ExportSheet({ onClose }: { onClose: () => void }) {
   useEffect(() => () => { if (url) URL.revokeObjectURL(url); }, [url]);
 
   const size = exportSize(project, scale);
+  const uhdOk = !!caps && choice.startsWith('wc:') && !!caps.webcodecs.find((c) => `wc:${c.codec}` === choice)?.uhd;
+  // leaving a 4K-capable codec drops back to Full HD
+  useEffect(() => { if (scale > 1 && caps && !uhdOk) setScale(1); }, [uhdOk, scale, caps]);
   const settings = (): ExportSettings => {
     const [m, v] = [choice.slice(0, 2), choice.slice(3)];
     return m === 'wc'
@@ -95,7 +98,8 @@ export function ExportSheet({ onClose }: { onClose: () => void }) {
           <div className="prop">
             <label>Resolution</label>
             <select value={scale} onChange={(e) => setScale(+e.target.value)}>
-              <option value={1}>Full · {exportSize(project, 1).width}×{exportSize(project, 1).height}</option>
+              {uhdOk && <option value={2}>4K · {exportSize(project, 2).width}×{exportSize(project, 2).height}</option>}
+              <option value={1}>Full HD · {exportSize(project, 1).width}×{exportSize(project, 1).height}</option>
               <option value={2 / 3}>720p · {exportSize(project, 2 / 3).width}×{exportSize(project, 2 / 3).height}</option>
               <option value={0.5}>540p · {exportSize(project, 0.5).width}×{exportSize(project, 0.5).height}</option>
             </select>
@@ -122,7 +126,9 @@ export function ExportSheet({ onClose }: { onClose: () => void }) {
               ? `Renders all ${Math.round(duration * fps)} frames exactly, independent of device speed. Output: ${size.width}×${size.height}.`
               : `Records the canvas while the animation plays in real time (${duration.toFixed(1)}s). Slow devices may drop frames — the result will tell you how many. Prefer WebCodecs when listed.`}
             {isIOS && ' On iPhone, MP4 · H.264 can be saved to Photos from the share sheet.'}
+            {scale > 1 && ` 4K uses about ${Math.round((size.width * size.height * 4 * 7) / 1048576)} MB of GPU memory while rendering and makes a large file — keep exports under ~30s on phones, and pick HEVC if offered for a smaller file.`}
             {scale === 1 && project.aspect !== '1:1' && ' If the export fails on an older iPhone, choose 720p.'}
+            {caps && choice.startsWith('wc:') && !uhdOk && ' 4K is not offered because this device’s encoder does not accept 4K for the selected format.'}
           </p>
           {issues.map((i) => <div key={i} className="notice error">{i}</div>)}
           <button className="wide primary" disabled={!choice || issues.length > 0} onClick={start}>Export</button>

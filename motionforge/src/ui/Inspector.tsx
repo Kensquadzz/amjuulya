@@ -27,7 +27,7 @@ export function Inspector({ onOpenCode }: { onOpenCode: () => void }) {
       {layer.type === 'shader' && <ShaderProps l={layer} t={t} onOpenCode={onOpenCode} />}
       {layer.type === 'shape' && (
         <Section title="Shape">
-          <SelectProp layer={layer} path="shape" label="Kind" t={t} options={['rect', 'circle', 'ring', 'line', 'triangle', 'cross'].map((v) => ({ value: v, label: v }))} />
+          <SelectProp layer={layer} path="shape" label="Kind" t={t} options={['rect', 'circle', 'ring', 'line', 'triangle', 'cross', 'swoosh', 'barcode'].map((v) => ({ value: v, label: v }))} />
           <NumProp layer={layer} path="w" label="Width" min={0} max={2400} step={1} t={t} />
           <NumProp layer={layer} path="h" label="Height" min={0} max={2400} step={1} t={t} />
           <NumProp layer={layer} path="radius" label="Corner" min={0} max={600} step={1} t={t} />
@@ -50,7 +50,11 @@ export function Inspector({ onOpenCode }: { onOpenCode: () => void }) {
         <Section title="Image">
           <NumProp layer={layer} path="w" label="Width" min={10} max={3000} step={1} t={t} />
           <NumProp layer={layer} path="blur" label="Blur" min={0} max={60} step={0.5} t={t} />
+          <NumProp layer={layer} path="shadow" label="Shadow blur" min={0} max={200} step={1} t={t} />
+          <NumProp layer={layer} path="shadowOpacity" label="Shadow alpha" min={0} max={1} step={0.01} t={t} />
+          <NumProp layer={layer} path="shadowY" label="Shadow Y" min={-200} max={200} step={1} t={t} />
           <ImagePicker layerId={layer.id} />
+          {!layer.src && <p className="hint">Empty slot — only shown in the editor, never exported. Transparent PNG cut-outs (people, products, objects) look best.</p>}
         </Section>
       )}
       {layer.type === 'background' && (
@@ -59,6 +63,8 @@ export function Inspector({ onOpenCode }: { onOpenCode: () => void }) {
           <ColorProp layer={layer} path="colorA" label="Color A" t={t} />
           <ColorProp layer={layer} path="colorB" label="Color B" t={t} />
           <NumProp layer={layer} path="angle" label="Angle" min={-360} max={360} step={1} t={t} unit="°" />
+          {layer.mode === 'radial' && <NumProp layer={layer} path="inner" label="Inner size" min={0} max={0.95} step={0.01} t={t} />}
+          {layer.mode === 'radial' && <NumProp layer={layer} path="scale" label="Radius" min={0.1} max={3} step={0.01} t={t} />}
         </Section>
       )}
       {layer.type === 'particles' && (
@@ -133,11 +139,11 @@ function TextProps({ l, t }: { l: TextLayer; t: number }) {
             const w = f.weights.reduce((a, b) => (Math.abs(b - l.fontWeight) < Math.abs(a - l.fontWeight) ? b : a));
             store.updateLayer(l.id, (x) => ({ ...x, fontFamily: f.family, fontWeight: w }));
           }}>
-            {FONTS.map((f) => <option key={f.family} value={f.family} style={{ fontFamily: f.stack }}>{f.family}</option>)}
+            {FONTS.map((f) => <option key={f.family} value={f.family} style={{ fontFamily: f.stack }}>{f.family}{f.cyrillic ? ' · Кирилл' : ''}</option>)}
           </select>
         </div>
         <SelectProp layer={l} path="fontWeight" label="Weight" t={t} options={fam.weights.map((w) => ({ value: w, label: String(w) }))} />
-        <ToggleProp layer={l} path="italic" label="Italic" t={t} />
+        {fam.italic ? <ToggleProp layer={l} path="italic" label="Italic" t={t} /> : null}
         <ToggleProp layer={l} path="uppercase" label="Uppercase" t={t} />
         <SelectProp layer={l} path="align" label="Align" t={t} options={[{ value: 'left', label: 'Left' }, { value: 'center', label: 'Center' }, { value: 'right', label: 'Right' }]} />
         <NumProp layer={l} path="fontSize" label="Size" min={8} max={600} step={1} t={t} unit="px" />

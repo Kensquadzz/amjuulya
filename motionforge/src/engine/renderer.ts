@@ -91,6 +91,8 @@ export class Renderer {
   width = 0;
   height = 0;
   pointer: { x: number; y: number; down: boolean } | null = null; // normalized, y down
+  /** editor preview only: draw empty image slots (never set for export) */
+  placeholders = false;
   onStatus?: (s: RendererStatus) => void;
   /** called when an async resource (font, image) becomes ready */
   onNeedsRedraw?: () => void;
@@ -245,6 +247,7 @@ export class Renderer {
       ctx, W, H, t, density,
       k: Math.min(W, H) / 1080,
       pointer: this.pointer ? { x: this.pointer.x * W, y: this.pointer.y * H, down: this.pointer.down } : null,
+      placeholders: this.placeholders,
       requestRedraw: () => this.onNeedsRedraw?.(),
     };
   }
@@ -258,7 +261,7 @@ export class Renderer {
       case 'image': drawImageLayer(env, L); break;
       case 'particles': drawParticles(env, L); break;
       case 'text': {
-        ensureFont(cssFont(L, 64), () => this.onNeedsRedraw?.());
+        ensureFont(cssFont(L, 64), () => this.onNeedsRedraw?.(), L.text || 'A');
         if (textNeedsIsolation(L)) {
           const ic = this.ictx;
           ic.setTransform(1, 0, 0, 1, 0, 0);

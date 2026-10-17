@@ -40,6 +40,8 @@ export function animatableProps(l: Layer): PropDef[] {
       return [...COMMON,
         { path: 'w', label: 'Width', kind: 'num', min: 10, max: 4000, step: 1 },
         { path: 'blur', label: 'Blur', kind: 'num', min: 0, max: 60, step: 0.5 },
+        { path: 'shadow', label: 'Shadow blur', kind: 'num', min: 0, max: 200, step: 1 },
+        { path: 'shadowOpacity', label: 'Shadow alpha', kind: 'num', min: 0, max: 1, step: 0.01 },
       ];
     case 'background':
       return [

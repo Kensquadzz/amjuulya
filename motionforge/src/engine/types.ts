@@ -77,6 +77,8 @@ export type TextPresetId =
   | 'wordByWord'
   | 'rotate'
   | 'cinematic'
+  | 'typePop'
+  | 'blurReveal'
   | 'none';
 
 export type TextUnit = 'char' | 'word' | 'line' | 'all';
@@ -131,7 +133,7 @@ export interface TextLayer extends LayerBase {
   cursor: CursorOpts;
 }
 
-export type ShapeKind = 'rect' | 'circle' | 'ring' | 'line' | 'triangle' | 'cross';
+export type ShapeKind = 'rect' | 'circle' | 'ring' | 'line' | 'triangle' | 'cross' | 'swoosh' | 'barcode';
 
 export interface ShapeLayer extends LayerBase {
   type: 'shape';
@@ -149,13 +151,21 @@ export interface ShapeLayer extends LayerBase {
   mask?: 'none' | 'alpha' | 'inverted';
   /** soft edge for masks (reference px) */
   feather?: number;
+  /** pattern seed (barcode) */
+  seed?: number;
 }
 
 export interface ImageLayer extends LayerBase {
   type: 'image';
-  src: string; // data URL
+  src: string; // data URL ('' = empty slot, shown as a placeholder in the editor only)
   w: number; // reference px width
   blur: number;
+  /** drop shadow: blur radius (reference px), opacity 0..1, vertical offset */
+  shadow?: number;
+  shadowOpacity?: number;
+  shadowY?: number;
+  /** placeholder aspect (h / w) for an empty slot */
+  slotRatio?: number;
 }
 
 export interface BackgroundLayer extends LayerBase {
@@ -164,6 +174,8 @@ export interface BackgroundLayer extends LayerBase {
   colorA: string;
   colorB: string;
   angle: number;
+  /** radial only: fraction of the radius that stays colorA before the blend starts */
+  inner?: number;
 }
 
 export interface ParticleLayer extends LayerBase {

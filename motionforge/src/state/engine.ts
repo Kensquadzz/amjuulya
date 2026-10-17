@@ -18,6 +18,7 @@ class Engine {
   attach(canvas: HTMLCanvasElement) {
     this.detach();
     this.renderer = new Renderer(canvas);
+    this.renderer.placeholders = true;
     this.player = new Player(this.renderer);
     this.player.density = QUALITY_DENSITY[this.quality];
     const store = getStore();

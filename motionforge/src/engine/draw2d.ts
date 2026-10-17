@@ -12,6 +12,8 @@ export interface Env2D {
   t: number;
   /** particle density multiplier for adaptive preview quality */
   density: number;
+  /** draw editor-only hints (empty image slots); false for export */
+  placeholders?: boolean;
   /** pointer in composition pixels, or null */
   pointer: { x: number; y: number; down: boolean } | null;
   requestRedraw: () => void;
@@ -32,6 +34,7 @@ export function drawBackground(env: Env2D, l: BackgroundLayer) {
   } else {
     const g = ctx.createRadialGradient(l.x * W, l.y * H, 0, l.x * W, l.y * H, (Math.hypot(W, H) / 2) * l.scale);
     g.addColorStop(0, l.colorA);
+    if (l.inner) g.addColorStop(clamp(l.inner, 0, 0.99), l.colorA);
     g.addColorStop(1, l.colorB);
     ctx.fillStyle = g;
   }
@@ -69,6 +72,43 @@ function shapePath(ctx: CanvasRenderingContext2D, l: ShapeLayer, w: number, h: n
       ctx.moveTo(-w / 2, 0); ctx.lineTo(w / 2, 0);
       ctx.moveTo(0, -h / 2); ctx.lineTo(0, h / 2);
       return w + h;
+    case 'swoosh':
+      // liquid blade hugging a corner: anchored at its top-right corner (0,0),
+      // running left along the top edge and down the right edge, with a
+      // concave inner curve ending in a sharp tip. Rotate 90/180/270° for other corners.
+      ctx.moveTo(0, 0);
+      ctx.lineTo(-w, 0);
+      // inner edge: concave sweep from the far end of the top edge down to the tip
+      ctx.bezierCurveTo(-w * 0.42, h * 0.04, -w * 0.3, h * 0.42, -w * 0.3, h);
+      // back up along a tighter curve to the right edge
+      ctx.bezierCurveTo(-w * 0.2, h * 0.5, -w * 0.06, h * 0.2, 0, h * 0.12);
+      ctx.closePath();
+      return 2 * (w + h);
+    case 'barcode':
+      ctx.rect(-w / 2, -h / 2, w, h);
+      return w;
+  }
+}
+
+/** Deterministic barcode bars; `draw` reveals them left to right. */
+function drawBarcode(ctx: CanvasRenderingContext2D, l: ShapeLayer, w: number, h: number) {
+  const seed = l.seed ?? 7;
+  const n = 64;
+  const widths: number[] = [];
+  let total = 0;
+  for (let i = 0; i < n; i++) {
+    const bw = 1 + Math.floor(hash(i, seed, 11) * 4);
+    widths.push(bw);
+    total += bw;
+  }
+  const unit = w / total;
+  const limit = -w / 2 + w * clamp(l.draw);
+  ctx.fillStyle = l.fill;
+  let x = -w / 2;
+  for (let i = 0; i < n; i++) {
+    const bw = widths[i] * unit;
+    if (i % 2 === 0 && x < limit) ctx.fillRect(x, -h / 2, Math.min(bw, limit - x), h);
+    x += bw;
   }
 }
 
@@ -79,6 +119,11 @@ export function drawShape(env: Env2D, l: ShapeLayer) {
   ctx.rotate((l.rotation * Math.PI) / 180);
   ctx.scale(l.scale, l.scale);
   const w = l.w * k, h = l.h * k;
+  if (l.shape === 'barcode') {
+    drawBarcode(ctx, l, w, h);
+    ctx.restore();
+    return;
+  }
   const len = shapePath(ctx, l, w, h, l.radius * k);
   const draw = clamp(l.draw);
   const glow = l.glow * k * l.scale;
@@ -107,9 +152,39 @@ export function drawShape(env: Env2D, l: ShapeLayer) {
 
 const imageCache = new Map<string, HTMLImageElement>();
 
+function drawSlot(env: Env2D, l: ImageLayer) {
+  const { ctx, W, H, k } = env;
+  const w = l.w * k, h = w * (l.slotRatio ?? 1);
+  ctx.save();
+  ctx.translate(l.x * W, l.y * H);
+  ctx.rotate((l.rotation * Math.PI) / 180);
+  ctx.scale(l.scale, l.scale);
+  ctx.fillStyle = 'rgba(128,128,140,0.18)';
+  ctx.strokeStyle = 'rgba(128,128,140,0.85)';
+  ctx.lineWidth = Math.max(1, 3 * k);
+  ctx.setLineDash([14 * k, 10 * k]);
+  ctx.beginPath();
+  ctx.roundRect?.(-w / 2, -h / 2, w, h, 24 * k);
+  if (!ctx.roundRect) ctx.rect(-w / 2, -h / 2, w, h);
+  ctx.fill();
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle = 'rgba(110,110,120,0.95)';
+  ctx.font = `600 ${Math.round(Math.min(w, h) * 0.075)}px Inter, sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('＋ ' + (l.name || 'Image'), 0, 0);
+  ctx.font = `400 ${Math.round(Math.min(w, h) * 0.05)}px Inter, sans-serif`;
+  ctx.fillText('Inspect → Replace image (PNG cutout)', 0, Math.min(w, h) * 0.1);
+  ctx.restore();
+}
+
 export function drawImageLayer(env: Env2D, l: ImageLayer) {
   const { ctx, W, H, k } = env;
-  if (!l.src) return;
+  if (!l.src) {
+    if (env.placeholders) drawSlot(env, l);
+    return;
+  }
   let img = imageCache.get(l.src);
   if (!img) {
     img = new Image();
@@ -124,6 +199,19 @@ export function drawImageLayer(env: Env2D, l: ImageLayer) {
   ctx.translate(l.x * W, l.y * H);
   ctx.rotate((l.rotation * Math.PI) / 180);
   ctx.scale(l.scale, l.scale);
+  if ((l.shadow ?? 0) > 0.5 && (l.shadowOpacity ?? 0) > 0) {
+    // drop shadow for cut-out PNGs (pass drawn far away, only the shadow lands)
+    const m = ctx.getTransform();
+    const sc = Math.hypot(m.a, m.b) || 1;
+    const off = (W * 3) / sc;
+    ctx.save();
+    ctx.shadowColor = `rgba(0,0,0,${Math.min(1, l.shadowOpacity ?? 0.4)})`;
+    ctx.shadowBlur = (l.shadow ?? 0) * k * l.scale;
+    ctx.shadowOffsetX = m.a * off;
+    ctx.shadowOffsetY = m.b * off + (l.shadowY ?? 0) * k * l.scale;
+    ctx.drawImage(img, -w / 2 - off, -h / 2, w, h);
+    ctx.restore();
+  }
   if (l.blur > 0.3) {
     // same offset-shadow blur as text (works without canvas `filter`)
     const m = ctx.getTransform();

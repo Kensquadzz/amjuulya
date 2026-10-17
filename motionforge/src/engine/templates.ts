@@ -3,12 +3,14 @@
 import { uid } from './util';
 import { makeBackground, makeParticles, makeShader, makeShape, makeText, newProject } from './project';
 import type { AspectId, EasingId, Keyframe, KfValue, Layer, Project } from './types';
+import { REEL_TEMPLATES } from './templates-reels';
 
 export type TemplateCategory =
+  | 'Reels'
   | 'Typography' | 'Text reveal' | 'Minimal' | 'Kinetic type' | 'Glitch' | 'Glow' | 'Particles' | 'Grid' | 'Distortion' | 'Light effects' | 'Shader effects';
 
 export const TEMPLATE_CATEGORIES: TemplateCategory[] = [
-  'Typography', 'Text reveal', 'Minimal', 'Kinetic type', 'Glitch', 'Glow', 'Particles', 'Grid', 'Distortion', 'Light effects', 'Shader effects',
+  'Reels', 'Typography', 'Text reveal', 'Minimal', 'Kinetic type', 'Glitch', 'Glow', 'Particles', 'Grid', 'Distortion', 'Light effects', 'Shader effects',
 ];
 
 export interface Template {
@@ -24,6 +26,7 @@ const kf = (t: number, v: KfValue, ease: EasingId = 'easeInOutCubic'): Keyframe 
 const D = 6;
 
 export const TEMPLATES: Template[] = [
+  ...REEL_TEMPLATES,
   {
     id: 'minimal-white', name: 'Minimal White Typography', categories: ['Typography', 'Minimal'], swatch: ['#f4f3ef', '#111111'],
     build: () => ({

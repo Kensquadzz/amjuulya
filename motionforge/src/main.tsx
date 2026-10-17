@@ -5,6 +5,7 @@ import { storage } from './engine/storage';
 import { normalizeProject } from './engine/project';
 import { sampleProject } from './engine/templates';
 import { engine } from './state/engine';
+import './fonts.css';
 import './styles.css';
 
 async function boot() {

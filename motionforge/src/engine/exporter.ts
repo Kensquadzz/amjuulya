@@ -42,7 +42,7 @@ export interface ExportResult {
 }
 
 export interface Capabilities {
-  webcodecs: { codec: VideoCodec; label: string; container: 'mp4' | 'webm' }[];
+  webcodecs: { codec: VideoCodec; label: string; container: 'mp4' | 'webm'; uhd: boolean }[];
   mediarecorder: { mimeType: string; label: string; ext: string }[];
   webgl2: boolean;
 }
@@ -75,7 +75,12 @@ export async function detectCapabilities(width = 1080, height = 1920): Promise<C
   if (typeof VideoEncoder !== 'undefined') {
     for (const codec of ['avc', 'hevc', 'vp9', 'av1', 'vp8'] as VideoCodec[]) {
       try {
-        if (await canEncodeVideo(codec, { width, height, bitrate: 8e6 })) webcodecs.push({ codec, ...CODEC_LABEL[codec] });
+        if (await canEncodeVideo(codec, { width, height, bitrate: 8e6 })) {
+          // 4K = 2× the 1080-reference size; only offered when the encoder accepts it
+          let uhd = false;
+          try { uhd = await canEncodeVideo(codec, { width: width * 2, height: height * 2, bitrate: 40e6, frameRate: 30 }); } catch { /* no 4K */ }
+          webcodecs.push({ codec, ...CODEC_LABEL[codec], uhd });
+        }
       } catch { /* unsupported */ }
     }
   }
@@ -93,15 +98,17 @@ export async function detectCapabilities(width = 1080, height = 1920): Promise<C
 
 function bitrateFor(w: number, h: number, fps: number, q: QualityLevel) {
   const bpp = q === 'high' ? 0.16 : q === 'medium' ? 0.09 : 0.05;
-  return Math.round(Math.min(40e6, Math.max(1e6, w * h * fps * bpp)));
+  // 4K needs a higher ceiling (~40–60 Mbps at high quality)
+  const cap = w * h > 4e6 ? 60e6 : 40e6;
+  return Math.round(Math.min(cap, Math.max(1e6, w * h * fps * bpp)));
 }
 
 /** Make sure every web font used by the project is loaded before frame 0. */
 async function loadFonts(p: Project) {
   if (!document.fonts) return;
-  const fonts = new Set<string>();
-  for (const l of p.layers) if (l.type === 'text') fonts.add(cssFont(l, 64));
-  await Promise.all([...fonts].map((f) => document.fonts.load(f).catch(() => undefined)));
+  // pass the real text so the needed unicode subsets (e.g. Cyrillic) are loaded
+  const jobs = p.layers.filter((l) => l.type === 'text').map((l) => document.fonts.load(cssFont(l as any, 64), (l as any).text || 'A').catch(() => undefined));
+  await Promise.all(jobs);
   await document.fonts.ready;
 }
 
@@ -121,6 +128,8 @@ export function validateForExport(p: Project, s: ExportSettings): string[] {
   if (!(s.duration > 0)) errs.push('Duration must be greater than zero.');
   if (s.duration > 120) errs.push('Exports are limited to 120 seconds to stay within mobile memory limits.');
   if (![24, 25, 30, 50, 60].includes(s.fps)) errs.push('Unsupported frame rate.');
+  if (s.scale > 1 && s.method !== 'webcodecs') errs.push('4K needs the frame-exact WebCodecs format (real-time recording cannot keep up at 4K).');
+  if (s.scale > 1 && s.duration > 60) errs.push('4K exports are limited to 60 seconds to stay within phone memory.');
   return errs;
 }
 

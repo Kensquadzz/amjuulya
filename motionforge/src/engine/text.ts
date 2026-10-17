@@ -177,6 +177,25 @@ export const TEXT_PRESETS: TextPresetDef[] = [
     state: (p, e, c) => ({ ...identity(), op: Math.pow(fade(p, 1.4), 0.8), blur: 26 * c.k * (1 - e), sc: lerp(1 + 0.12 * c.k, 1, e) }),
   },
   {
+    // reel-style captions: each letter pops up quickly, like fast typing
+    id: 'typePop', label: 'Type pop (reel caption)',
+    defaults: { unit: 'char', duration: 0.22, stagger: 0.032, ease: 'easeOutBack', direction: 'up', intensity: 1, order: 'forward' },
+    state: (p, e, c) => ({ ...identity(), op: fade(p, 3), ty: -c.dir[1] * 0.35 * c.k * (1 - e), tx: -c.dir[0] * 0.35 * c.k * (1 - e), sc: lerp(0.55, 1, e) }),
+  },
+  {
+    // heavy headline lines resolving out of a strong horizontal motion blur
+    id: 'blurReveal', label: 'Blur reveal (reel headline)',
+    defaults: { unit: 'line', duration: 0.7, stagger: 0.22, ease: 'easeOutCubic', direction: 'right', intensity: 1, order: 'forward' },
+    state: (p, e, c) => ({
+      ...identity(),
+      op: Math.pow(fade(p, 1.6), 0.9),
+      blur: 34 * c.k * (1 - e),
+      sx: 1 + 0.18 * c.k * (1 - e),
+      tx: -c.dir[0] * 0.25 * c.k * (1 - e),
+      ty: -c.dir[1] * 0.25 * c.k * (1 - e),
+    }),
+  },
+  {
     id: 'none', label: 'No animation',
     defaults: { unit: 'all', duration: 0.01, stagger: 0, ease: 'linear', intensity: 1, order: 'forward' },
     state: () => identity(),

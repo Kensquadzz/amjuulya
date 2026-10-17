@@ -209,9 +209,16 @@ export async function exportVideo(
       format: container === 'mp4' ? new Mp4OutputFormat({ fastStart: 'in-memory' }) : container === 'mov' ? new MovOutputFormat({ fastStart: 'in-memory' }) : new WebMOutputFormat(),
       target: new BufferTarget(),
     });
+    // Safari's hardware encoder undershoots a variable target badly on dark,
+    // smooth motion graphics (a 40 Mbps 4K request came out at ~9 Mbps and
+    // looked soft), so High quality asks for a constant bitrate where the
+    // encoder supports it (Chromium's software H.264 does not at 4K).
+    const bitrate = bitrateFor(width, height, s.fps, s.quality);
+    const cbr = new Quality({ bitrate, bitrateMode: 'constant' });
+    const useCbr = s.quality === 'high' && await canEncodeVideo(codec, { width, height, quality: cbr, frameRate: s.fps }).catch(() => false);
     const source = new CanvasSource(canvas, {
       codec,
-      quality: new Quality({ bitrate: bitrateFor(width, height, s.fps, s.quality) }),
+      quality: useCbr ? cbr : new Quality({ bitrate }),
       keyFrameInterval: 2,
     });
     output.addVideoTrack(source, { frameRate: s.fps });

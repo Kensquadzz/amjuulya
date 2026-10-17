@@ -149,6 +149,9 @@ await tool('Буцах');
 await tool('Дуу');
 await page.getByRole('button', { name: '＋ Add sound effect' }).tap();
 await page.getByRole('button', { name: 'Add Whoosh', exact: true }).tap();
+check('studio sound library listed', await page.getByRole('button', { name: 'Add Fire whoosh', exact: true }).isVisible());
+await page.getByRole('button', { name: 'Add Fire whoosh', exact: true }).tap();
+await wait(600);
 await wait(400);
 await page.getByRole('button', { name: 'Close' }).tap();
 await page.getByRole('button', { name: 'Built-in music…' }).tap();
@@ -157,8 +160,8 @@ await wait(400);
 await page.getByRole('button', { name: 'Close' }).tap();
 await page.locator('.done-btn').tap();
 st = await S();
-check('sound effect + background music added', (st.project.audio || []).length === 2, (st.project.audio || []).map((c) => c.name).join(', '));
-check('audio lanes on the timeline', (await page.locator('.cap-bar.bar-audio').count()) === 2);
+check('sound effects + background music added', (st.project.audio || []).length === 3 && st.project.audio.some((c) => c.assetId === 'sfx:rec-fire-whoosh'), (st.project.audio || []).map((c) => c.name).join(', '));
+check('audio lanes on the timeline', (await page.locator('.cap-bar.bar-audio').count()) === 3);
 
 // tap an audio clip → audio tools
 await page.locator('.cap-bar.bar-audio').first().dispatchEvent('click');

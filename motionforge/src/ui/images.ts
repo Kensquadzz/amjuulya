@@ -1,5 +1,6 @@
-/** Load an image file, downscale to keep projects small, return a data URL. */
-export async function loadImageFile(file: File, maxSide = 1600): Promise<string> {
+/** Load an image file, downscale to keep projects small, return a data URL.
+ *  3840 keeps full-frame photos sharp in 4K exports (1600 got upscaled and looked soft). */
+export async function loadImageFile(file: File, maxSide = 3840): Promise<string> {
   const url = URL.createObjectURL(file);
   try {
     const img = await new Promise<HTMLImageElement>((res, rej) => {
@@ -14,7 +15,7 @@ export async function loadImageFile(file: File, maxSide = 1600): Promise<string>
     c.height = Math.max(1, Math.round(img.naturalHeight * s));
     c.getContext('2d')!.drawImage(img, 0, 0, c.width, c.height);
     const png = file.type === 'image/png' || file.type === 'image/gif' || file.type === 'image/webp';
-    return c.toDataURL(png ? 'image/png' : 'image/jpeg', 0.9);
+    return c.toDataURL(png ? 'image/png' : 'image/jpeg', 0.92);
   } finally {
     URL.revokeObjectURL(url);
   }

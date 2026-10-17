@@ -367,6 +367,8 @@ export function drawImageLayer(env: Env2D, l: ImageLayer) {
     if (env.placeholders) drawSlot(env, l);
     return;
   }
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high'; // big photos scaled down in previews stay crisp
   let img = imageCache.get(l.src);
   if (!img) {
     img = new Image();

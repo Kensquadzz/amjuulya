@@ -9,7 +9,7 @@ import { engine, useTime } from '../state/engine';
 import { getStore, useStore } from '../state/store';
 import { Section, Sheet, toast } from './controls';
 
-const CATS: SfxCategory[] = ['Transitions', 'Hits', 'UI', 'Risers', 'Magic', 'Ambience', 'Music'];
+const CATS: SfxCategory[] = ['Studio', 'Transitions', 'Hits', 'UI', 'Risers', 'Magic', 'Ambience', 'Music'];
 const isIOS = () => /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 
 export function updateClip(id: string, patch: Partial<AudioClip>, coalesce?: string) {
@@ -276,7 +276,7 @@ function SfxPicker({ mode, onClose, onAdd }: { mode: 'sfx' | 'music'; onClose: (
   );
   return (
     <Sheet title={mode === 'music' ? 'Built-in music & ambience' : 'Sound effects'} onClose={onClose}>
-      <p className="hint">{SFX.length} sounds, all generated on this device: no downloads and no licensing. ▶ listen · ★ favourite · ⤓ save MP3 · ＋ add.</p>
+      <p className="hint">{SFX.length} sounds: recorded Studio samples plus effects generated on this device. ▶ listen · ★ favourite · ⤓ save MP3 · ＋ add.</p>
       <div className="row-btns">
         <input className="name-input" placeholder="Search sounds…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search sounds" />
         <button disabled={!!zip} onClick={async () => {

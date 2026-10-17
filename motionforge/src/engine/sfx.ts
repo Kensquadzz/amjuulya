@@ -1,17 +1,34 @@
-// Procedural sound effects, rendered with the Web Audio API in an
-// OfflineAudioContext. Every sound is generated from code (no samples, no
-// licensing), deterministic for a given (preset, seed), and regenerated on
-// load — so projects stay small and never reference external files.
+// Sound effects library. Most sounds are procedural: rendered with the Web
+// Audio API in an OfflineAudioContext from code, deterministic for a given
+// (preset, seed) and regenerated on load. The 'Studio' sounds are recorded
+// samples shipped with the app in /public/sfx; projects reference both kinds
+// by id only, so they stay small.
 
-export type SfxCategory = 'Transitions' | 'Hits' | 'UI' | 'Risers' | 'Magic' | 'Ambience' | 'Music';
+export type SfxCategory = 'Studio' | 'Transitions' | 'Hits' | 'UI' | 'Risers' | 'Magic' | 'Ambience' | 'Music';
 
 export interface SfxPreset {
   id: string;
   label: string;
   category: SfxCategory;
   duration: number;
-  build: (ctx: OfflineAudioContext, out: AudioNode, rnd: () => number) => void;
+  build?: (ctx: OfflineAudioContext, out: AudioNode, rnd: () => number) => void;
+  /** recorded sample bundled with the app (path under the site root) */
+  file?: string;
 }
+
+/** Recorded studio samples (see public/sfx). */
+const STUDIO: SfxPreset[] = ([
+  ['blade-whoosh', 'Blade whoosh', 1.39],
+  ['slide-whoosh', 'Slide whoosh', 3.15],
+  ['fire-whoosh', 'Fire whoosh', 3.25],
+  ['metallic-riser', 'Metallic riser', 3.24],
+  ['camera-flash', 'Camera flash', 2.04],
+  ['camera-charge', 'Camera flash charge', 9.22],
+  ['click', 'Click', 1.41],
+  ['radio-beep', 'Radio beep', 0.53],
+  ['gear-shift', 'Gear shift', 5.15],
+  ['gun-reload', 'Reload', 4.09],
+] as const).map(([id, label, duration]) => ({ id: `rec-${id}`, label, category: 'Studio' as const, duration, file: `sfx/${id}.mp3` }));
 
 const SR = 44100;
 
@@ -270,6 +287,7 @@ function sweep(ctx: OfflineAudioContext, out: AudioNode, rnd: () => number, d: n
 }
 
 export const SFX: SfxPreset[] = [
+  ...STUDIO,
   { id: 'whoosh', label: 'Whoosh', category: 'Transitions', duration: 0.9, build: (c, o, r) => whoosh(c, o, r, 0.9) },
   { id: 'whooshFast', label: 'Fast whoosh', category: 'Transitions', duration: 0.45, build: (c, o, r) => whoosh(c, o, r, 0.45, 400, 5200) },
   { id: 'swipe', label: 'Swipe', category: 'Transitions', duration: 0.3, build: (c, o, r) => whoosh(c, o, r, 0.3, 900, 7000, false) },
@@ -464,9 +482,19 @@ export const SFX: SfxPreset[] = [
 export const sfxById = (id: string) => SFX.find((s) => s.id === id);
 
 /** Render a preset to an AudioBuffer (stereo, 44.1 kHz). */
+async function loadSample(file: string): Promise<AudioBuffer> {
+  const res = await fetch(`${import.meta.env.BASE_URL}${file}`);
+  if (!res.ok) throw new Error(`Sound file missing (${res.status})`);
+  const data = await res.arrayBuffer();
+  const ctx = new OfflineAudioContext(2, 1, SR);
+  return ctx.decodeAudioData(data);
+}
+
 export async function renderSfx(id: string, seed = 1): Promise<AudioBuffer> {
   const p = sfxById(id);
   if (!p) throw new Error(`Unknown sound effect "${id}"`);
+  if (p.file) return normalise(await loadSample(p.file), 0.8);
+  if (!p.build) throw new Error(`Sound effect "${id}" has no source`);
   const ctx = new OfflineAudioContext(2, Math.ceil((p.duration + 0.05) * SR), SR);
   const master = ctx.createGain();
   master.gain.value = 0.85;
@@ -478,7 +506,10 @@ export async function renderSfx(id: string, seed = 1): Promise<AudioBuffer> {
   p.build(ctx, master, prng(seed * 7919 + id.length));
   const buf = await ctx.startRendering();
   // peak-normalise so every effect sits at a consistent level in the mix
-  const target = p.category === 'Ambience' ? 0.45 : p.category === 'Music' ? 0.7 : p.category === 'UI' ? 0.6 : 0.8;
+  return normalise(buf, p.category === 'Ambience' ? 0.45 : p.category === 'Music' ? 0.7 : p.category === 'UI' ? 0.6 : 0.8);
+}
+
+function normalise(buf: AudioBuffer, target: number) {
   let peak = 0;
   for (let c = 0; c < buf.numberOfChannels; c++) { const d = buf.getChannelData(c); for (let i = 0; i < d.length; i++) peak = Math.max(peak, Math.abs(d[i])); }
   if (peak > 1e-4) {

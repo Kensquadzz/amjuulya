@@ -9,7 +9,7 @@ import { shaderById } from '../engine/shaders/library';
 import { storage } from '../engine/storage';
 import type { AspectId, Project } from '../engine/types';
 
-const VERSION = "v4";
+const VERSION = "v5";
 const W = 216, H = 384;
 let renderer: Renderer | null = null;
 const memory = new Map<string, string>();

@@ -446,6 +446,14 @@ export class Renderer {
     gl.useProgram(e.program);
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, this.accum![this.cur].tex);
+    // Filters that read u_input with textureLod get a mip chain, so wide
+    // blurs/glows sample pre-filtered levels instead of a few sparse texels
+    // (sparse taps show up as speckled ghost copies, worst at 4K).
+    const lod = /textureLod\s*\(\s*u_input/.test(L.source);
+    if (lod) {
+      gl.generateMipmap(gl.TEXTURE_2D);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+    }
     const mouse = this.pointer ? [this.pointer.x, 1 - this.pointer.y] : [0.5, 0.5];
     const span = Math.max(1e-3, L.end - L.start);
     for (const [name, u] of e.uniforms) {
@@ -471,6 +479,7 @@ export class Renderer {
       else if (u.type === gl.FLOAT_VEC4 && typeof v === 'string') { const c = hexToVec3(v); gl.uniform4f(u.loc, c[0], c[1], c[2], 1); }
     }
     gl.drawArrays(gl.TRIANGLES, 0, 3);
+    if (lod) gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR); // still bound on unit 0
     this.composite(temp.tex, L.opacity, L.blend, false);
   }
 

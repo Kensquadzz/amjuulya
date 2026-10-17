@@ -762,44 +762,54 @@ uniform float u_radius;    // @ui 1 60 18 | Radius
 uniform float u_intensity; // @ui 0 4 1.2 | Intensity
 uniform vec3 u_tint;       // @color #ffffff | Tint
 
-vec3 bright(vec2 uv) {
-  vec3 c = texture(u_input, uv).rgb;
+// Multi-scale glow from the mip chain: resolution independent (same look in
+// a 360p preview and a 4K export) and free of sparse-tap ghosting.
+vec3 level(vec2 uv, float lod) {
+  vec2 t = exp2(lod) / u_resolution;
+  vec3 c = textureLod(u_input, uv, lod).rgb * 0.25;
+  c += textureLod(u_input, uv + vec2( t.x, 0.0), lod).rgb * 0.125;
+  c += textureLod(u_input, uv + vec2(-t.x, 0.0), lod).rgb * 0.125;
+  c += textureLod(u_input, uv + vec2(0.0,  t.y), lod).rgb * 0.125;
+  c += textureLod(u_input, uv + vec2(0.0, -t.y), lod).rgb * 0.125;
+  c += textureLod(u_input, uv + t, lod).rgb * 0.0625;
+  c += textureLod(u_input, uv - t, lod).rgb * 0.0625;
+  c += textureLod(u_input, uv + vec2(t.x, -t.y), lod).rgb * 0.0625;
+  c += textureLod(u_input, uv + vec2(-t.x, t.y), lod).rgb * 0.0625;
+  return c;
+}
+vec3 bright(vec3 c) {
   float l = max(c.r, max(c.g, c.b));
-  return c * smoothstep(u_threshold, u_threshold + 0.2, l);
+  // blurred levels are dimmer than their sources, so the knee sits lower
+  return c * smoothstep(u_threshold * 0.6, u_threshold * 0.6 + 0.3, l);
 }
 
 void main() {
   vec3 base = texture(u_input, v_uv).rgb;
-  vec2 px = u_radius / u_resolution * (min(u_resolution.x, u_resolution.y) / 1080.0);
-  vec3 acc = vec3(0.0);
-  float wsum = 0.0;
-  for (int ring = 1; ring <= 3; ring++) {
-    float rr = float(ring) / 3.0;
-    for (int i = 0; i < 12; i++) {
-      float a = float(i) / 12.0 * 6.2831 + float(ring) * 0.5;
-      float w = 1.0 - rr * 0.6;
-      acc += bright(v_uv + vec2(cos(a), sin(a)) * px * rr) * w;
-      wsum += w;
-    }
-  }
-  vec3 glow = acc / wsum;
+  float r = u_radius * min(u_resolution.x, u_resolution.y) / 1080.0;
+  float lod = log2(max(1.0, r / 3.0));
+  vec3 glow = bright(level(v_uv, max(0.0, lod - 1.0))) * 0.4
+            + bright(level(v_uv, lod)) * 0.35
+            + bright(level(v_uv, lod + 1.0)) * 0.25;
   fragColor = vec4(base + glow * u_tint * u_intensity * 2.0, 1.0);
 }
 `;
 
 const BLUR = `${FILTER_H}
-// Blur — 25-tap gaussian blur of everything below.
+// Blur — gaussian blur of everything below.
 uniform float u_radius;    // @ui 0 40 8 | Radius
 
 void main() {
-  vec2 px = u_radius / u_resolution * (min(u_resolution.x, u_resolution.y) / 1080.0) * 0.5;
+  float r = u_radius * min(u_resolution.x, u_resolution.y) / 1080.0;
+  // sample a pre-filtered mip level so the 25 taps never leave gaps
+  float lod = max(0.0, log2(max(1.0, r * 0.5)) - 0.5);
+  vec2 px = r / u_resolution * 0.5;
   vec3 acc = vec3(0.0);
   float ws = 0.0;
   for (int y = -2; y <= 2; y++)
   for (int x = -2; x <= 2; x++) {
     vec2 o = vec2(float(x), float(y));
     float w = exp(-dot(o, o) / 4.5);
-    acc += texture(u_input, v_uv + o * px).rgb * w;
+    acc += textureLod(u_input, v_uv + o * px, lod).rgb * w;
     ws += w;
   }
   fragColor = vec4(acc / ws, 1.0);

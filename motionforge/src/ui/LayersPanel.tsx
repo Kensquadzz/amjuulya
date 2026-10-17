@@ -110,7 +110,7 @@ export function LayersPanel({ onEdit }: { onEdit: () => void }) {
 
 const CATS: ShaderCategory[] = ['Grid', 'Particles', 'Glitch', 'Distortion', 'Glow', 'Light', 'Gradient', 'Texture'];
 
-function EffectPicker({ onPick, onClose }: { onPick: (id: string) => void; onClose: () => void }) {
+export function EffectPicker({ onPick, onClose }: { onPick: (id: string) => void; onClose: () => void }) {
   return (
     <Sheet title="Add effect layer" onClose={onClose}>
       <p className="hint">Generators draw an image. Filters (marked ⧉) process everything below them in the layer stack — place them above the layers they should affect.</p>

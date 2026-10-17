@@ -1,4 +1,5 @@
 import { useState, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { keyframeAt } from '../engine/keyframes';
 import type { Layer } from '../engine/types';
 import { setProp, toggleKeyframe, valueAt, clearTrack } from '../state/engine';
@@ -159,8 +160,9 @@ export function Toasts() {
   );
 }
 
+/** Full bottom sheet, rendered into <body> so iOS never clips it inside a scroll container. */
 export function Sheet({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
-  return (
+  return createPortal(
     <div className="sheet-backdrop" onClick={onClose}>
       <div className="sheet" role="dialog" aria-label={title} onClick={(e) => e.stopPropagation()}>
         <header className="sheet-head">
@@ -169,6 +171,21 @@ export function Sheet({ title, onClose, children }: { title: string; onClose: ()
         </header>
         <div className="sheet-body">{children}</div>
       </div>
-    </div>
+    </div>,
+    document.body,
+  );
+}
+
+/** Half-height tool panel (CapCut style): the preview stays visible above it. */
+export function ToolSheet({ title, onClose, children, tall }: { title: string; onClose: () => void; children: ReactNode; tall?: boolean }) {
+  return createPortal(
+    <div className={`tool-sheet ${tall ? 'tall' : ''}`} role="dialog" aria-label={title}>
+      <header className="tool-head">
+        <h2>{title}</h2>
+        <button className="done-btn" onClick={onClose} aria-label="Done">✓</button>
+      </header>
+      <div className="tool-body">{children}</div>
+    </div>,
+    document.body,
   );
 }

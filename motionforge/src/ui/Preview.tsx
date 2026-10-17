@@ -5,8 +5,10 @@ import { engine, QUALITY_DENSITY, QUALITY_SCALE, setProp, valueAt } from '../sta
 import { getStore, useStore } from '../state/store';
 import { toast } from './controls';
 import { liveAudio } from '../engine/audio';
+import { hitTest, layerBox } from '../engine/bounds';
+import { useLang } from './i18n';
 
-export function Preview() {
+export function Preview({ simple = false }: { simple?: boolean }) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const aspect = useStore((s) => s.project.aspect);
@@ -49,28 +51,64 @@ export function Preview() {
     try { localStorage.setItem('mf.quality', quality); } catch { /* private mode */ }
   }, [cssW, cssH, quality, A.w, A.h]);
 
-  // ---- pointer: drag selected layer, or feed u_mouse / particle interaction
-  const drag = useRef<{ id: string; x0: number; y0: number; px: number; py: number } | null>(null);
-  const norm = (e: React.PointerEvent) => {
+  // ---- pointer: tap selects (simple mode), one finger drags the selected
+  // layer, two fingers scale + rotate it; otherwise feed u_mouse / particles
+  const pointers = useRef(new Map<number, { x: number; y: number }>());
+  const drag = useRef<{ id: string; x0: number; y0: number; px: number; py: number; moved: boolean } | null>(null);
+  const pinch = useRef<{ id: string; d0: number; a0: number; s0: number; r0: number } | null>(null);
+  const [moveMode, setMoveMode] = useState(true);
+  const norm = (e: { clientX: number; clientY: number }) => {
     const r = canvasRef.current!.getBoundingClientRect();
     return { x: (e.clientX - r.left) / r.width, y: (e.clientY - r.top) / r.height };
   };
-  const onDown = (e: React.PointerEvent) => {
-    const p = norm(e);
+  const selectedMovable = () => {
     const st = getStore().state;
     const l = st.project.layers.find((x) => x.id === st.selectedLayerId);
-    if (l && l.type !== 'shader' && l.type !== 'background' && moveMode) {
-      (e.target as Element).setPointerCapture(e.pointerId);
-      const t = engine.frameTime();
-      drag.current = { id: l.id, x0: Number(valueAt(l, 'x', t)), y0: Number(valueAt(l, 'y', t)), px: p.x, py: p.y };
+    return l && l.type !== 'shader' && l.type !== 'background' && l.type !== 'particles' ? l : null;
+  };
+  const startPinch = () => {
+    const l = selectedMovable();
+    const pts = [...pointers.current.values()];
+    if (!l || pts.length < 2) return;
+    const t = engine.frameTime();
+    drag.current = null;
+    pinch.current = { id: l.id, d0: Math.hypot(pts[0].x - pts[1].x, (pts[0].y - pts[1].y) * A.h / A.w), a0: Math.atan2(pts[1].y - pts[0].y, pts[1].x - pts[0].x), s0: Number(valueAt(l, 'scale', t)), r0: Number(valueAt(l, 'rotation', t)) };
+  };
+  const onDown = (e: React.PointerEvent) => {
+    const p = norm(e);
+    (e.target as Element).setPointerCapture(e.pointerId);
+    pointers.current.set(e.pointerId, p);
+    if (pointers.current.size === 2) { startPinch(); return; }
+    const st = getStore().state;
+    const t = engine.frameTime();
+    if (simple) {
+      const hit = hitTest(st.project, t, p.x * A.w, p.y * A.h, A.w, A.h);
+      if (hit && hit !== st.selectedLayerId) getStore().select(hit);
+      else if (!hit) { getStore().select(null); if (engine.renderer) engine.renderer.pointer = { ...p, down: true }; return; }
+    }
+    const l = selectedMovable();
+    if (l && (moveMode || simple)) {
+      drag.current = { id: l.id, x0: Number(valueAt(l, 'x', t)), y0: Number(valueAt(l, 'y', t)), px: p.x, py: p.y, moved: false };
     } else if (engine.renderer) {
       engine.renderer.pointer = { ...p, down: true };
     }
   };
   const onMove = (e: React.PointerEvent) => {
     const p = norm(e);
+    if (pointers.current.has(e.pointerId)) pointers.current.set(e.pointerId, p);
+    const pc = pinch.current;
+    if (pc && pointers.current.size >= 2) {
+      const pts = [...pointers.current.values()];
+      const d = Math.hypot(pts[0].x - pts[1].x, (pts[0].y - pts[1].y) * A.h / A.w);
+      const a = Math.atan2(pts[1].y - pts[0].y, pts[1].x - pts[0].x);
+      setProp(pc.id, 'scale', +Math.max(0.05, Math.min(8, pc.s0 * (d / Math.max(1e-3, pc.d0)))).toFixed(3));
+      setProp(pc.id, 'rotation', +(pc.r0 + ((a - pc.a0) * 180) / Math.PI).toFixed(1));
+      return;
+    }
     const d = drag.current;
     if (d) {
+      if (!d.moved && Math.hypot(p.x - d.px, p.y - d.py) < 0.008) return;
+      d.moved = true;
       setProp(d.id, 'x', +(d.x0 + p.x - d.px).toFixed(4));
       setProp(d.id, 'y', +(d.y0 + p.y - d.py).toFixed(4));
     } else if (engine.renderer && (e.pointerType !== 'mouse' || e.buttons || engine.renderer.pointer)) {
@@ -78,12 +116,13 @@ export function Preview() {
       engine.player?.invalidate();
     }
   };
-  const onUp = () => {
-    drag.current = null;
+  const onUp = (e?: React.PointerEvent) => {
+    if (e) pointers.current.delete(e.pointerId);
+    if (pointers.current.size < 2) pinch.current = null;
+    if (pointers.current.size === 0) drag.current = null;
     if (engine.renderer) engine.renderer.pointer = null;
     engine.player?.invalidate();
   };
-  const [moveMode, setMoveMode] = useState(true);
 
   const toggleFocus = () => {
     const el = wrapRef.current?.parentElement;
@@ -93,8 +132,8 @@ export function Preview() {
   };
 
   return (
-    <div className={`preview ${focus ? 'focus' : ''}`}>
-      <div className="preview-bar">
+    <div className={`preview ${focus ? 'focus' : ''} ${simple ? 'simple' : ''}`}>
+      {!simple && <div className="preview-bar">
         <select aria-label="Aspect ratio" value={aspect} onChange={(e) => getStore().update((p) => ({ ...p, aspect: e.target.value as AspectId }))}>
           {(Object.keys(ASPECTS) as AspectId[]).map((a) => <option key={a} value={a}>{ASPECTS[a].label}</option>)}
         </select>
@@ -107,7 +146,7 @@ export function Preview() {
           {moveMode ? '✥ Move' : '☝ Touch'}
         </button>
         <button className="icon-btn" onClick={toggleFocus} aria-label="Fullscreen preview">{focus ? '⤡' : '⤢'}</button>
-      </div>
+      </div>}
       <div className="stage" ref={wrapRef}>
         <canvas
           ref={canvasRef}
@@ -118,9 +157,11 @@ export function Preview() {
           onPointerCancel={onUp}
           onPointerLeave={(e) => { if (!drag.current && e.pointerType === 'mouse') onUp(); }}
         />
+        {simple && <SelectionFrame cssW={cssW} cssH={cssH} />}
         {glStatus && <div className="stage-msg">{glStatus}</div>}
+        {simple && <button className="stage-fs icon-btn" onClick={toggleFocus} aria-label="Fullscreen preview">{focus ? '⤡' : '⤢'}</button>}
       </div>
-      <Transport />
+      {simple ? <PlayRow /> : <Transport />}
     </div>
   );
 }
@@ -175,3 +216,58 @@ export function Transport() {
     </div>
   );
 }
+
+/** White frame around the selected layer, positioned over the canvas. */
+function SelectionFrame({ cssW, cssH }: { cssW: number; cssH: number }) {
+  const sel = useStore((s) => s.project.layers.find((l) => l.id === s.selectedLayerId) ?? null);
+  const aspect = useStore((s) => s.project.aspect);
+  const [, force] = useState(0);
+  useEffect(() => {
+    let unsub: (() => void) | undefined;
+    const iv = setInterval(() => { if (engine.player && !unsub) unsub = engine.player.subscribe(() => force((n) => (n + 1) % 1e6)) as () => void; }, 60);
+    return () => { clearInterval(iv); unsub?.(); };
+  }, []);
+  if (!sel || !cssW) return null;
+  const A = ASPECTS[aspect];
+  const t = engine.frameTime();
+  if (t < sel.start || t > sel.end) return null;
+  const b = layerBox(sel, t, A.w, A.h);
+  if (!b) return null;
+  const s = cssW / A.w;
+  return (
+    <div className="sel-frame" style={{ width: b.w * s, height: b.h * s, left: `calc(50% - ${cssW / 2}px + ${b.cx * s}px)`, top: `calc(50% - ${cssH / 2}px + ${b.cy * s}px)`, transform: `translate(-50%, -50%) rotate(${b.rot}deg)` }} />
+  );
+}
+
+/** Simple play row: big play button, current / total time. */
+export function PlayRow() {
+  const duration = useStore((s) => s.project.duration);
+  const fps = useStore((s) => s.project.fps);
+  const [playing, setPlaying] = useState(false);
+  const timeRef = useRef<HTMLSpanElement>(null);
+  const { t } = useLang();
+  useStore((s) => s.project); // refresh undo/redo state
+  useEffect(() => {
+    let unsub: (() => void) | undefined;
+    const iv = setInterval(() => {
+      if (!engine.player || unsub) return;
+      unsub = engine.player.subscribe((tt, pl) => {
+        if (timeRef.current) timeRef.current.textContent = fmtShort(tt);
+        setPlaying((p) => (p !== pl ? pl : p));
+      }) as () => void;
+    }, 50);
+    return () => { clearInterval(iv); unsub?.(); };
+  }, [fps]);
+  return (
+    <div className="play-row">
+      <span className="time"><span ref={timeRef}>{fmtShort(0)}</span> / {fmtShort(duration)}</span>
+      <button className="play-big" aria-label={playing ? t('pause') : t('play')} onClick={() => { liveAudio.unlock(); engine.player?.toggle(); }}>{playing ? '❚❚' : '▶'}</button>
+      <span className="time right">
+        <button className="icon-btn small" aria-label={t('undo')} disabled={!getStore().canUndo} onClick={() => getStore().undo()}>↶</button>
+        <button className="icon-btn small" aria-label={t('redo')} disabled={!getStore().canRedo} onClick={() => getStore().redo()}>↷</button>
+      </span>
+    </div>
+  );
+}
+
+const fmtShort = (t: number) => `${String(Math.floor(t / 60)).padStart(2, '0')}:${(t % 60).toFixed(1).padStart(4, '0')}`;

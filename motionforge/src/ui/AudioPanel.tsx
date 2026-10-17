@@ -191,7 +191,7 @@ function Num({ label, value, min, max, step, onChange, unit }: { label: string; 
   );
 }
 
-function ClipEditor({ clip }: { clip: AudioClip }) {
+export function ClipEditor({ clip }: { clip: AudioClip }) {
   const dur = useStore((s) => s.project.duration);
   const [srcLen, setSrcLen] = useState<number | null>(null);
   useEffect(() => { getBuffer(clip.assetId).then((b) => setSrcLen(b.duration)).catch(() => setSrcLen(null)); }, [clip.assetId]);

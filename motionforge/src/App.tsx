@@ -13,6 +13,8 @@ import { storage } from './engine/storage';
 import { getStore, useStore } from './state/store';
 import { engine } from './state/engine';
 import { liveAudio } from './engine/audio';
+import { Editor } from './ui/Editor';
+import { Home } from './ui/Home';
 
 type Tab = 'templates' | 'layers' | 'inspect' | 'timeline' | 'audio' | 'code';
 const TABS: { id: Tab; label: string; icon: string }[] = [
@@ -24,15 +26,13 @@ const TABS: { id: Tab; label: string; icon: string }[] = [
   { id: 'code', label: 'Code', icon: '</>' },
 ];
 
+/** Top level: Home ⇄ simple editor; the classic tabbed workspace stays available as "classic". */
 export function App() {
-  const [tab, setTab] = useState<Tab>(() => (localStorage.getItem('mf.tab') as Tab) || 'timeline');
+  const [view, setView] = useState<'home' | 'editor' | 'classic'>(() => (localStorage.getItem('mf.view') === 'classic' ? 'classic' : 'home'));
   const [sheet, setSheet] = useState<'export' | 'projects' | null>(null);
-  const name = useStore((s) => s.project.name);
   const dirty = useStore((s) => s.dirty);
-  useStore((s) => s.project); // re-render undo/redo enabled state
   const store = getStore();
-
-  useEffect(() => { try { localStorage.setItem('mf.tab', tab); } catch { /* */ } }, [tab]);
+  useEffect(() => { try { localStorage.setItem('mf.view', view === 'classic' ? 'classic' : ''); } catch { /* */ } }, [view]);
 
   // autosave shortly after changes
   useEffect(() => {
@@ -43,17 +43,39 @@ export function App() {
     return () => clearTimeout(id);
   });
 
-  // optional keyboard shortcuts (never required on touch devices)
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement).tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || (e.target as HTMLElement).isContentEditable) return;
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); if (e.shiftKey) store.redo(); else store.undo(); }
-      if (e.key === ' ') { e.preventDefault(); liveAudio.unlock(); engine.player?.toggle(); }
+      if (e.key === ' ' && view !== 'home') { e.preventDefault(); liveAudio.unlock(); engine.player?.toggle(); }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [store]);
+  }, [store, view]);
+
+  return (
+    <>
+      {view === 'home' && <Home onOpen={() => setView('editor')} />}
+      {view === 'editor' && <Editor onHome={() => { engine.player?.pause(); setView('home'); }} onExport={() => setSheet('export')} />}
+      {view === 'classic' && <ClassicApp onSimple={() => setView('editor')} />}
+      {sheet === 'export' && <ExportSheet onClose={() => setSheet(null)} />}
+      {sheet === 'projects' && <ProjectsSheet onClose={() => setSheet(null)} />}
+      <Toasts />
+    </>
+  );
+}
+
+/** The original tabbed workspace (power users). */
+function ClassicApp({ onSimple }: { onSimple: () => void }) {
+  const [tab, setTab] = useState<Tab>(() => (localStorage.getItem('mf.tab') as Tab) || 'timeline');
+  const [sheet, setSheet] = useState<'export' | 'projects' | null>(null);
+  const name = useStore((s) => s.project.name);
+  const dirty = useStore((s) => s.dirty);
+  useStore((s) => s.project); // re-render undo/redo enabled state
+  const store = getStore();
+
+  useEffect(() => { try { localStorage.setItem('mf.tab', tab); } catch { /* */ } }, [tab]);
 
   const save = async () => {
     try { await storage.saveProject(store.state.project); store.markSaved(); toast('Project saved', 'ok'); }
@@ -69,6 +91,7 @@ export function App() {
           <button className="icon-btn" onClick={() => store.undo()} disabled={!store.canUndo} aria-label="Undo">↶</button>
           <button className="icon-btn" onClick={() => store.redo()} disabled={!store.canRedo} aria-label="Redo">↷</button>
           <button className="icon-btn" onClick={save} aria-label="Save project">⤓</button>
+          <button className="icon-btn" onClick={onSimple} aria-label="Simple editor">◱</button>
           <button className="export-btn" onClick={() => setSheet('export')}>Export</button>
         </div>
       </header>
@@ -94,7 +117,6 @@ export function App() {
       </main>
       {sheet === 'export' && <ExportSheet onClose={() => setSheet(null)} />}
       {sheet === 'projects' && <ProjectsSheet onClose={() => setSheet(null)} />}
-      <Toasts />
     </div>
   );
 }

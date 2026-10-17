@@ -142,7 +142,7 @@ function PreviewSheet({ tpl, onClose, onUse, onDuplicate }: { tpl: Template; onC
   );
 }
 
-export function TemplatesPanel() {
+export function TemplatesPanel({ onUsed }: { onUsed?: () => void } = {}) {
   const [cat, setCat] = useState<TemplateCategory | 'All' | 'Mine'>('All');
   const [mine, setMine] = useState<SavedPreset[]>([]);
   const [preview, setPreview] = useState<Template | null>(null);
@@ -159,7 +159,8 @@ export function TemplatesPanel() {
     store.load(p);
     setPreview(null);
     engine.player?.seek(0);
-    toast(`"${tpl.name}" loaded — edit texts in Inspect, sounds in Audio`, 'ok');
+    toast(`"${tpl.name}" ✓`, 'ok');
+    onUsed?.();
   };
 
   const applyMine = (sp: SavedPreset) => {
@@ -167,6 +168,7 @@ export function TemplatesPanel() {
     const p = normalizeProject(deepClone(sp.project));
     store.load({ ...p, id: uid(), name: sp.name, createdAt: Date.now(), updatedAt: Date.now() });
     engine.player?.seek(0);
+    onUsed?.();
   };
 
   const saveAsPreset = async () => {

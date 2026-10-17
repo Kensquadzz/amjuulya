@@ -7,6 +7,8 @@ await server.listen();
 const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH, args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
 const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
 const page = await ctx.newPage();
+// these checks drive the classic (tabbed) workspace; tests/cap.mjs covers the simple editor
+await page.addInitScript(() => { try { localStorage.setItem('mf.view', 'classic'); } catch {} });
 const errors = [];
 page.on('pageerror', (e) => errors.push('pageerror: ' + e.message));
 page.on('console', (m) => { if (m.type() === 'error' && !/404|Outdated Optimize/.test(m.text())) errors.push(m.text()); });
@@ -179,7 +181,7 @@ await page.locator('select[aria-label="Aspect ratio"]').selectOption('9:16');
 // 12 templates apply
 await tab('Presets');
 await page.locator('.tpl-main', { hasText: 'Red Glow Grid' }).tap();
-await page.getByRole('button', { name: 'Use this template' }).tap();
+await page.getByRole('button', { name: /Use this template/ }).tap();
 await wait(800);
 st = await S();
 check('template applies', st.name === 'Red Glow Grid' && st.layers.length === 3);

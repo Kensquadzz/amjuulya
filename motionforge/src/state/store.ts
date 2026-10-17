@@ -9,6 +9,8 @@ export interface AppState {
   project: Project;
   selectedLayerId: string | null;
   selectedKf: SelectedKf | null;
+  /** selected audio clip (simple editor) */
+  selectedClipId: string | null;
   dirty: boolean;
   savedAt: number | null;
 }
@@ -27,7 +29,7 @@ export class Store {
   private lastTime = 0;
 
   constructor(project: Project) {
-    this.state = { project, selectedLayerId: project.layers.at(-1)?.id ?? null, selectedKf: null, dirty: false, savedAt: null };
+    this.state = { project, selectedLayerId: null, selectedKf: null, selectedClipId: null, dirty: false, savedAt: null };
   }
 
   subscribe = (fn: Listener) => {
@@ -77,7 +79,7 @@ export class Store {
     this.past = [];
     this.future = [];
     this.lastKey = null;
-    this.set({ project, selectedLayerId: project.layers.at(-1)?.id ?? null, selectedKf: null, dirty: false, savedAt: null });
+    this.set({ project, selectedLayerId: null, selectedKf: null, selectedClipId: null, dirty: false, savedAt: null });
   }
 
   get canUndo() { return this.past.length > 0; }
@@ -104,7 +106,11 @@ export class Store {
   }
 
   select(id: string | null) {
-    if (id !== this.state.selectedLayerId) this.set({ selectedLayerId: id, selectedKf: null });
+    if (id !== this.state.selectedLayerId || this.state.selectedClipId) this.set({ selectedLayerId: id, selectedKf: null, selectedClipId: null });
+  }
+
+  selectClip(id: string | null) {
+    this.set({ selectedClipId: id, selectedLayerId: null, selectedKf: null });
   }
 
   selectKf(k: SelectedKf | null) {

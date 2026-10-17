@@ -91,3 +91,17 @@ export function effectThumb(shaderId: string) {
     return { project: p, t: 1.7, w: 160, h: 160 };
   });
 }
+
+/** Thumbnail of a single sticker / shape layer on a dark backdrop. */
+export function layerThumb(key: string, make: () => import('../engine/types').Layer) {
+  return renderJob(`lyr:${key}:${VERSION}`, () => {
+    const p = newProject('l', { aspect: '1:1', duration: 4, background: '#101014' });
+    const l = make();
+    l.x = 0.5; l.y = 0.5; l.start = 0; l.end = 4; l.tracks = {};
+    // small stickers are shown large enough to recognise
+    if (l.type === 'shape') l.scale = Math.min(3, 760 / Math.max(l.w, l.h, 1));
+    if (l.type === 'shape' && l.shape === 'swoosh') { l.x = 0.85; l.y = 0.1; l.scale = 1.2; }
+    p.layers.push(l);
+    return { project: p, t: 2, w: 120, h: 120 };
+  });
+}

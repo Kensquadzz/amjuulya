@@ -192,12 +192,12 @@ describe('cinematic templates', () => {
       for (const d of tpl.durations!) {
         const b = tpl.build({ duration: d });
         expect(b.duration).toBe(d);
-        const w = b.layers.filter((l) => l.type === 'shader') as ShaderLayer[];
+        // exactly one 3D world: a ray-marched shader or a Three.js scene
+        const w = b.layers.filter((l) => l.type === 'scene3d' || (l.type === 'shader' && shaderById(SHADERS.find((s) => s.source === (l as ShaderLayer).source)?.id ?? '')?.category === 'Cinematic 3D'));
         expect(w.length).toBe(1);
         expect(w[0].start).toBe(0);
         expect(w[0].end).toBe(d);
-        expect(shaderById(SHADERS.find((s) => s.source === w[0].source)!.id)!.category).toBe('Cinematic 3D');
-        if (d === tpl.defaultDuration) worlds.add(w[0].source);
+        if (d === tpl.defaultDuration) worlds.add(w[0].type === 'scene3d' ? `scene:${w[0].scene}` : (w[0] as ShaderLayer).source);
         for (const l of b.layers) {
           expect(l.start).toBeGreaterThanOrEqual(0);
           expect(l.end).toBeLessThanOrEqual(d + 1e-6);

@@ -1,5 +1,6 @@
 import type { Layer } from '../engine/types';
 import { parseShaderParams } from '../engine/shaderParams';
+import { sceneById } from '../engine/scenes3d';
 
 export interface PropDef { path: string; label: string; kind: 'num' | 'color'; min?: number; max?: number; step?: number }
 
@@ -71,6 +72,13 @@ export function animatableProps(l: Layer): PropDef[] {
       ];
     case 'model3d':
       return [...COMMON, ...MODEL_PROPS];
+    case 'scene3d':
+      return [
+        { path: 'opacity', label: 'Opacity', kind: 'num', min: 0, max: 1, step: 0.01 },
+        ...(sceneById(l.scene)?.params ?? []).flatMap((p): PropDef[] => p.kind === 'float'
+          ? [{ path: `params.${p.key}`, label: p.label, kind: 'num', min: p.min, max: p.max, step: (p.max - p.min) / 200 }]
+          : p.kind === 'color' ? [{ path: `params.${p.key}`, label: p.label, kind: 'color' }] : []),
+      ];
     case 'particles':
       return [
         { path: 'opacity', label: 'Opacity', kind: 'num', min: 0, max: 1, step: 0.01 },
@@ -101,4 +109,4 @@ export function propLabel(l: Layer, path: string) {
   return animatableProps(l).find((p) => p.path === path)?.label ?? path;
 }
 
-export const LAYER_ICON: Record<Layer['type'], string> = { text: 'T', shape: '◻', image: '▣', shader: '✦', background: '▤', particles: '∴', model3d: '◈' };
+export const LAYER_ICON: Record<Layer['type'], string> = { text: 'T', shape: '◻', image: '▣', shader: '✦', background: '▤', particles: '∴', model3d: '◈', scene3d: '🎬' };

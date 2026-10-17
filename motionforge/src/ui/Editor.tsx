@@ -15,7 +15,7 @@ import { CapTimeline } from './CapTimeline';
 import { AudioPanel, ClipEditor } from './AudioPanel';
 import { TemplatesPanel } from './TemplatesPanel';
 import { EffectPicker, LayersPanel } from './LayersPanel';
-import { Inspector, ShaderParamControls } from './Inspector';
+import { Inspector, SceneParamControls, ShaderParamControls } from './Inspector';
 import { Timeline } from './Timeline';
 import { CodePanel } from './CodePanel';
 import { NumProp, Sheet, ToolSheet, toast } from './controls';
@@ -121,7 +121,7 @@ export function Editor({ onHome, onExport }: { onHome: () => void; onExport: () 
       { id: 'pos', icon: '✥', label: 'cPosition', run: () => setPanel('position') },
       ...common(sel)];
     else tools = [back,
-      { id: 'adjust', icon: '🎚', label: 'cAdjust', run: () => setPanel(sel.type === 'shader' ? 'adjust' : 'all') },
+      { id: 'adjust', icon: '🎚', label: 'cAdjust', run: () => setPanel(sel.type === 'shader' || sel.type === 'scene3d' ? 'adjust' : 'all') },
       ...common(sel)];
   } else if (clip) {
     tools = [
@@ -191,6 +191,7 @@ export function Editor({ onHome, onExport }: { onHome: () => void; onExport: () 
       {panel === 'shadow' && sel?.type === 'image' && <ShadowSheet l={sel} onClose={() => setPanel(null)} />}
       {panel === 'color' && sel?.type === 'shape' && <ShapeColorSheet l={sel} onClose={() => setPanel(null)} />}
       {panel === 'adjust' && sel?.type === 'shader' && <ToolSheet title={sel.name} onClose={() => setPanel(null)}><ShaderParamControls l={sel} t={engine.frameTime()} /></ToolSheet>}
+      {panel === 'adjust' && sel?.type === 'scene3d' && <ToolSheet tall title={sel.name} onClose={() => setPanel(null)}><SceneParamControls l={sel} t={engine.frameTime()} /></ToolSheet>}
       {panel === 'add3d' && <Model3DAddSheet onClose={() => setPanel(null)} />}
       {panel === 'model' && sel?.type === 'model3d' && <ModelSheet l={sel} onClose={() => setPanel(null)} />}
       {panel === 'camera' && sel?.type === 'model3d' && <CameraSheet l={sel} onClose={() => setPanel(null)} />}

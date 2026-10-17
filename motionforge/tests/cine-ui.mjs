@@ -48,7 +48,7 @@ await page.getByRole('button', { name: /Use this template/ }).tap();
 await page.waitForTimeout(1500);
 let st = await S();
 check('used at 16:9 and 20 s', st.project.aspect === '16:9' && st.project.duration === 20, `${st.project.aspect} ${st.project.duration}s`);
-const world = st.project.layers.find((l) => l.type === 'shader');
+const world = st.project.layers.find((l) => l.type === 'scene3d');
 check('3D world spans the film', world && world.start === 0 && world.end === 20);
 
 // select the 3D layer on the timeline and edit its brand text
@@ -56,13 +56,13 @@ await page.locator('.cap-bar', { hasText: 'Chrome logo stage' }).dispatchEvent('
 await page.waitForTimeout(300);
 await page.locator('.cap-tool', { hasText: 'Тохируулах' }).first().tap();
 await page.waitForTimeout(500);
-const ta = page.locator('.glyph-prop textarea');
+const ta = page.locator('.glyph-prop textarea').first();
 check('3D text control shown', await ta.isVisible());
 await ta.fill('ALTAN');
 await page.waitForTimeout(2500);
 st = await S();
-const w2 = st.project.layers.find((l) => l.type === 'shader');
-check('3D text edit lands in the project', w2.params.u_logo === 'ALTAN', w2.params.u_logo);
+const w2 = st.project.layers.find((l) => l.type === 'scene3d');
+check('3D text edit lands in the project', w2.params.text === 'ALTAN', w2.params.text);
 await page.evaluate(() => window.__motionforge.engine.player.seek(16));
 await page.waitForTimeout(3000);
 await shot('c3-adjust');

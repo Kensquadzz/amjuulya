@@ -6,7 +6,9 @@
 import type * as THREEType from 'three';
 import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import type { Env2D } from './draw2d';
-import type { ModelLayer, Project } from './types';
+import type { ModelLayer, Project, SceneLayer } from './types';
+import { sceneById } from './scenes3d';
+import { sceneDefaults, type SceneInstance } from './scene3d';
 
 type T = typeof THREEType;
 interface Mods {
@@ -14,6 +16,8 @@ interface Mods {
   GLTFLoader: typeof import('three/examples/jsm/loaders/GLTFLoader.js').GLTFLoader;
   RoomEnvironment: typeof import('three/examples/jsm/environments/RoomEnvironment.js').RoomEnvironment;
   RoundedBoxGeometry: typeof import('three/examples/jsm/geometries/RoundedBoxGeometry.js').RoundedBoxGeometry;
+  toCreasedNormals: typeof import('three/examples/jsm/utils/BufferGeometryUtils.js').toCreasedNormals;
+  MarchingCubes: typeof import('three/examples/jsm/objects/MarchingCubes.js').MarchingCubes;
 }
 
 let modsP: Promise<Mods> | null = null;
@@ -23,7 +27,9 @@ function loadThree(): Promise<Mods> {
     import('three/examples/jsm/loaders/GLTFLoader.js'),
     import('three/examples/jsm/environments/RoomEnvironment.js'),
     import('three/examples/jsm/geometries/RoundedBoxGeometry.js'),
-  ]).then(([THREE, g, r, rb]) => ({ THREE, GLTFLoader: g.GLTFLoader, RoomEnvironment: r.RoomEnvironment, RoundedBoxGeometry: rb.RoundedBoxGeometry }));
+    import('three/examples/jsm/utils/BufferGeometryUtils.js'),
+    import('three/examples/jsm/objects/MarchingCubes.js'),
+  ]).then(([THREE, g, r, rb, bu, mc]) => ({ THREE, GLTFLoader: g.GLTFLoader, RoomEnvironment: r.RoomEnvironment, RoundedBoxGeometry: rb.RoundedBoxGeometry, toCreasedNormals: bu.toCreasedNormals, MarchingCubes: mc.MarchingCubes }));
   return modsP;
 }
 
@@ -57,7 +63,10 @@ export class ModelHost {
   private gl: THREEType.WebGLRenderer | null = null;
   private envMap: THREEType.Texture | null = null;
   private entries = new Map<string, Entry>();
+  private scenes = new Map<string, { id: string; inst: SceneInstance; ready: boolean; error?: string; wait: Promise<void> }>();
   readonly canvas = document.createElement('canvas');
+  /** fraction of the frame scenes render at (set by the compositor from its heavyScale) */
+  scale = 1;
 
   constructor(private onReady: () => void) {}
 
@@ -90,15 +99,58 @@ export class ModelHost {
     return { ready: !!e?.ready, error: e?.error, clips: e?.clips.map((c, i) => c.name || `Clip ${i + 1}`) ?? [] };
   }
 
-  /** Exports and thumbnails: load Three.js and every model before frame 0. */
+  /** Exports and thumbnails: load Three.js, every model and every scene's assets before frame 0. */
   async prepare(p: Project) {
     const ls = p.layers.filter((l): l is ModelLayer => l.type === 'model3d');
-    if (!ls.length) return;
+    const ss = p.layers.filter((l): l is SceneLayer => l.type === 'scene3d');
+    if (!ls.length && !ss.length) return;
     this.mods = await loadThree();
     this.renderer();
-    await Promise.all(ls.map((l) => this.entry(l).wait));
-    const bad = ls.map((l) => this.entries.get(l.id)?.error).find(Boolean);
-    if (bad) throw new Error(`3D model could not be loaded: ${bad}`);
+    await Promise.all([...ls.map((l) => this.entry(l).wait), ...ss.map((l) => this.sceneOf(l)?.wait)]);
+    const bad = ls.map((l) => this.entries.get(l.id)?.error).find(Boolean) ?? ss.map((l) => this.scenes.get(l.id)?.error).find(Boolean);
+    if (bad) throw new Error(`3D content could not be loaded: ${bad}`);
+  }
+
+  private params(l: SceneLayer) {
+    const def = sceneById(l.scene);
+    return { ...(def ? sceneDefaults(def) : {}), ...l.params };
+  }
+
+  private sceneOf(l: SceneLayer) {
+    const old = this.scenes.get(l.id);
+    if (old && old.id === l.scene) return old;
+    if (old) { old.inst.dispose(); this.scenes.delete(l.id); }
+    const def = sceneById(l.scene);
+    if (!def) return null;
+    const { THREE, RoundedBoxGeometry, toCreasedNormals, MarchingCubes } = this.mods!;
+    const inst = def.create({ THREE, RoundedBoxGeometry, toCreasedNormals, MarchingCubes, renderer: this.renderer(), redraw: () => this.onReady() });
+    const e = { id: l.scene, inst, ready: false, error: undefined as string | undefined, wait: Promise.resolve() };
+    e.wait = inst.prepare(this.params(l)).catch((err) => { e.error = String(err?.message ?? err); }).finally(() => { e.ready = true; this.onReady(); });
+    this.scenes.set(l.id, e);
+    return e;
+  }
+
+  /** Draw a Three.js cinematic scene layer (resolved at env.t). */
+  drawScene(ctx: CanvasRenderingContext2D, l: SceneLayer, env: Env2D) {
+    if (!this.ensure()) { this.hint(ctx, env, 'Loading 3D…'); return; }
+    const r = this.renderer();
+    const e = this.sceneOf(l);
+    if (!e) { this.hint(ctx, env, `Unknown 3D scene "${l.scene}"`); return; }
+    if (!e.ready) { this.hint(ctx, env, 'Preparing 3D scene…'); return; }
+    if (e.error) { this.hint(ctx, env, `3D scene error: ${e.error}`); return; }
+    // preview only: while playing on a slow device the 3D frame may render
+    // below full size (the compositor scales it up); exports always use 1
+    const W = Math.max(2, Math.round(env.W * this.scale)), H = Math.max(2, Math.round(env.H * this.scale));
+    if (this.canvas.width !== W || this.canvas.height !== H) r.setSize(W, H, false);
+    const span = Math.max(1e-3, l.end - l.start);
+    r.setClearColor(0x000000, 0);
+    e.inst.render({ p: Math.max(0, Math.min(1, (env.t - l.start) / span)), t: Math.max(0, env.t - l.start), W, H, params: this.params(l) });
+    ctx.save();
+    ctx.translate(l.x * W, l.y * H);
+    ctx.rotate((l.rotation * Math.PI) / 180);
+    ctx.scale(l.scale, l.scale);
+    ctx.drawImage(this.canvas, -W / 2, -H / 2, W, H);
+    ctx.restore();
   }
 
   private keyOf(l: ModelLayer) { return `${l.src ? l.src.length + ':' + l.src.slice(-64) : l.primitive}|${l.texture.length}:${l.texture.slice(-32)}`; }
@@ -301,7 +353,7 @@ export class ModelHost {
     ctx.translate(l.x * W, l.y * H);
     ctx.rotate((l.rotation * Math.PI) / 180);
     ctx.scale(l.scale, l.scale);
-    ctx.drawImage(this.canvas, -W / 2, -H / 2, W, H);
+    ctx.drawImage(this.canvas, -env.W / 2, -env.H / 2, env.W, env.H);
     ctx.restore();
   }
 
@@ -318,6 +370,7 @@ export class ModelHost {
   /** Drop scenes of layers that no longer exist. */
   sweep(ids: Set<string>) {
     for (const [id, e] of this.entries) if (!ids.has(id)) { this.disposeEntry(e); this.entries.delete(id); }
+    for (const [id, e] of this.scenes) if (!ids.has(id)) { e.inst.dispose(); this.scenes.delete(id); }
   }
 
   private disposeEntry(e: Entry) {
@@ -339,6 +392,8 @@ export class ModelHost {
   dispose() {
     for (const e of this.entries.values()) this.disposeEntry(e);
     this.entries.clear();
+    for (const e of this.scenes.values()) e.inst.dispose();
+    this.scenes.clear();
     this.envMap?.dispose();
     this.gl?.dispose();
     this.gl?.forceContextLoss();

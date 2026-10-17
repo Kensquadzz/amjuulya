@@ -282,6 +282,7 @@ export class Renderer {
       case 'image': drawImageLayer(env, L); break;
       case 'particles': drawParticles(env, L); break;
       case 'model3d': (this.models ??= new ModelHost(() => this.onNeedsRedraw?.())).draw(ctx, L, env); break;
+      case 'scene3d': { const h = (this.models ??= new ModelHost(() => this.onNeedsRedraw?.())); h.scale = this.heavyScale; h.drawScene(ctx, L, env); break; }
       case 'text': {
         ensureFont(cssFont(L, 64), () => this.onNeedsRedraw?.(), L.text || 'A');
         if (textNeedsIsolation(L)) {
@@ -551,7 +552,7 @@ export class Renderer {
   /** Release the GL context entirely (export renderers). */
   /** Load every picture and build every text/logo field the project's shaders use (exports await this). */
   async prepareTextures(p: Project) {
-    if (p.layers.some((l) => l.type === 'model3d')) await (this.models ??= new ModelHost(() => this.onNeedsRedraw?.())).prepare(p);
+    if (p.layers.some((l) => l.type === 'model3d' || l.type === 'scene3d')) await (this.models ??= new ModelHost(() => this.onNeedsRedraw?.())).prepare(p);
     if (!this.tex) return;
     const items: Parameters<TextureStore['prepare']>[0] = [];
     for (const l of p.layers) {

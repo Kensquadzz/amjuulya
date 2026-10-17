@@ -42,7 +42,7 @@ export type Tracks = Record<string, Keyframe[]>;
 
 export type BlendMode = 'normal' | 'add' | 'screen' | 'multiply';
 
-export type LayerType = 'text' | 'shape' | 'image' | 'shader' | 'background' | 'particles' | 'model3d';
+export type LayerType = 'text' | 'shape' | 'image' | 'shader' | 'background' | 'particles' | 'model3d' | 'scene3d';
 
 export interface LayerBase {
   id: string;
@@ -262,7 +262,14 @@ export interface ModelLayer extends LayerBase {
   clipSpeed: number;
 }
 
-export type Layer = TextLayer | ShapeLayer | ImageLayer | BackgroundLayer | ParticleLayer | ShaderLayer | ModelLayer;
+/** A Three.js cinematic scene (scenes3d/*): code-built world + camera; params drive content, colour and light. */
+export interface SceneLayer extends LayerBase {
+  type: 'scene3d';
+  scene: string;
+  params: Record<string, ParamValue>;
+}
+
+export type Layer = TextLayer | ShapeLayer | ImageLayer | BackgroundLayer | ParticleLayer | ShaderLayer | ModelLayer | SceneLayer;
 
 export interface AudioClip {
   id: string;

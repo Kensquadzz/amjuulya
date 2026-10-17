@@ -4,7 +4,7 @@
 // design and an ending. Timings are fractions of the duration, so every
 // template can be built at 10, 15 or 20 seconds (or any length).
 import { uid } from './util';
-import { makeBackground, makeModel, makeShader, makeText } from './project';
+import { makeBackground, makeModel, makeScene3D, makeShader, makeText } from './project';
 import { sfxById } from './sfx';
 import type { AudioClip, Keyframe, Layer, ModelLayer, ShaderLayer, TextLayer } from './types';
 import type { Template } from './templates';
@@ -37,7 +37,7 @@ function world(d: number, id: string, name: string, params: Record<string, numbe
 function liquidGlass(d: number): Built {
   const at = (f: number) => f * d;
   const layers: Layer[] = [
-    world(d, 'cineLiquidGlass', 'Liquid glass world'),
+    makeScene3D(d, 'liquidGlass', { name: 'Liquid glass (3D)', start: 0, end: d }),
     kicker(d, 0.06, 0.3, 'Designed to flow', { y: 0.8 }),
     T(d, 0.32, 0.56, 'Pure. Clear.\nEffortless.', { y: 0.8, fontSize: 64, fontWeight: 300, fontFamily: 'Playfair Display', italic: true, anim: { preset: 'fadeRise', unit: 'word', stagger: 0.18, duration: 0.9 } as any }),
     T(d, 0.84, 1, 'The new standard of clarity', { y: 0.63, fontSize: 40, fontWeight: 400, letterSpacing: 0.04, color: '#eef2ff', anim: { preset: 'fadeRise', unit: 'word', stagger: 0.08, out: { enabled: false } } as any }),
@@ -61,7 +61,7 @@ function productOrbit(d: number): Built {
   const callout = (a: number, text: string, y: number) =>
     T(d, a, a + 0.12, text, { x: 0.5, y, fontSize: 40, fontWeight: 500, letterSpacing: 0.06, color: '#ffffff', anim: { preset: 'slideBlur', unit: 'all', direction: 'right', duration: 0.6 } as any });
   const layers: Layer[] = [
-    world(d, 'cineProductOrbit', 'Product studio'),
+    makeScene3D(d, 'productOrbit', { name: 'Product studio (3D)', start: 0, end: d }),
     kicker(d, 0.04, 0.2, 'Introducing', { y: 0.12 }),
     T(d, 0.2, 0.4, 'NOVA', { y: 0.13, fontSize: 150, fontWeight: 900, fontFamily: 'Montserrat', letterSpacing: 0.08, anim: { preset: 'blurReveal', unit: 'char', stagger: 0.06 } as any }),
     callout(0.42, 'Zero sugar', 0.12),
@@ -86,7 +86,7 @@ function productOrbit(d: number): Built {
 function chromeLogo(d: number): Built {
   const at = (f: number) => f * d;
   const layers: Layer[] = [
-    world(d, 'cineChromeLogo', 'Chrome logo stage'),
+    makeScene3D(d, 'chromeLogo', { name: 'Chrome logo stage (3D)', start: 0, end: d }),
     kicker(d, 0.05, 0.3, 'A new era', { y: 0.32, color: '#bcd2ff' }),
     T(d, 0.62, 1, 'Engineered for excellence', { y: 0.7, fontSize: 36, fontWeight: 500, letterSpacing: 0.32, uppercase: true, color: '#dfe8ff', anim: { preset: 'spacing', unit: 'all', duration: 1.4, out: { enabled: false } } as any }),
   ];
@@ -106,7 +106,7 @@ function chromeLogo(d: number): Built {
 function floatingUI(d: number): Built {
   const at = (f: number) => f * d;
   const layers: Layer[] = [
-    world(d, 'cineFloatingUI', 'Interface space'),
+    makeScene3D(d, 'floatingUI', { name: 'Floating phones (3D)', start: 0, end: d }),
     kicker(d, 0.05, 0.28, 'Meet the new app', { y: 0.12, color: '#bcd0ff' }),
     T(d, 0.3, 0.52, 'Everything you need.\nIn one place.', { y: 0.14, fontSize: 56, fontWeight: 700, anim: { preset: 'fadeRise', unit: 'line', stagger: 0.25 } as any }),
     T(d, 0.56, 0.8, 'Fast · Private · Beautiful', { y: 0.88, fontSize: 36, fontWeight: 500, letterSpacing: 0.08, color: '#dfe6ff', anim: { preset: 'wordByWord', unit: 'word', stagger: 0.25 } as any }),

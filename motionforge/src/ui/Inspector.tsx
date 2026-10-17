@@ -4,7 +4,8 @@ import { EASING_LABELS } from '../engine/easing';
 import { animFor } from '../engine/project';
 import { parseShaderParams } from '../engine/shaderParams';
 import { setPath } from '../engine/keyframes';
-import type { EasingId, ImageLayer, Layer, ShaderLayer, TextLayer } from '../engine/types';
+import type { EasingId, ImageLayer, Layer, SceneLayer, ShaderLayer, TextLayer } from '../engine/types';
+import { sceneById } from '../engine/scenes3d';
 import { engine, setProp, useTime } from '../state/engine';
 import { getStore, useSelectedLayer, useStore } from '../state/store';
 import { autoRemoveBg, cutOutLayer, restoreOriginal, setAutoRemoveBg, setLayerImageFromFile } from './imageActions';
@@ -28,6 +29,7 @@ export function Inspector({ onOpenCode }: { onOpenCode: () => void }) {
       <LayerHeader layer={layer} />
       {layer.type === 'text' && <TextProps l={layer} t={t} />}
       {layer.type === 'shader' && <ShaderProps l={layer} t={t} onOpenCode={onOpenCode} />}
+      {layer.type === 'scene3d' && <Section title={`${sceneById(layer.scene)?.name ?? layer.scene} · Three.js scene`}><SceneParamControls l={layer} t={t} /></Section>}
       {layer.type === 'model3d' && (
         <Section title={`3D model · ${layer.src ? layer.fileName ?? 'GLB' : layer.primitive}`}>
           {MODEL_PROPS.map((p) => p.kind === 'color'
@@ -236,6 +238,44 @@ export function ShaderParamControls({ l, t }: { l: ShaderLayer; t: number }) {
               {p.options.map((o, i) => <option key={i} value={i}>{o}</option>)}
             </select>
             <KfButton layer={l} path={path} t={t} />
+          </div>
+        );
+      })}
+    </>
+  );
+}
+
+/** Controls for a Three.js cinematic scene: text, pictures, colours and keyframable numbers. */
+export function SceneParamControls({ l, t }: { l: SceneLayer; t: number }) {
+  const def = sceneById(l.scene);
+  if (!def) return <p className="hint">Unknown scene.</p>;
+  const set = (k: string, v: string) => getStore().updateLayer(l.id, (x) => ({ ...(x as SceneLayer), params: { ...(x as SceneLayer).params, [k]: v } }), `sp:${l.id}:${k}`);
+  return (
+    <>
+      {def.params.map((p) => {
+        const path = `params.${p.key}`;
+        if (p.kind === 'float') return <NumProp key={p.key} layer={l} path={path} label={p.label} min={p.min} max={p.max} step={(p.max - p.min) / 200} t={t} />;
+        if (p.kind === 'color') return <ColorProp key={p.key} layer={l} path={path} label={p.label} t={t} />;
+        if (p.kind === 'text') return (
+          <div className="glyph-prop" key={p.key}>
+            <label className="cap-prop-l">{p.label}</label>
+            <textarea rows={1} value={String(l.params[p.key] ?? p.def)} onChange={(e) => set(p.key, e.target.value)} aria-label={p.label} />
+          </div>
+        );
+        const v = String(l.params[p.key] ?? '');
+        return (
+          <div className="prop tex-prop" key={p.key}>
+            <label>{p.label}</label>
+            {v ? <img className="tex-thumb" src={v} alt="" /> : <span className="tex-thumb empty">—</span>}
+            <label className="file-btn">{v ? 'Replace…' : '＋ Add…'}
+              <input type="file" accept="image/*" hidden onChange={async (e) => {
+                const f = e.target.files?.[0];
+                e.target.value = '';
+                if (!f) return;
+                try { set(p.key, await loadImageFile(f, 4096)); } catch (err) { toast((err as Error).message, 'error'); }
+              }} />
+            </label>
+            {v && <button className="chip small" onClick={() => set(p.key, '')}>Remove</button>}
           </div>
         );
       })}

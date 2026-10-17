@@ -4,8 +4,10 @@ import { presetById } from './text';
 import { shaderById, BLANK_SHADER } from './shaders/library';
 import { defaultParams } from './shaderParams';
 import { LEGACY_SHADERS, fingerprint } from './shaders/legacy';
+import { sceneById } from './scenes3d';
+import { sceneDefaults } from './scene3d';
 import type {
-  BackgroundLayer, ImageLayer, Layer, LayerBase, LayerType, ModelLayer, ParticleLayer, Project, ShaderLayer, ShapeLayer, TextAnim, TextLayer, TextPresetId,
+  BackgroundLayer, ImageLayer, Layer, LayerBase, LayerType, ModelLayer, ParticleLayer, Project, SceneLayer, ShaderLayer, ShapeLayer, TextAnim, TextLayer, TextPresetId,
 } from './types';
 
 const base = <T extends LayerType>(type: T, name: string, duration: number): LayerBase & { type: T } => ({
@@ -112,6 +114,16 @@ export function makeModel(duration: number, patch: Partial<ModelLayer> = {}): Mo
   };
 }
 
+export function makeScene3D(duration: number, sceneId: string, patch: Partial<SceneLayer> = {}): SceneLayer {
+  const def = sceneById(sceneId);
+  return {
+    ...base('scene3d', def?.name ?? '3D scene', duration),
+    scene: sceneId,
+    ...patch,
+    params: { ...(def ? sceneDefaults(def) : {}), ...(patch.params ?? {}) },
+  };
+}
+
 export function makeLayer(type: LayerType, duration: number): Layer {
   switch (type) {
     case 'text': return makeText(duration);
@@ -121,6 +133,7 @@ export function makeLayer(type: LayerType, duration: number): Layer {
     case 'particles': return makeParticles(duration);
     case 'shader': return makeShader(duration, 'custom');
     case 'model3d': return makeModel(duration);
+    case 'scene3d': return makeScene3D(duration, 'productOrbit');
   }
 }
 
@@ -160,6 +173,10 @@ export function normalizeProject(raw: any): Project {
       if (l.type === 'text') {
         merged.anim = { ...dflt.anim, ...(l.anim ?? {}), out: { ...dflt.anim.out, ...(l.anim?.out ?? {}) } };
         merged.cursor = { ...dflt.cursor, ...(l.cursor ?? {}) };
+      }
+      if (l.type === 'scene3d') {
+        const def = sceneById(merged.scene);
+        merged.params = { ...(def ? sceneDefaults(def) : {}), ...(l.params ?? {}) };
       }
       if (l.type === 'shader') {
         // an unedited copy of an older built-in shader picks up the current

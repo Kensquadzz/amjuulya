@@ -5,13 +5,15 @@
 // template can be built at 10, 15 or 20 seconds (or any length).
 import { uid } from './util';
 import { makeBackground, makeModel, makeScene3D, makeShader, makeText } from './project';
-import { sfxById } from './sfx';
+import { sfxById, userSfx } from './sfx';
 import type { AudioClip, Keyframe, Layer, ModelLayer, ShaderLayer, TextLayer } from './types';
 import type { Template } from './templates';
 
 type Built = ReturnType<Template['build']>;
 
-function sfx(id: string, start: number, patch: Partial<AudioClip> = {}): AudioClip {
+function sfx(name: string, start: number, patch: Partial<AudioClip> = {}): AudioClip {
+  const [id, peak] = userSfx(name);
+  start -= peak;
   const p = sfxById(id);
   return { id: uid(), name: p?.label ?? id, assetId: `sfx:${id}`, start: Math.max(0, start), offset: 0, duration: p?.duration ?? 1, volume: 0.8, fadeIn: 0, fadeOut: 0, role: 'sfx', ...patch };
 }

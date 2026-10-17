@@ -41,11 +41,12 @@ export const productOrbit: SceneDef = {
     { key: 'camera', kind: 'float', label: 'Camera movement', min: 0, max: 1.5, def: 1 },
     { key: 'reflection', kind: 'float', label: 'Floor reflection', min: 0, max: 1, def: 0.35 },
     { key: 'spin', kind: 'float', label: 'Can spin (°/s)', min: -40, max: 40, def: 0 },
+    { key: 'condensation', kind: 'float', label: 'Ice-cold droplets', min: 0, max: 1, def: 0.8 },
   ],
   create(kit: SceneKit) {
     const { THREE } = kit;
     const scene = new THREE.Scene();
-    const env = studioEnv(kit);
+    const env = studioEnv(kit, { strips: 0.75, room: '#585c66' }); // a grey room: polished metal never reflects pure black
     scene.environment = env;
     scene.fog = new THREE.Fog('#1c1e26', 5, 16);
     const cam = new THREE.PerspectiveCamera(28, 1, 0.02, 60);
@@ -57,14 +58,46 @@ export const productOrbit: SceneDef = {
     const labelTex = new THREE.CanvasTexture(lc);
     labelTex.colorSpace = THREE.SRGBColorSpace;
     labelTex.anisotropy = kit.renderer.capabilities.getMaxAnisotropy();
-    const label = new THREE.MeshPhysicalMaterial({ map: labelTex, metalness: 0.45, roughness: 0.32, clearcoat: 1, clearcoatRoughness: 0.08 });
+    // condensation: a mist + micro-droplet relief (bump) and matching roughness
+    // (mist is matt, water is glossy), baked once into a canvas
+    const dc = document.createElement('canvas');
+    dc.width = 2048; dc.height = 1024;
+    {
+      const x = dc.getContext('2d')!;
+      x.fillStyle = 'rgb(128,128,128)'; x.fillRect(0, 0, 2048, 1024);
+      let seed = 7;
+      const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+      for (let i = 0; i < 14000; i++) {
+        const X = rnd() * 2048, Y = rnd() * 1024, r = 1 + rnd() * rnd() * 7;
+        const g = x.createRadialGradient(X - r * 0.3, Y - r * 0.3, 0, X, Y, r);
+        g.addColorStop(0, 'rgba(255,255,255,0.95)'); g.addColorStop(0.7, 'rgba(200,200,200,0.6)'); g.addColorStop(1, 'rgba(128,128,128,0)');
+        x.fillStyle = g; x.beginPath(); x.arc(X, Y, r, 0, Math.PI * 2); x.fill();
+      }
+      // a few runs: drops that slid down and left a clear trail
+      for (let i = 0; i < 26; i++) {
+        const X = rnd() * 2048, Y0 = rnd() * 600, L = 120 + rnd() * 380, w = 3 + rnd() * 4;
+        const g = x.createLinearGradient(0, Y0, 0, Y0 + L);
+        g.addColorStop(0, 'rgba(90,90,90,0)'); g.addColorStop(1, 'rgba(90,90,90,0.9)');
+        x.fillStyle = g; x.fillRect(X - w / 2, Y0, w, L);
+        x.fillStyle = 'rgba(255,255,255,1)'; x.beginPath(); x.ellipse(X, Y0 + L, w * 1.3, w * 1.6, 0, 0, Math.PI * 2); x.fill();
+      }
+    }
+    const dropTex = new THREE.CanvasTexture(dc);
+    dropTex.wrapS = THREE.RepeatWrapping;
+    dropTex.anisotropy = kit.renderer.capabilities.getMaxAnisotropy();
+    // printed metal: ink over aluminium keeps a metallic sheen under the colour
+    const label = new THREE.MeshPhysicalMaterial({ map: labelTex, metalness: 0.62, roughness: 0.3, clearcoat: 1, clearcoatRoughness: 0.12, bumpMap: dropTex, bumpScale: 1.2 });
 
     // ---- the can
     const can = new THREE.Group();
     const pts = profile(THREE);
     const iBody0 = pts.findIndex((v) => v.y === LABEL_Y0), iBody1 = pts.findIndex((v) => v.y === LABEL_Y1);
     can.add(new THREE.Mesh(new THREE.LatheGeometry(pts.slice(0, iBody0 + 1), 160), alu));
-    can.add(new THREE.Mesh(new THREE.LatheGeometry(pts.slice(iBody1), 160), alu));
+    // the print continues over the shoulder up to the neck, like a real can
+    const iNeck = pts.findIndex((v) => v.y === 1.118);
+    const shoulder = new THREE.MeshPhysicalMaterial({ color: '#e2253f', metalness: 0.62, roughness: 0.32, clearcoat: 1, clearcoatRoughness: 0.12 });
+    can.add(new THREE.Mesh(new THREE.LatheGeometry(pts.slice(iBody1, iNeck + 1), 160), shoulder));
+    can.add(new THREE.Mesh(new THREE.LatheGeometry(pts.slice(iNeck), 160), alu));
     // label: u = 0.5 faces +z (the hero side), text reads left to right from outside
     const body = new THREE.Mesh(new THREE.CylinderGeometry(R, R, LABEL_Y1 - LABEL_Y0, 160, 1, true, Math.PI, Math.PI * 2), label);
     body.position.y = (LABEL_Y0 + LABEL_Y1) / 2;
@@ -91,10 +124,29 @@ export const productOrbit: SceneDef = {
     score.rotation.z = Math.PI * 0.3;
     score.position.set(0, 1.174, -0.11);
     can.add(score);
+    // water drops sitting on the can: real little lenses (transmission)
+    const DROPS = 420;
+    const dropMat = new THREE.MeshPhysicalMaterial({ color: '#ffffff', metalness: 0, roughness: 0.02, transmission: 1, thickness: 0.02, ior: 1.33, clearcoat: 1, clearcoatRoughness: 0, envMapIntensity: 1.4 });
+    const drops = new THREE.InstancedMesh(new THREE.SphereGeometry(1, 16, 10, 0, Math.PI * 2, 0, Math.PI / 2), dropMat, DROPS);
+    {
+      const m = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0);
+      let seed = 11;
+      const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+      for (let i = 0; i < DROPS; i++) {
+        const a = rnd() * Math.PI * 2, y = LABEL_Y0 + 0.03 + rnd() * (LABEL_Y1 - LABEL_Y0 - 0.06);
+        const r = 0.003 + rnd() * rnd() * 0.011;
+        const n = new THREE.Vector3(Math.sin(a), 0, Math.cos(a));
+        q.setFromUnitVectors(up, n);
+        // gravity: big drops sag into a slight teardrop
+        m.compose(n.clone().multiplyScalar(R + 0.0004).setY(y), q, new THREE.Vector3(r, r * 0.5, r * (1 + Math.min(0.35, r * 30))));
+        drops.setMatrixAt(i, m);
+      }
+    }
+    can.add(drops);
     scene.add(can);
 
     // ---- floor, faded reflection, contact shadow, backdrop
-    const floorMat = new THREE.MeshPhysicalMaterial({ color: '#15161b', roughness: 0.42, metalness: 0, clearcoat: 0.55, clearcoatRoughness: 0.3, depthWrite: false });
+    const floorMat = new THREE.MeshPhysicalMaterial({ color: '#15161b', roughness: 0.55, metalness: 0, clearcoat: 0.25, clearcoatRoughness: 0.4, depthWrite: false });
     const floor = new THREE.Mesh(new THREE.CircleGeometry(30, 96), floorMat);
     floor.rotation.x = -Math.PI / 2;
     floor.renderOrder = -2;
@@ -248,6 +300,12 @@ export const productOrbit: SceneDef = {
         (scene.fog as THREEType.Fog).color.set(bd).multiplyScalar(0.55);
         floorMat.color.set(bd).multiplyScalar(0.62);
         reflUniform.value = Number(prm.reflection ?? 0.35);
+        shoulder.color.set(fmt(prm.canColor) || '#e2253f');
+        const cond = Number(prm.condensation ?? 0.8);
+        drops.count = Math.round(DROPS * cond);
+        drops.visible = cond > 0.01;
+        label.bumpScale = 1.6 * cond;
+        label.roughness = 0.3 + 0.12 * cond; // mist frosts the print a little
         const spin = (Number(prm.spin ?? 0) * f.t * Math.PI) / 180;
         can.rotation.y = mirror.rotation.y = spin;
         // dust drifts slowly through the key light
@@ -288,7 +346,7 @@ export const productOrbit: SceneDef = {
           m.geometry.dispose();
           (Array.isArray(m.material) ? m.material : [m.material]).forEach((mm) => mm.dispose());
         });
-        labelTex.dispose(); dustTex.dispose(); env.dispose(); shadow.dispose();
+        labelTex.dispose(); dropTex.dispose(); dustTex.dispose(); env.dispose(); shadow.dispose();
       },
     };
   },

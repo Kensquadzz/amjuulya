@@ -135,6 +135,18 @@ export const chromeLogo: SceneDef = {
     const glint = new THREE.Sprite(new THREE.SpriteMaterial({ map: starTex, transparent: true, blending: THREE.AdditiveBlending, depthTest: false, color: '#ffffff' }));
     glint.renderOrder = 21;
     scene.add(glint);
+    // a pool of light on the floor under the logo: the stage reads as a lit set,
+    // not a black void, and the reflection sits inside it
+    const pool = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ map: glowTex, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, fog: false }));
+    pool.rotation.x = -Math.PI / 2;
+    pool.position.set(0, 0.002, 0.9);
+    pool.scale.set(13, 11, 1);
+    pool.renderOrder = -1;
+    scene.add(pool);
+    // a far horizon glow line where the floor meets the dark
+    const horizon = new THREE.Mesh(new THREE.PlaneGeometry(40, 0.6), new THREE.MeshBasicMaterial({ map: glowTex, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, fog: false, opacity: 0.35 }));
+    horizon.position.set(0, 0.05, -12);
+    scene.add(horizon);
     const key = new THREE.DirectionalLight('#ffffff', 1.2);
     key.position.set(-2, 4, 5);
     scene.add(key);
@@ -228,6 +240,8 @@ export const chromeLogo: SceneDef = {
           mat.color.set(smokeC).multiplyScalar(2.2);
           mat.opacity = amt * 0.42 * (1 - 0.35 * reveal);
         });
+        (pool.material as THREEType.MeshBasicMaterial).color.set(smokeC).multiplyScalar(5 * reveal);
+        (horizon.material as THREEType.MeshBasicMaterial).color.set(smokeC).multiplyScalar(6);
         (rays.material as THREEType.MeshBasicMaterial).opacity = 0.12 * reveal * (0.8 + 0.2 * Math.sin(f.t * 0.7));
         rays.lookAt(cam.position);
         // lens streak follows the sweep, glint at the end on the top-right corner

@@ -18,7 +18,7 @@ export const liquidGlass: SceneDef = {
     { key: 'colorA', kind: 'color', label: 'Colour field A', def: '#5b2bff' },
     { key: 'colorB', kind: 'color', label: 'Colour field B', def: '#14b8ff' },
     { key: 'colorC', kind: 'color', label: 'Colour field C', def: '#ff4fa3' },
-    { key: 'tint', kind: 'color', label: 'Glass tint', def: '#c4b5ff' },
+    { key: 'tint', kind: 'color', label: 'Glass tint', def: '#dcd4ff' },
     { key: 'ior', kind: 'float', label: 'Refraction', min: 1.05, max: 2, def: 1.5 },
     { key: 'dispersion', kind: 'float', label: 'Rainbow dispersion', min: 0, max: 10, def: 6 },
     { key: 'flow', kind: 'float', label: 'Flow speed', min: 0, max: 2, def: 1 },
@@ -27,7 +27,7 @@ export const liquidGlass: SceneDef = {
   create(kit: SceneKit) {
     const { THREE } = kit;
     const scene = new THREE.Scene();
-    const env = studioEnv(kit, { key: 1.2, strips: 1.4, room: '#0b0b12' });
+    const env = studioEnv(kit, { key: 1.4, strips: 2.4, room: '#07070b' }); // sharp bright strips = crisp glass highlights
     scene.environment = env;
     scene.environmentIntensity = 1.15;
     const cam = new THREE.PerspectiveCamera(32, 1, 0.05, 60);
@@ -42,19 +42,21 @@ export const liquidGlass: SceneDef = {
         float fbm(vec2 p){ float v = 0.0, a = 0.5; for (int i = 0; i < 5; i++){ v += a * n(p); p = p * 2.03 + 7.1; a *= 0.5; } return v; }
         void main(){
           vec2 p = vUv * vec2(3.2, 2.0);
-          float t = uT * 0.06;
-          vec2 w = vec2(fbm(p + vec2(t, -t * 0.7)), fbm(p * 1.3 - vec2(t * 0.8, t * 0.4) + 4.0));
-          float a = fbm(p * 0.8 + w * 1.8 + t);
-          // hue drifts across the frame (A -> C) with B pooling in the eddies
-          vec3 c = mix(uA, uC, smoothstep(0.15, 0.85, vUv.x * 0.8 + (w.x - 0.5) * 1.2 + 0.1));
-          c = mix(c, uB, smoothstep(0.52, 0.78, fbm(p * 1.1 - w * 1.4 - t)));
-          // fine liquid caustic lines give the refraction something to bend
-          float lines = 1.0 - smoothstep(0.0, 0.025, 0.5 - abs(fract(a * 7.0 + w.x * 2.0) - 0.5));
-          float fine = 1.0 - smoothstep(0.0, 0.03, 0.5 - abs(fract(fbm(p * 2.2 - w * 2.0 + t * 1.5) * 9.0) - 0.5));
-          c += lines * 0.9 * (0.3 + c) + fine * 0.25 * (0.2 + c);
-          // deep night base: colour only lives in the flowing veins, the rest stays ink-dark
-          float body = smoothstep(0.5, 0.74, a) * (0.65 + 0.35 * sin(w.y * 9.0 + a * 6.0));
-          c = mix(vec3(0.004, 0.004, 0.014) + c * 0.02, c * 0.6, clamp(body, 0.0, 1.0));
+          float t = uT * 0.05;
+          vec2 w = vec2(fbm(p * 0.7 + vec2(t, -t * 0.7)), fbm(p * 0.9 - vec2(t * 0.8, t * 0.4) + 4.0));
+          // silk ribbons of light drifting through a near-black space: crisp
+          // bright bands are what make real glass read (you see them bend inside it)
+          vec3 c = vec3(0.004, 0.004, 0.012);
+          for (int k = 0; k < 3; k++) {
+            float fk = float(k);
+            float y = vUv.y + (w.x - 0.5) * (0.55 + fk * 0.1) + sin(vUv.x * (2.2 + fk) + t * (3.0 + fk) + fk * 2.1) * 0.12 - 0.25 - fk * 0.24;
+            float core = exp(-pow(y / (0.012 + 0.01 * w.y), 2.0));
+            float glow = exp(-pow(y / 0.09, 2.0));
+            vec3 col = k == 0 ? uA : (k == 1 ? uB : uC);
+            float along = 0.55 + 0.45 * sin(vUv.x * 5.0 - t * 4.0 + fk * 1.7 + w.y * 6.0);
+            c += col * (core * 1.8 + glow * 0.18) * along;
+          }
+          c += mix(uA, uC, vUv.x) * 0.05 * fbm(p * 1.5 + w * 2.0);
           float v = length((vUv - 0.5) * vec2(1.3, 1.0));
           c *= (1.0 - smoothstep(0.2, 0.75, v) * 0.75) * uFade;
           gl_FragColor = vec4(c, 1.0);
@@ -67,10 +69,10 @@ export const liquidGlass: SceneDef = {
     scene.add(back);
 
     // glass
-    const glassOpts = { color: '#ffffff', metalness: 0, roughness: 0.04, transmission: 1, thickness: 1.0, ior: 1.5, dispersion: 6, attenuationColor: new THREE.Color('#c4b5ff'), attenuationDistance: 3, specularIntensity: 1, iridescence: 1, iridescenceIOR: 1.3, iridescenceThicknessRange: [180, 520] as [number, number], clearcoat: 1, clearcoatRoughness: 0.03, envMapIntensity: 1.8 };
+    const glassOpts = { color: '#ffffff', metalness: 0, roughness: 0, transmission: 1, thickness: 1.5, ior: 1.5, dispersion: 6, attenuationColor: new THREE.Color('#ffffff'), attenuationDistance: 6, specularIntensity: 1, iridescence: 0.35, iridescenceIOR: 1.3, iridescenceThicknessRange: [180, 520] as [number, number], clearcoat: 1, clearcoatRoughness: 0, envMapIntensity: 2.4 };
     const blobGlass = new THREE.MeshPhysicalMaterial(glassOpts);
-    // lettering is lightly frosted glass: brighter and more legible than clear glass, with clear polished bevels catching the rims
-    const textGlass = new THREE.MeshPhysicalMaterial({ ...glassOpts, color: '#f4f2ff', emissive: '#4a3a8c', emissiveIntensity: 0.35, transmission: 0.82, thickness: 0.7, roughness: 0.16, attenuationDistance: 2.4, clearcoatRoughness: 0.02 });
+    // lettering: thick clear glass with a faint inner glow; the dark halo behind keeps it legible
+    const textGlass = new THREE.MeshPhysicalMaterial({ ...glassOpts, color: '#ffffff', emissive: '#ffffff', emissiveIntensity: 0.12, thickness: 1.1, roughness: 0.04, attenuationDistance: 1.6 });
     const blobs = new kit.MarchingCubes(44, blobGlass, false, false, 60000);
     blobs.isolation = 60;
     blobs.scale.setScalar(1.6);
@@ -138,8 +140,8 @@ export const liquidGlass: SceneDef = {
           m.dispersion = Number(prm.dispersion ?? 6);
         }
         // the drops stay nearly clear (only a whisper of tint); the lettering carries the full tint
-        textGlass.attenuationColor.set(fmt(prm.tint) || '#c4b5ff');
-        blobGlass.attenuationColor.set('#ffffff').lerp(textGlass.attenuationColor, 0.25);
+        textGlass.attenuationColor.set(fmt(prm.tint) || '#dcd4ff');
+        blobGlass.attenuationColor.set('#ffffff').lerp(textGlass.attenuationColor, 0.12);
         const p = f.p;
         // drops: wander, then gather into the centre and shrink as the word forms
         const gather = easeInOut(seg(p, 0.46, 0.66));
@@ -166,7 +168,7 @@ export const liquidGlass: SceneDef = {
         word.visible = form > 0.001;
         halo.visible = word.visible;
         halo.scale.set(wordW * s * 1.9, wordH * s * 2.6, 1);
-        (halo.material as THREEType.MeshBasicMaterial).opacity = 0.35 * form;
+        (halo.material as THREEType.MeshBasicMaterial).opacity = 0.7 * form;
         // a highlight light glides across the glass at the end
         moving.intensity = 6 * seg(p, 0.78, 0.84) * (1 - seg(p, 0.95, 1));
         moving.position.set(-3 + 6 * easeInOut(seg(p, 0.78, 0.98)), 1.2, 2.2);

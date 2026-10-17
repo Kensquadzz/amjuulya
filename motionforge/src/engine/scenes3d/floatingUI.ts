@@ -257,21 +257,64 @@ export const floatingUI: SceneDef = {
       orbs.push(s); scene.add(s);
     }
 
-    // phones
-    const body = new kit.RoundedBoxGeometry(PW, PH, PD, 8, 0.068);
-    const frameMat = new THREE.MeshPhysicalMaterial({ color: '#9aa3b2', metalness: 1, roughness: 0.28, clearcoat: 0.6, clearcoatRoughness: 0.15 });
-    const backGlass = new THREE.MeshPhysicalMaterial({ color: '#141824', metalness: 0.2, roughness: 0.35, clearcoat: 1, clearcoatRoughness: 0.08 });
-    // the screen: a rounded rect with UVs 0..1, a glass layer gives it real reflections
-    const sw = PW - 0.022, sh = PH - 0.022, sr = 0.058;
-    const shape = new THREE.Shape();
-    shape.moveTo(-sw / 2 + sr, -sh / 2);
-    shape.lineTo(sw / 2 - sr, -sh / 2); shape.quadraticCurveTo(sw / 2, -sh / 2, sw / 2, -sh / 2 + sr);
-    shape.lineTo(sw / 2, sh / 2 - sr); shape.quadraticCurveTo(sw / 2, sh / 2, sw / 2 - sr, sh / 2);
-    shape.lineTo(-sw / 2 + sr, sh / 2); shape.quadraticCurveTo(-sw / 2, sh / 2, -sw / 2, sh / 2 - sr);
-    shape.lineTo(-sw / 2, -sh / 2 + sr); shape.quadraticCurveTo(-sw / 2, -sh / 2, -sw / 2 + sr, -sh / 2);
-    const screenGeo = new THREE.ShapeGeometry(shape, 10);
+    // phones: an iPhone-proportioned slab — large continuous corner radius,
+    // flat glass front and back, a rounded titanium band (bevelled extrusion)
+    const rrShape = (w: number, h: number, r: number) => {
+      const sh = new THREE.Shape();
+      sh.moveTo(-w / 2 + r, -h / 2);
+      sh.lineTo(w / 2 - r, -h / 2); sh.absarc(w / 2 - r, -h / 2 + r, r, -Math.PI / 2, 0, false);
+      sh.lineTo(w / 2, h / 2 - r); sh.absarc(w / 2 - r, h / 2 - r, r, 0, Math.PI / 2, false);
+      sh.lineTo(-w / 2 + r, h / 2); sh.absarc(-w / 2 + r, h / 2 - r, r, Math.PI / 2, Math.PI, false);
+      sh.lineTo(-w / 2, -h / 2 + r); sh.absarc(-w / 2 + r, -h / 2 + r, r, Math.PI, Math.PI * 1.5, false);
+      return sh;
+    };
+    const RC = 0.074; // corner radius ≈ 16% of the width, like the real device
+    const BT = PD * 0.36, BS = 0.011; // band roundness: bevel depth and inset
+    const body = new THREE.ExtrudeGeometry(rrShape(PW - 2 * BS, PH - 2 * BS, RC - BS), { depth: PD - 2 * BT, bevelEnabled: true, bevelThickness: BT, bevelSize: BS, bevelSegments: 10, curveSegments: 48 });
+    body.translate(0, 0, -(PD - 2 * BT) / 2);
+    const frameMat = new THREE.MeshPhysicalMaterial({ color: '#9aa3b2', metalness: 1, roughness: 0.3, clearcoat: 0.4, clearcoatRoughness: 0.2 });
+    const backGlass = new THREE.MeshPhysicalMaterial({ color: '#1a1f2b', metalness: 0.1, roughness: 0.42, clearcoat: 1, clearcoatRoughness: 0.12 });
+    const lensGlass = new THREE.MeshPhysicalMaterial({ color: '#05060a', metalness: 0.2, roughness: 0.05, clearcoat: 1, clearcoatRoughness: 0.02, iridescence: 0.6, iridescenceIOR: 1.6 });
+    const ringMat = new THREE.MeshPhysicalMaterial({ color: '#c8ccd4', metalness: 1, roughness: 0.18 });
+    // the screen: rounded rect with UVs 0..1; a glass layer gives it real reflections
+    const sw = PW - 0.03, sh = PH - 0.03, sr = RC - 0.016;
+    const shape = rrShape(sw, sh, sr);
+    const screenGeo = new THREE.ShapeGeometry(shape, 24);
     const pos = screenGeo.attributes.position, uv = screenGeo.attributes.uv;
     for (let i = 0; i < pos.count; i++) uv.setXY(i, pos.getX(i) / sw + 0.5, pos.getY(i) / sh + 0.5);
+    const bezelGeo = new THREE.ShapeGeometry(rrShape(PW - 0.014, PH - 0.014, RC - 0.007), 24);
+    const bezelMat = new THREE.MeshPhysicalMaterial({ color: '#020203', roughness: 0.1, clearcoat: 1, clearcoatRoughness: 0.03 });
+    // camera plateau on the back (seen when a phone turns), side buttons
+    const bumpGeo = new THREE.ExtrudeGeometry(rrShape(0.17, 0.17, 0.045), { depth: 0.004, bevelEnabled: true, bevelThickness: 0.003, bevelSize: 0.003, bevelSegments: 4, curveSegments: 24 });
+    const lensGeo = new THREE.CylinderGeometry(0.03, 0.03, 0.01, 40);
+    const ringGeo = new THREE.TorusGeometry(0.031, 0.004, 10, 40);
+    const btnGeo = new kit.RoundedBoxGeometry(0.008, 0.1, 0.018, 3, 0.004);
+    const makeShell = () => {
+      const g = new THREE.Group();
+      g.add(new THREE.Mesh(body, [backGlass, frameMat]));
+      const bezel = new THREE.Mesh(bezelGeo, bezelMat);
+      bezel.position.z = PD / 2 + 0.0004;
+      g.add(bezel);
+      const bump = new THREE.Mesh(bumpGeo, [backGlass, frameMat]);
+      bump.rotation.y = Math.PI;
+      bump.position.set(PW / 2 - 0.115, PH / 2 - 0.115, -PD / 2 - 0.0005);
+      g.add(bump);
+      ([[-0.035, 0.035], [-0.035, -0.035], [0.035, 0]] as [number, number][]).forEach(([dx, dy]) => {
+        const lens = new THREE.Mesh(lensGeo, lensGlass);
+        lens.rotation.x = Math.PI / 2;
+        lens.position.set(PW / 2 - 0.115 + dx, PH / 2 - 0.115 + dy, -PD / 2 - 0.012);
+        const ring = new THREE.Mesh(ringGeo, ringMat);
+        ring.position.copy(lens.position).setZ(-PD / 2 - 0.016);
+        g.add(lens, ring);
+      });
+      ([[-1, 0.27, 0.06], [-1, 0.14, 0.1], [-1, 0.01, 0.1], [1, 0.12, 0.16]] as [number, number, number][]).forEach(([side, y, len]) => {
+        const b = new THREE.Mesh(btnGeo, frameMat);
+        b.scale.y = len / 0.1;
+        b.position.set(side * (PW / 2 + 0.002), y, 0);
+        g.add(b);
+      });
+      return g;
+    };
 
     type Phone = { g: THREEType.Group; canvas: HTMLCanvasElement; tex: THREEType.CanvasTexture; mat: THREEType.MeshPhysicalMaterial; home: [number, number, number, number]; draw: (x: Ctx, accent: string, name: string) => void; shot?: string; img?: HTMLImageElement | null };
     const phones: Phone[] = [];
@@ -286,23 +329,18 @@ export const floatingUI: SceneDef = {
     const HOMES: [number, number, number, number][] = [[0, 0, 0, 0], [-0.62, 0.07, -0.42, 0.42], [0.62, -0.06, -0.42, -0.42], [-1.18, -0.1, -1.15, 0.6], [1.18, 0.12, -1.15, -0.6]];
     HOMES.forEach((home, i) => {
       const g = new THREE.Group();
-      const shell = new THREE.Mesh(body, [frameMat, frameMat, frameMat, frameMat, frameMat, backGlass]);
-      g.add(shell);
+      g.add(makeShell());
       const canvas = document.createElement('canvas');
       canvas.width = SW; canvas.height = SH;
       const tex = new THREE.CanvasTexture(canvas);
       tex.colorSpace = THREE.SRGBColorSpace;
       tex.anisotropy = kit.renderer.capabilities.getMaxAnisotropy();
       // black glass that emits the UI: reflections from the clearcoat sit on top of the pixels
-      const mat = new THREE.MeshPhysicalMaterial({ color: '#000000', emissive: '#ffffff', emissiveMap: tex, emissiveIntensity: 1, roughness: 0.12, metalness: 0, clearcoat: 1, clearcoatRoughness: 0.02 });
+      const mat = new THREE.MeshPhysicalMaterial({ color: '#000000', emissive: '#ffffff', emissiveMap: tex, emissiveIntensity: 1, roughness: 0.12, metalness: 0, clearcoat: 0.6, clearcoatRoughness: 0.02, envMap: env, envMapIntensity: 0.3 });
+      // (its own envMap: scene.environment would ignore envMapIntensity and wash dark screens grey)
       const screen = new THREE.Mesh(screenGeo, mat);
-      screen.position.z = PD / 2 + 0.0015;
+      screen.position.z = PD / 2 + 0.0009;
       g.add(screen);
-      // bezel: a thin black ring around the screen
-      const bezel = new THREE.Mesh(new THREE.ShapeGeometry(shape, 10), new THREE.MeshStandardMaterial({ color: '#020203', roughness: 0.3 }));
-      bezel.scale.set((PW - 0.008) / sw, (PH - 0.008) / sh, 1);
-      bezel.position.z = PD / 2 + 0.0008;
-      g.add(bezel);
       scene.add(g);
       phones.push({ g, canvas, tex, mat, home, draw: DESIGNS[i] });
     });

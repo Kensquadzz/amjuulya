@@ -528,3 +528,26 @@ function normalise(buf: AudioBuffer, target: number) {
   }
   return buf;
 }
+
+/**
+ * Templates are written with the generated sound names; they play the
+ * project owner's own recordings instead (Kenyset pack + studio samples).
+ * [user sample id, seconds from the file start to its main peak] — the clip
+ * is moved earlier by that much so the peak still lands on the cue.
+ */
+export const USER_SFX: Record<string, [string, number]> = {
+  softHit: ['ks-sharp-pop', 0], punch: ['ks-sharp-pop', 0], pop: ['ks-pop', 0], bubble: ['ks-bubble', 0],
+  swoosh: ['ks-swoosh-014', 0], whoosh: ['ks-simple-whoosh', 0], whooshFast: ['ks-swoosh-06', 0], swipe: ['ks-swoosh-2', 0],
+  deepWhoosh: ['ks-whoosh-velocity', 0.5], impact: ['ks-whoosh-end', 0.25], cinematicBoom: ['ks-whoosh-end', 0.25], whooshHit: ['ks-whoosh-end', 0.25],
+  sweepUp: ['ks-simple-whoosh-02', 1.1], reverseSwell: ['ks-simple-whoosh-02', 1.1], riser: ['rec-metallic-riser', 0], downlifter: ['ks-whoosh-arrow-start', 0],
+  glitchSwipe: ['ks-glitch-fx-transitions-8', 0.25],
+  shine: ['ks-shine-1', 0], twinkle: ['ks-shine-1', 0], sparkle: ['ks-shine-1', 0], shimmer: ['ks-shine-6', 0], magicWand: ['ks-shine-6', 0],
+  success: ['ks-success', 0], notify: ['ks-new-notification-08', 0], chime: ['ks-bright-notification', 0],
+  tap: ['ks-app-click-1', 0], toggle: ['ks-ui-sound-2', 0], scroll: ['ks-ui-pop-up-2', 0], clockTick: ['ks-mouse-click', 0],
+  typing: ['ks-keyboard-typing-fast', 0], blip: ['ks-sci-fi-sfx-1', 0.25], blipSequence: ['ks-ui-processing-data-sequence-modern-interface-progress-02', 0],
+  heartbeat: ['ks-sonar-ping', 0],
+  padBright: ['ks-nightfall-future-bass-music', 0], beatDrive: ['ks-nightfall-future-bass-music', 0],
+  padDark: ['ks-music-track', 0], padWarm: ['ks-music-track', 0], droneDeep: ['ks-music-track', 0],
+};
+/** The owner's recording for a generated sound name (unchanged if none). */
+export const userSfx = (id: string): [string, number] => USER_SFX[id] ?? [id, 0];

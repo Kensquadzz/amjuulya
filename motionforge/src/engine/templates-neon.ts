@@ -4,15 +4,17 @@
 // lens flare. Each scene ships with matching procedural sound design.
 import { uid } from './util';
 import { makeShader, makeShape, makeText } from './project';
-import { sfxById } from './sfx';
+import { sfxById, userSfx } from './sfx';
 import type { AudioClip, EasingId, IconId, Keyframe, KfValue, Layer, ShapeLayer, TextLayer } from './types';
 import type { Template } from './templates';
 
 const kf = (t: number, v: KfValue, ease: EasingId = 'easeInOutCubic'): Keyframe => ({ id: uid(), t, v, ease });
 
-function sfx(id: string, start: number, patch: Partial<AudioClip> = {}): AudioClip {
+function sfx(name: string, start: number, patch: Partial<AudioClip> = {}): AudioClip {
+  const [id, peak] = userSfx(name);
+  start -= peak;
   const p = sfxById(id);
-  return { id: uid(), name: p?.label ?? id, assetId: `sfx:${id}`, start, offset: 0, duration: p?.duration ?? 1, volume: 0.85, fadeIn: 0, fadeOut: 0, ...patch };
+  return { id: uid(), name: p?.label ?? id, assetId: `sfx:${id}`, start: Math.max(0, start), offset: 0, duration: p?.duration ?? 1, volume: 0.85, fadeIn: 0, fadeOut: 0, ...patch };
 }
 
 interface Scene { layers: Layer[]; audio: AudioClip[] }

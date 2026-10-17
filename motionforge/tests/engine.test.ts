@@ -218,3 +218,16 @@ describe('cinematic templates', () => {
     expect(worlds.size).toBe(12); // twelve different scenes, not one scene renamed
   });
 });
+
+describe('template sounds', () => {
+  it('templates play the owner\'s recordings, not generated sounds', async () => {
+    const { USER_SFX, sfxById } = await import('../src/engine/sfx');
+    for (const [, [id]] of Object.entries(USER_SFX)) expect(sfxById(id)?.file, id).toBeTruthy();
+    for (const t of TEMPLATES) {
+      for (const a of t.build().audio ?? []) {
+        const id = a.assetId.replace(/^sfx:/, '');
+        expect(sfxById(id)?.file, `${t.id}: ${id}`).toBeTruthy();
+      }
+    }
+  });
+});

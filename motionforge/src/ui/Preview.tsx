@@ -4,6 +4,7 @@ import { formatTime } from '../engine/util';
 import { engine, QUALITY_DENSITY, QUALITY_SCALE, setProp, valueAt } from '../state/engine';
 import { getStore, useStore } from '../state/store';
 import { toast } from './controls';
+import { liveAudio } from '../engine/audio';
 
 export function Preview() {
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -154,9 +155,9 @@ export function Transport() {
     <div className="transport">
       <button className="icon-btn" onClick={() => engine.player?.seek(0)} aria-label="Go to start">⏮</button>
       <button className="icon-btn" onClick={() => step(-1)} aria-label="Previous frame">◂</button>
-      <button className="play-btn" onClick={() => engine.player?.toggle()} aria-label={playing ? 'Pause' : 'Play'}>{playing ? '❚❚' : '▶'}</button>
+      <button className="play-btn" onClick={() => { liveAudio.unlock(); engine.player?.toggle(); }} aria-label={playing ? 'Pause' : 'Play'}>{playing ? '❚❚' : '▶'}</button>
       <button className="icon-btn" onClick={() => step(1)} aria-label="Next frame">▸</button>
-      <button className="icon-btn" onClick={() => engine.player?.restart()} aria-label="Restart">↻</button>
+      <button className="icon-btn" onClick={() => { liveAudio.unlock(); engine.player?.restart(); }} aria-label="Restart">↻</button>
       <input
         ref={rangeRef}
         className="scrub"

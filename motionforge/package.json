@@ -5,16 +5,18 @@
   "type": "module",
   "description": "MOTIONFORGE STUDIO \u2014 mobile-first motion design, typography animation & GLSL shader editor",
   "scripts": {
-    "dev": "vite --host",
-    "build": "tsc --noEmit && vite build",
+    "dev": "node scripts/copy-ort.mjs && vite --host",
+    "build": "node scripts/copy-ort.mjs && tsc --noEmit && vite build",
     "preview": "vite preview --host",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:e2e": "node tests/e2e.mjs && node tests/app.mjs test-results",
     "icons": "node tests/icons.mjs",
-    "fonts": "node scripts/build-fonts.mjs"
+    "fonts": "node scripts/build-fonts.mjs",
+    "assets": "node scripts/copy-ort.mjs"
   },
   "dependencies": {
+    "@breezystack/lamejs": "^1.2.7",
     "@codemirror/commands": "^6.11.1",
     "@codemirror/language": "^6.13.1",
     "@codemirror/legacy-modes": "^6.5.5",
@@ -36,6 +38,7 @@
     "@fontsource/unbounded": "^5.3.0",
     "codemirror": "^6.0.2",
     "mediabunny": "^1.61.5",
+    "onnxruntime-web": "^1.30.0",
     "react": "^19.3.1",
     "react-dom": "^19.3.1"
   },

@@ -5,19 +5,22 @@ import { Inspector } from './ui/Inspector';
 import { LayersPanel } from './ui/LayersPanel';
 import { TemplatesPanel } from './ui/TemplatesPanel';
 import { CodePanel } from './ui/CodePanel';
+import { AudioPanel } from './ui/AudioPanel';
 import { ExportSheet } from './ui/ExportSheet';
 import { ProjectsSheet } from './ui/ProjectsSheet';
 import { Toasts, toast } from './ui/controls';
 import { storage } from './engine/storage';
 import { getStore, useStore } from './state/store';
 import { engine } from './state/engine';
+import { liveAudio } from './engine/audio';
 
-type Tab = 'templates' | 'layers' | 'inspect' | 'timeline' | 'code';
+type Tab = 'templates' | 'layers' | 'inspect' | 'timeline' | 'audio' | 'code';
 const TABS: { id: Tab; label: string; icon: string }[] = [
   { id: 'templates', label: 'Presets', icon: '✧' },
   { id: 'layers', label: 'Layers', icon: '☰' },
   { id: 'inspect', label: 'Inspect', icon: '⚙' },
   { id: 'timeline', label: 'Timeline', icon: '◆' },
+  { id: 'audio', label: 'Audio', icon: '♪' },
   { id: 'code', label: 'Code', icon: '</>' },
 ];
 
@@ -46,7 +49,7 @@ export function App() {
       const tag = (e.target as HTMLElement).tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || (e.target as HTMLElement).isContentEditable) return;
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); if (e.shiftKey) store.redo(); else store.undo(); }
-      if (e.key === ' ') { e.preventDefault(); engine.player?.toggle(); }
+      if (e.key === ' ') { e.preventDefault(); liveAudio.unlock(); engine.player?.toggle(); }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -84,6 +87,7 @@ export function App() {
             {tab === 'layers' && <LayersPanel onEdit={() => setTab('inspect')} />}
             {tab === 'inspect' && <Inspector onOpenCode={() => setTab('code')} />}
             {tab === 'timeline' && <Timeline />}
+            {tab === 'audio' && <AudioPanel />}
             {tab === 'code' && <CodePanel />}
           </div>
         </div>

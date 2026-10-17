@@ -380,6 +380,230 @@ void main() {
 }
 `;
 
+// ---------------------------------------------------------------- neon / glass (promo style)
+
+const SDF = `
+float sdRoundBox(vec2 p, vec2 b, float r) { vec2 q = abs(p) - b + r; return length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - r; }
+vec2 placeP(vec2 c, float sc) {
+  // centre given in layer convention (x right, y DOWN, 0..1); result in short-side units
+  float S = min(u_resolution.x, u_resolution.y);
+  vec2 cc = vec2(c.x, 1.0 - c.y) * u_resolution;
+  return (gl_FragCoord.xy - cc) / S / max(sc, 1e-3);
+}
+`;
+
+const GLASS_CARD = `${H}${NOISE}${SDF}
+// Glass card — rounded card filled with a flowing multi-colour gradient,
+// bright glass rim and a soft coloured glow. Animate Center Y / Scale to rise in.
+uniform float u_x;       // @ui -0.5 1.5 0.6 | Center X
+uniform float u_y;       // @ui -0.5 1.5 0.5 | Center Y
+uniform float u_scale;   // @ui 0 2 1 | Scale
+uniform float u_w;       // @ui 0.1 1.4 0.98 | Width
+uniform float u_h;       // @ui 0.1 1.4 0.66 | Height
+uniform float u_radius;  // @ui 0 0.3 0.09 | Corner radius
+uniform float u_glow;    // @ui 0 1.5 0.7 | Outer glow
+uniform float u_speed;   // @ui 0 3 0.35 | Flow speed
+uniform float u_alpha;   // @ui 0 1 1 | Opacity
+uniform vec3 u_colorA;   // @color #ff7a2b | Color A
+uniform vec3 u_colorB;   // @color #ff2d7a | Color B
+uniform vec3 u_colorC;   // @color #6b3dff | Color C
+
+void main() {
+  vec2 p = placeP(vec2(u_x, u_y), u_scale);
+  vec2 b = vec2(u_w, u_h) * 0.5;
+  float d = sdRoundBox(p, b, u_radius);
+  float px = 1.5 / min(u_resolution.x, u_resolution.y) / max(u_scale, 1e-3);
+  float inside = 1.0 - smoothstep(-px, px, d);
+  vec2 q = p / b;
+  float t = u_time * u_speed;
+  float n = fbm(q * 1.3 + vec2(t * 0.35, -t * 0.25));
+  vec3 col = mix(u_colorC, u_colorB, smoothstep(-0.9, 0.5, q.x * 0.55 + q.y * 0.75 + (n - 0.5) * 0.9));
+  col = mix(col, u_colorA, smoothstep(0.15, 1.05, q.x * 0.55 + q.y * 0.85 + (n - 0.5) * 0.7));
+  // glass depth: brighter near the edges, deeper in the middle
+  float edge = smoothstep(-0.22, 0.0, d);
+  col *= 0.78 + 0.4 * edge;
+  float rim = exp(-abs(d + 0.004) / 0.0035) * (0.35 + 0.65 * clamp(0.5 - q.x * 0.5 + q.y * 0.5, 0.0, 1.0));
+  vec3 card = col + vec3(1.0) * rim * 0.9;
+  float g = exp(-max(d, 0.0) / 0.09) * u_glow * (1.0 - inside);
+  vec3 glowC = mix(u_colorC, u_colorB, clamp(q.x * 0.5 + 0.5, 0.0, 1.0));
+  float a = clamp(inside + g * 0.85, 0.0, 1.0);
+  vec3 rgb = (card * inside + glowC * g * 0.85) / max(a, 1e-4);
+  fragColor = vec4(rgb, a * u_alpha);
+}
+`;
+
+const NEON_PILL = `${H}${SDF}
+// Neon pill — search-bar style capsule with a colour-cycling neon rim,
+// dark glass fill and a wide under-glow. Put a text layer on top.
+uniform float u_x;         // @ui -0.5 1.5 0.5 | Center X
+uniform float u_y;         // @ui -0.5 1.5 0.45 | Center Y
+uniform float u_scale;     // @ui 0 2 1 | Scale
+uniform float u_w;         // @ui 0.1 1.2 0.66 | Width
+uniform float u_h;         // @ui 0.03 0.4 0.105 | Height
+uniform float u_thickness; // @ui 0.001 0.03 0.0045 | Rim thickness
+uniform float u_glow;      // @ui 0 2 0.9 | Glow
+uniform float u_hueSpeed;  // @ui 0 3 0.5 | Colour cycle speed
+uniform float u_alpha;     // @ui 0 1 1 | Opacity
+uniform vec3 u_colorA;     // @color #8a5cff | Neon A
+uniform vec3 u_colorB;     // @color #29c8ff | Neon B
+uniform vec3 u_colorC;     // @color #3dffa8 | Neon C
+
+vec3 cyc(float h) {
+  h = fract(h) * 3.0;
+  if (h < 1.0) return mix(u_colorA, u_colorB, h);
+  if (h < 2.0) return mix(u_colorB, u_colorC, h - 1.0);
+  return mix(u_colorC, u_colorA, h - 2.0);
+}
+
+void main() {
+  vec2 p = placeP(vec2(u_x, u_y), u_scale);
+  vec2 b = vec2(u_w, u_h) * 0.5;
+  float d = sdRoundBox(p, b, b.y);
+  float px = 1.5 / min(u_resolution.x, u_resolution.y) / max(u_scale, 1e-3);
+  float inside = 1.0 - smoothstep(-px, px, d);
+  float a = atan(p.y, p.x * b.y / b.x);
+  vec3 neon = cyc(a / 6.2831 + u_time * u_hueSpeed);
+  float core = 1.0 - smoothstep(u_thickness * 0.4, u_thickness, abs(d));
+  float halo = exp(-abs(d) / (u_thickness * 3.0));
+  float outer = exp(-max(d, 0.0) / 0.05) * (1.0 - inside) * u_glow;
+  float under = exp(-length((p - vec2(0.0, -b.y * 0.2)) / vec2(b.x * 1.25, b.y * 3.2))) * u_glow * 0.55;
+  vec3 fill = mix(vec3(0.035, 0.035, 0.07), vec3(0.11, 0.1, 0.18), clamp(p.y / b.y * 0.5 + 0.5, 0.0, 1.0));
+  vec3 rgb = fill * inside + neon * (core * 1.1 + halo * 0.3) + neon * outer * 0.45 + u_colorA * under * (1.0 - inside) * 0.9;
+  float al = clamp(inside + core + halo * 0.3 + outer * 0.55 + under * 0.85, 0.0, 1.0);
+  fragColor = vec4(rgb / max(al, 1e-4), al * u_alpha);
+}
+`;
+
+const ORB_RING = `${H}${SDF}
+// Orb ring — glowing orbs circling a point; animate Radius to converge.
+uniform float u_x;       // @ui -0.5 1.5 0.5 | Center X
+uniform float u_y;       // @ui -0.5 1.5 0.5 | Center Y
+uniform float u_count;   // @ui 3 16 8 | Orbs
+uniform float u_radius;  // @ui 0 0.6 0.16 | Radius
+uniform float u_size;    // @ui 0.002 0.08 0.032 | Orb size
+uniform float u_speed;   // @ui -4 4 1.2 | Spin
+uniform float u_glow;    // @ui 0 3 1 | Glow
+uniform float u_haze;    // @ui 0 1 0.6 | Haze
+uniform float u_alpha;   // @ui 0 1 1 | Opacity
+uniform vec3 u_colorA;   // @color #4b6bff | Haze colour
+
+void main() {
+  vec2 p = placeP(vec2(u_x, u_y), 1.0);
+  vec3 col = vec3(0.0);
+  for (int i = 0; i < 16; i++) {
+    float fi = float(i);
+    if (fi >= u_count) break;
+    float ang = fi / u_count * 6.2831 + u_time * u_speed;
+    vec2 pos = vec2(cos(ang), sin(ang)) * u_radius;
+    float d = length(p - pos);
+    vec3 hue = 0.5 + 0.5 * cos(6.2831 * (fi / u_count + vec3(0.0, 0.33, 0.67)));
+    float core = 1.0 - smoothstep(u_size * 0.35, u_size, d);
+    float glow = (u_size * u_size) / (d * d + 1e-5) * 0.09 * u_glow;
+    col += hue * (glow + core * 0.9) + vec3(1.0) * core * 0.25;
+  }
+  float r = length(p);
+  col += u_colorA * exp(-abs(r - u_radius) / 0.07) * u_haze * 0.5;
+  col += u_colorA * exp(-r / max(u_radius, 0.02)) * u_haze * 0.25;
+  float al = clamp(max(col.r, max(col.g, col.b)), 0.0, 1.0);
+  fragColor = vec4(col / max(al, 1e-4), al * u_alpha);
+}
+`;
+
+const PLANET = `${H}
+// Planet horizon — huge sphere rising from the bottom with a glowing
+// atmosphere rim and a star field. Animate Rise from 0 to 1.
+uniform float u_rise;    // @ui 0 1 0.7 | Rise
+uniform float u_radius;  // @ui 0.3 3 1.15 | Planet radius
+uniform float u_glow;    // @ui 0 2 1 | Atmosphere glow
+uniform float u_stars;   // @ui 0 1 0.5 | Stars
+uniform vec3 u_atmoA;    // @color #8a3dff | Atmosphere A
+uniform vec3 u_atmoB;    // @color #2f86ff | Atmosphere B
+uniform vec3 u_surface;  // @color #07081a | Surface
+uniform vec3 u_bg;       // @color #020206 | Space
+
+float h21(vec2 p) { return fract(sin(dot(p, vec2(41.3, 289.1))) * 43758.5453); }
+
+void main() {
+  float S = min(u_resolution.x, u_resolution.y);
+  vec2 p = (gl_FragCoord.xy - 0.5 * u_resolution) / S;
+  float halfH = 0.5 * u_resolution.y / S;
+  float top = mix(-halfH - 0.1, halfH * 0.2, u_rise);
+  vec2 c = vec2(0.0, top - u_radius);
+  float r = length(p - c);
+  float d = r - u_radius;
+  float px = 1.5 / S;
+  float inside = 1.0 - smoothstep(-px, px, d);
+  vec3 col = u_bg;
+  // stars
+  vec2 g = floor(gl_FragCoord.xy / 3.0);
+  float st = step(0.9965, h21(g)) * (0.4 + 0.6 * sin(u_time * 2.0 + h21(g + 3.0) * 30.0));
+  col += vec3(st) * u_stars * (1.0 - inside);
+  float side = clamp((p.x - c.x) / u_radius * 0.5 + 0.5, 0.0, 1.0);
+  vec3 atmo = mix(u_atmoA, u_atmoB, side);
+  // outer atmosphere and bright rim
+  col += atmo * exp(-max(d, 0.0) / 0.15) * u_glow * (1.0 - inside) * 1.1;
+  col += mix(atmo, vec3(1.0), 0.55) * exp(-abs(d) / 0.004) * u_glow;
+  // surface with inner rim light
+  vec3 surf = u_surface + atmo * exp(d / 0.07) * 0.8 * u_glow + atmo * exp(d / 0.45) * 0.12;
+  col = mix(col, surf, inside);
+  fragColor = vec4(col, 1.0);
+}
+`;
+
+const FLARE = `${H}${SDF}
+// Lens flare — four-point star with halo and anamorphic streak (use Add blend).
+uniform float u_x;         // @ui -0.5 1.5 0.5 | Center X
+uniform float u_y;         // @ui -0.5 1.5 0.45 | Center Y
+uniform float u_size;      // @ui 0.02 1 0.3 | Size
+uniform float u_intensity; // @ui 0 3 1.2 | Intensity
+uniform float u_rot;       // @ui -3.2 3.2 0.25 | Rotation
+uniform float u_streak;    // @ui 0 2 0.6 | Streak
+uniform vec3 u_colorA;     // @color #3dff6a | Colour
+
+void main() {
+  vec2 p = placeP(vec2(u_x, u_y), 1.0);
+  float cs = cos(u_rot), sn = sin(u_rot);
+  vec2 q = mat2(cs, -sn, sn, cs) * p;
+  float w = 0.003 + u_size * 0.004;
+  float rayA = exp(-abs(q.y) / w) * exp(-abs(q.x) / u_size);
+  float rayB = exp(-abs(q.x) / w) * exp(-abs(q.y) / u_size);
+  vec2 q2 = mat2(0.7071, -0.7071, 0.7071, 0.7071) * q;
+  float rayC = (exp(-abs(q2.y) / (w * 0.6)) * exp(-abs(q2.x) / (u_size * 0.35)) + exp(-abs(q2.x) / (w * 0.6)) * exp(-abs(q2.y) / (u_size * 0.35))) * 0.5;
+  float core = exp(-length(q) / (u_size * 0.05));
+  float halo = exp(-length(q) / (u_size * 0.45)) * 0.35;
+  float streak = exp(-abs(p.y) / 0.004) * exp(-abs(p.x) / (u_size * 2.5)) * u_streak;
+  vec3 col = u_colorA * (rayA + rayB + rayC + halo + streak) + vec3(1.0) * core;
+  col *= u_intensity;
+  fragColor = vec4(col, clamp(max(col.r, max(col.g, col.b)), 0.0, 1.0));
+}
+`;
+
+const AURORA = `${H}
+// Colour bleed — dark backdrop with slow drifting blobs of coloured light.
+uniform float u_intensity; // @ui 0 2 0.7 | Intensity
+uniform float u_speed;     // @ui 0 3 0.3 | Speed
+uniform float u_size;      // @ui 0.1 1.5 0.55 | Blob size
+uniform vec3 u_colorA;     // @color #ff5a2b | Colour A
+uniform vec3 u_colorB;     // @color #c42dff | Colour B
+uniform vec3 u_colorC;     // @color #2d5bff | Colour C
+uniform vec3 u_bg;         // @color #050507 | Background
+
+void main() {
+  float S = min(u_resolution.x, u_resolution.y);
+  vec2 p = gl_FragCoord.xy / S;
+  vec2 R = u_resolution / S;
+  float t = u_time * u_speed;
+  vec3 col = u_bg;
+  vec2 a = R * vec2(0.85 + 0.1 * sin(t), 0.9 + 0.05 * cos(t * 0.8));
+  vec2 b = R * vec2(0.15 + 0.1 * cos(t * 0.7), 0.55 + 0.1 * sin(t * 0.9));
+  vec2 c = R * vec2(0.6 + 0.15 * sin(t * 0.5), 0.12 + 0.05 * cos(t * 1.1));
+  col += u_colorA * exp(-dot(p - a, p - a) / (u_size * u_size * 0.35)) * u_intensity;
+  col += u_colorB * exp(-dot(p - b, p - b) / (u_size * u_size * 0.3)) * u_intensity;
+  col += u_colorC * exp(-dot(p - c, p - c) / (u_size * u_size * 0.4)) * u_intensity;
+  fragColor = vec4(col, 1.0);
+}
+`;
+
 // ---------------------------------------------------------------- filters
 
 const FILTER_H = `${H}uniform sampler2D u_input; // everything composited below this layer
@@ -606,6 +830,12 @@ export const SHADERS: ShaderDef[] = [
   { id: 'lightRays', name: 'Light Rays', category: 'Light', kind: 'generator', blend: 'add', source: LIGHT_RAYS, description: 'Volumetric light streaks.' },
   { id: 'lightSweep', name: 'Light Sweep', category: 'Light', kind: 'generator', blend: 'add', source: LIGHT_SWEEP, description: 'Diagonal sweeping highlight.' },
   { id: 'lines', name: 'Animated Lines', category: 'Light', kind: 'generator', blend: 'add', source: ANIMATED_LINES, description: 'Travelling light streaks.' },
+  { id: 'glassCard', name: 'Glass Gradient Card', category: 'Glow', kind: 'generator', blend: 'normal', source: GLASS_CARD, description: 'Rounded glass card with flowing gradient + rim + glow.' },
+  { id: 'neonPill', name: 'Neon Search Bar', category: 'Glow', kind: 'generator', blend: 'normal', source: NEON_PILL, description: 'Capsule with colour-cycling neon rim and under-glow.' },
+  { id: 'orbRing', name: 'Orb Ring', category: 'Particles', kind: 'generator', blend: 'screen', source: ORB_RING, description: 'Glowing orbs circling — animate Radius to converge.' },
+  { id: 'planet', name: 'Planet Horizon', category: 'Light', kind: 'generator', blend: 'normal', source: PLANET, description: 'Rising planet with atmosphere glow and stars.' },
+  { id: 'flare', name: 'Lens Flare Star', category: 'Light', kind: 'generator', blend: 'add', source: FLARE, description: 'Four-point flare with halo and streak.' },
+  { id: 'aurora', name: 'Colour Bleed Backdrop', category: 'Gradient', kind: 'generator', blend: 'normal', source: AURORA, description: 'Dark backdrop with drifting colour light.' },
   { id: 'chromatic', name: 'Chromatic Aberration', category: 'Distortion', kind: 'filter', blend: 'normal', source: CHROMATIC, description: 'Radial RGB fringing.' },
   { id: 'crt', name: 'Distorted Scanlines', category: 'Glitch', kind: 'filter', blend: 'normal', source: CRT, description: 'CRT curvature and rolling lines.' },
   { id: 'bloom', name: 'Glow / Bloom', category: 'Glow', kind: 'filter', blend: 'normal', source: BLOOM, description: 'Soft glow from bright areas.' },

@@ -4,6 +4,7 @@ import { newProject, normalizeProject } from '../engine/project';
 import { sampleProject } from '../engine/templates';
 import { deepClone, uid } from '../engine/util';
 import { deliverFile } from '../engine/exporter';
+import { collectAssets, restoreAssets } from '../engine/audio';
 import { engine } from '../state/engine';
 import { getStore, useStore } from '../state/store';
 import { Sheet, toast } from './controls';
@@ -56,6 +57,7 @@ export function ProjectsSheet({ onClose }: { onClose: () => void }) {
     try {
       const raw = JSON.parse(await f.text());
       const p = normalizeProject(raw);
+      await restoreAssets(raw._assets);
       if (!guard()) return;
       const fresh = { ...p, id: uid(), updatedAt: Date.now() };
       store.load(fresh);
@@ -69,7 +71,9 @@ export function ProjectsSheet({ onClose }: { onClose: () => void }) {
   };
 
   const exportJson = async () => {
-    const blob = new Blob([JSON.stringify(store.state.project, null, 2)], { type: 'application/json' });
+    // embed imported audio files so the JSON is self-contained
+    const _assets = await collectAssets(store.state.project);
+    const blob = new Blob([JSON.stringify({ ...store.state.project, _assets }, null, 2)], { type: 'application/json' });
     const name = `${(project.name || 'project').replace(/[^\w\- ]+/g, '').replace(/\s+/g, '-')}.motionforge.json`;
     const r = await deliverFile(blob, name, /iP(hone|ad)/.test(navigator.userAgent));
     if (r !== 'cancelled') toast('Project JSON exported', 'ok');

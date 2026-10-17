@@ -4,10 +4,11 @@ import { EASING_LABELS } from '../engine/easing';
 import { animFor } from '../engine/project';
 import { parseShaderParams } from '../engine/shaderParams';
 import { setPath } from '../engine/keyframes';
-import type { EasingId, Layer, ShaderLayer, TextLayer } from '../engine/types';
+import type { EasingId, ImageLayer, Layer, ShaderLayer, TextLayer } from '../engine/types';
 import { engine, setProp, useTime } from '../state/engine';
 import { getStore, useSelectedLayer, useStore } from '../state/store';
-import { loadImageFile } from './images';
+import { autoRemoveBg, cutOutLayer, restoreOriginal, setAutoRemoveBg, setLayerImageFromFile } from './imageActions';
+import { useState } from 'react';
 import { ColorProp, NumProp, Section, SelectProp, ToggleProp, KfButton } from './controls';
 
 const EASE_OPTS = (Object.keys(EASING_LABELS) as EasingId[]).map((id) => ({ value: id, label: EASING_LABELS[id] }));
@@ -27,7 +28,7 @@ export function Inspector({ onOpenCode }: { onOpenCode: () => void }) {
       {layer.type === 'shader' && <ShaderProps l={layer} t={t} onOpenCode={onOpenCode} />}
       {layer.type === 'shape' && (
         <Section title="Shape">
-          <SelectProp layer={layer} path="shape" label="Kind" t={t} options={['rect', 'circle', 'ring', 'line', 'triangle', 'cross', 'swoosh', 'barcode'].map((v) => ({ value: v, label: v }))} />
+          <SelectProp layer={layer} path="shape" label="Kind" t={t} options={['rect', 'circle', 'ring', 'line', 'triangle', 'cross', 'swoosh', 'barcode', 'glassTile', 'search'].map((v) => ({ value: v, label: v }))} />
           <NumProp layer={layer} path="w" label="Width" min={0} max={2400} step={1} t={t} />
           <NumProp layer={layer} path="h" label="Height" min={0} max={2400} step={1} t={t} />
           <NumProp layer={layer} path="radius" label="Corner" min={0} max={600} step={1} t={t} />
@@ -35,6 +36,8 @@ export function Inspector({ onOpenCode }: { onOpenCode: () => void }) {
           <ColorProp layer={layer} path="fill" label="Fill color" t={t} />
           <NumProp layer={layer} path="strokeWidth" label="Stroke" min={0} max={60} step={0.5} t={t} />
           <ColorProp layer={layer} path="stroke" label="Stroke color" t={t} />
+          {layer.shape === 'glassTile' && <ColorProp layer={layer} path="stroke2" label="Rim colour 2" t={t} />}
+          {layer.shape === 'glassTile' && <SelectProp layer={layer} path="icon" label="Icon" t={t} options={['none', 'music', 'image', 'eye', 'diamond', 'flower', 'sparkle', 'search', 'heart', 'dots', 'arrow', 'wave', 'chat', 'play'].map((v) => ({ value: v, label: v }))} />}
           <NumProp layer={layer} path="draw" label="Draw on" min={0} max={1} step={0.005} t={t} display={100} unit="%" />
           <NumProp layer={layer} path="glow" label="Glow" min={0} max={120} step={1} t={t} />
         </Section>
@@ -53,7 +56,7 @@ export function Inspector({ onOpenCode }: { onOpenCode: () => void }) {
           <NumProp layer={layer} path="shadow" label="Shadow blur" min={0} max={200} step={1} t={t} />
           <NumProp layer={layer} path="shadowOpacity" label="Shadow alpha" min={0} max={1} step={0.01} t={t} />
           <NumProp layer={layer} path="shadowY" label="Shadow Y" min={-200} max={200} step={1} t={t} />
-          <ImagePicker layerId={layer.id} />
+          <ImagePicker layer={layer} />
           {!layer.src && <p className="hint">Empty slot — only shown in the editor, never exported. Transparent PNG cut-outs (people, products, objects) look best.</p>}
         </Section>
       )}
@@ -146,6 +149,7 @@ function TextProps({ l, t }: { l: TextLayer; t: number }) {
         {fam.italic ? <ToggleProp layer={l} path="italic" label="Italic" t={t} /> : null}
         <ToggleProp layer={l} path="uppercase" label="Uppercase" t={t} />
         <SelectProp layer={l} path="align" label="Align" t={t} options={[{ value: 'left', label: 'Left' }, { value: 'center', label: 'Center' }, { value: 'right', label: 'Right' }]} />
+        <SelectProp layer={l} path="anchor" label="Anchor X" t={t} options={[{ value: 'center', label: 'Block centre' }, { value: 'left', label: 'Left edge' }, { value: 'right', label: 'Right edge' }]} />
         <NumProp layer={l} path="fontSize" label="Size" min={8} max={600} step={1} t={t} unit="px" />
         <NumProp layer={l} path="letterSpacing" label="Tracking" min={-0.2} max={1.5} step={0.005} t={t} unit="em" />
         <NumProp layer={l} path="lineHeight" label="Line height" min={0.5} max={3} step={0.01} t={t} />
@@ -236,17 +240,28 @@ function ShaderProps({ l, t, onOpenCode }: { l: ShaderLayer; t: number; onOpenCo
   );
 }
 
-function ImagePicker({ layerId }: { layerId: string }) {
+function ImagePicker({ layer }: { layer: ImageLayer }) {
+  const [auto, setAuto] = useState(autoRemoveBg);
   return (
-    <label className="file-btn">
-      Replace image…
-      <input type="file" accept="image/*" hidden onChange={async (e) => {
-        const f = e.target.files?.[0];
-        if (!f) return;
-        const src = await loadImageFile(f);
-        getStore().updateLayer(layerId, (l) => ({ ...l, src } as Layer));
-      }} />
-    </label>
+    <>
+      <div className="row-btns">
+        <label className="file-btn primary-file">
+          {layer.src ? 'Replace image…' : '＋ Add image…'}
+          <input type="file" accept="image/*" hidden onChange={(e) => {
+            const f = e.target.files?.[0];
+            e.target.value = '';
+            if (f) setLayerImageFromFile(layer.id, f);
+          }} />
+        </label>
+        {layer.src && !layer.srcOriginal && <button onClick={() => cutOutLayer(layer.id)}>✂ Remove background</button>}
+        {layer.srcOriginal && <button onClick={() => restoreOriginal(layer.id)}>↺ Restore original</button>}
+      </div>
+      <div className="prop">
+        <label>Auto cut-out</label>
+        <button className={`switch ${auto ? 'on' : ''}`} role="switch" aria-checked={auto} onClick={() => { setAutoRemoveBg(!auto); setAuto(!auto); }}><span /></button>
+        <span className="hint" style={{ margin: 0 }}>remove background after picking</span>
+      </div>
+    </>
   );
 }
 

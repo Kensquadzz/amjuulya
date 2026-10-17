@@ -1,0 +1,15 @@
+<!doctype html><meta charset="utf-8"><base href="/"><body style="background:#888"><script type="module">
+import { removeBackground } from '/src/engine/bgremove.ts';
+window.run = async (url) => {
+  const blob = await (await fetch(url)).blob();
+  const src = await new Promise((r) => { const fr = new FileReader(); fr.onload = () => r(fr.result); fr.readAsDataURL(blob); });
+  const res = await removeBackground(src);
+  // composite onto a checker to inspect
+  const img = new Image(); img.src = res.dataUrl; await img.decode();
+  const c = document.createElement('canvas'); c.width = img.width; c.height = img.height;
+  const x = c.getContext('2d');
+  for (let y = 0; y < c.height; y += 20) for (let i = 0; i < c.width; i += 20) { x.fillStyle = ((i + y) / 20) % 2 ? '#3fb' : '#f3c'; x.fillRect(i, y, 20, 20); }
+  x.drawImage(img, 0, 0);
+  return { ms: Math.round(res.ms), coverage: +res.coverage.toFixed(3), w: img.width, h: img.height, png: c.toDataURL() };
+};
+</script>

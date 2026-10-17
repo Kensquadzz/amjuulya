@@ -125,6 +125,8 @@ export interface TextLayer extends LayerBase {
   letterSpacing: number; // em
   lineHeight: number; // multiplier
   align: 'left' | 'center' | 'right';
+  /** which edge of the text block Position X refers to (default centre) */
+  anchor?: 'left' | 'center' | 'right';
   color: string;
   blur: number; // px
   glow: number; // px
@@ -133,7 +135,9 @@ export interface TextLayer extends LayerBase {
   cursor: CursorOpts;
 }
 
-export type ShapeKind = 'rect' | 'circle' | 'ring' | 'line' | 'triangle' | 'cross' | 'swoosh' | 'barcode';
+export type ShapeKind = 'rect' | 'circle' | 'ring' | 'line' | 'triangle' | 'cross' | 'swoosh' | 'barcode' | 'glassTile' | 'search';
+
+export type IconId = 'none' | 'music' | 'image' | 'eye' | 'diamond' | 'flower' | 'sparkle' | 'search' | 'heart' | 'dots' | 'arrow' | 'wave' | 'chat' | 'play';
 
 export interface ShapeLayer extends LayerBase {
   type: 'shape';
@@ -153,6 +157,9 @@ export interface ShapeLayer extends LayerBase {
   feather?: number;
   /** pattern seed (barcode) */
   seed?: number;
+  /** glass tile: second gradient colour for rim/icon, icon glyph */
+  stroke2?: string;
+  icon?: IconId;
 }
 
 export interface ImageLayer extends LayerBase {
@@ -166,6 +173,8 @@ export interface ImageLayer extends LayerBase {
   shadowY?: number;
   /** placeholder aspect (h / w) for an empty slot */
   slotRatio?: number;
+  /** the photo before background removal (kept so it can be restored) */
+  srcOriginal?: string;
 }
 
 export interface BackgroundLayer extends LayerBase {
@@ -210,6 +219,20 @@ export interface ShaderLayer extends LayerBase {
 
 export type Layer = TextLayer | ShapeLayer | ImageLayer | BackgroundLayer | ParticleLayer | ShaderLayer;
 
+export interface AudioClip {
+  id: string;
+  name: string;
+  /** 'sfx:<preset>[:seed]' (generated) or 'asset:<id>' (file stored in IndexedDB) */
+  assetId: string;
+  start: number; // timeline time (s)
+  offset: number; // seconds trimmed from the start of the source
+  duration: number; // clip length on the timeline (s)
+  volume: number; // 0..2
+  fadeIn: number;
+  fadeOut: number;
+  muted?: boolean;
+}
+
 export interface Project {
   id: string;
   name: string;
@@ -219,6 +242,7 @@ export interface Project {
   fps: number;
   background: string;
   layers: Layer[]; // bottom -> top
+  audio?: AudioClip[];
   templateId?: string;
   createdAt: number;
   updatedAt: number;

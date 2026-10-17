@@ -364,6 +364,8 @@ export function drawText(env: TextDrawEnv, l: TextLayer) {
   ctx.translate(l.x * W, l.y * H);
   ctx.rotate((l.rotation * Math.PI) / 180);
   ctx.scale(l.scale, l.scale);
+  if (l.anchor === 'left') ctx.translate(L.width / 2, 0);
+  else if (l.anchor === 'right') ctx.translate(-L.width / 2, 0);
   ctx.font = cssFont(l, fontPx);
   ctx.textBaseline = 'alphabetic';
   ctx.textAlign = 'left';
@@ -485,6 +487,8 @@ export function drawSweep(env: TextDrawEnv, l: TextLayer) {
   ctx.translate(l.x * W, l.y * H);
   ctx.rotate((l.rotation * Math.PI) / 180);
   ctx.scale(l.scale, l.scale);
+  if (l.anchor === 'left') ctx.translate(L.width / 2, 0);
+  else if (l.anchor === 'right') ctx.translate(-L.width / 2, 0);
   ctx.globalCompositeOperation = 'source-atop';
   const g = ctx.createLinearGradient(x - band / 2, 0, x + band / 2, 0);
   g.addColorStop(0, rgba(c.color, 0));

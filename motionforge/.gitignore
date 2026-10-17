@@ -3,3 +3,8 @@ dist
 test-results
 *.log
 .netlify
+public/ort
+tests/ref-video.mov
+tests/ref-opus.webm
+tests/statue.jpg
+tests/chess.jpg

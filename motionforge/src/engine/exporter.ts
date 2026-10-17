@@ -9,7 +9,8 @@
 // (Safari: MP4, Chrome/Firefox: WebM). Slow devices may drop frames.
 //
 // The file extension always matches the real container; nothing is renamed.
-import { BufferTarget, CanvasSource, Mp4OutputFormat, Output, Quality, WebMOutputFormat, canEncodeVideo, type VideoCodec } from 'mediabunny';
+import { AudioBufferSource, BufferTarget, CanvasSource, MovOutputFormat, Mp4OutputFormat, Output, Quality, WebMOutputFormat, canEncodeAudio, canEncodeVideo, type AudioCodec, type VideoCodec } from 'mediabunny';
+import { mixdown } from './audio';
 import { Renderer } from './renderer';
 import { ASPECTS, type Project } from './types';
 import { cssFont } from './text';
@@ -39,6 +40,9 @@ export interface ExportResult {
   method: ExportMethod;
   droppedFrames?: number;
   elapsedMs: number;
+  /** what happened to the soundtrack */
+  audio: 'none' | 'included' | 'dropped';
+  audioCodec?: string;
 }
 
 export interface Capabilities {
@@ -169,6 +173,18 @@ export async function exportVideo(
     }
   }
   const frames = Math.max(1, Math.round(s.duration * s.fps));
+  // soundtrack: one deterministic offline mix of every audio clip
+  let mix: AudioBuffer | null = null;
+  if (project.audio?.some((c) => !c.muted)) {
+    onProgress('Mixing audio', 0);
+    try {
+      mix = await mixdown(project, s.duration);
+    } catch (e) {
+      renderer.destroy();
+      canvas.remove();
+      throw new Error('Audio mix failed: ' + ((e as Error).message || e));
+    }
+  }
   try {
     if (s.method === 'webcodecs') return await viaWebCodecs();
     return await viaMediaRecorder();
@@ -179,9 +195,18 @@ export async function exportVideo(
 
   async function viaWebCodecs(): Promise<ExportResult> {
     const codec = s.codec ?? 'avc';
-    const container = CODEC_LABEL[codec]?.container ?? 'mp4';
+    let container: 'mp4' | 'webm' | 'mov' = CODEC_LABEL[codec]?.container ?? 'mp4';
+    // choose an audio codec the device can encode for this container
+    let audioCodec: AudioCodec | null = null;
+    if (mix) {
+      const can = (c: AudioCodec) => canEncodeAudio(c, { numberOfChannels: 2, sampleRate: mix!.sampleRate, bitrate: 192000 }).catch(() => false);
+      if (container === 'mp4') {
+        if (await can('aac')) audioCodec = 'aac';
+        else { container = 'mov'; audioCodec = 'pcm-s16'; } // QuickTime MOV + PCM plays everywhere on Apple devices
+      } else if (await can('opus')) audioCodec = 'opus';
+    }
     const output = new Output({
-      format: container === 'mp4' ? new Mp4OutputFormat({ fastStart: 'in-memory' }) : new WebMOutputFormat(),
+      format: container === 'mp4' ? new Mp4OutputFormat({ fastStart: 'in-memory' }) : container === 'mov' ? new MovOutputFormat({ fastStart: 'in-memory' }) : new WebMOutputFormat(),
       target: new BufferTarget(),
     });
     const source = new CanvasSource(canvas, {
@@ -190,7 +215,17 @@ export async function exportVideo(
       keyFrameInterval: 2,
     });
     output.addVideoTrack(source, { frameRate: s.fps });
+    let audioSource: AudioBufferSource | null = null;
+    if (mix && audioCodec) {
+      audioSource = new AudioBufferSource({ codec: audioCodec, quality: new Quality({ bitrate: 192000 }) });
+      output.addAudioTrack(audioSource);
+    }
     await output.start();
+    if (audioSource && mix) {
+      onProgress('Encoding audio', 0);
+      await audioSource.add(mix);
+      audioSource.close();
+    }
     for (let i = 0; i < frames; i++) {
       if (signal.aborted) { await output.cancel(); throw new ExportCancelled(); }
       const t = i / s.fps;
@@ -206,17 +241,31 @@ export async function exportVideo(
     await output.finalize();
     const buf = (output.target as BufferTarget).buffer;
     if (!buf || buf.byteLength === 0) throw new Error('The encoder produced an empty file.');
-    const mimeType = container === 'mp4' ? 'video/mp4' : 'video/webm';
+    const mimeType = container === 'mp4' ? 'video/mp4' : container === 'mov' ? 'video/quicktime' : 'video/webm';
     return {
       blob: new Blob([buf], { type: mimeType }),
       filename: `${safeName(project.name)}-${width}x${height}.${container}`,
       mimeType, width, height, frames, method: 'webcodecs', elapsedMs: performance.now() - t0,
+      audio: !mix ? 'none' : audioCodec ? 'included' : 'dropped', audioCodec: audioCodec ?? undefined,
     };
   }
 
   async function viaMediaRecorder(): Promise<ExportResult> {
-    const mimeType = s.mimeType ?? MR_TYPES.find((t) => MediaRecorder.isTypeSupported(t.mimeType))?.mimeType;
+    let mimeType = s.mimeType ?? MR_TYPES.find((t) => MediaRecorder.isTypeSupported(t.mimeType))?.mimeType;
     if (!mimeType) throw new Error('MediaRecorder on this browser cannot record any known video format.');
+    // with a soundtrack, a video-only codec string would reject the audio track
+    if (mix && /webm;codecs=vp[89]$/.test(mimeType)) {
+      const withOpus = mimeType + ',opus';
+      mimeType = MediaRecorder.isTypeSupported(withOpus) ? withOpus : 'video/webm';
+    }
+    if (mix && mimeType.startsWith('video/mp4;codecs=avc1')) mimeType = 'video/mp4';
+    let actx: AudioContext | null = null;
+    let audioDest: MediaStreamAudioDestinationNode | null = null;
+    if (mix) {
+      actx = new AudioContext({ sampleRate: mix.sampleRate });
+      await actx.resume().catch(() => {});
+      audioDest = actx.createMediaStreamDestination();
+    }
     // Prefer manual frame capture (captureStream(0) + requestFrame) so every
     // rendered frame is captured even though the export canvas is off-screen.
     let stream = (canvas as HTMLCanvasElement).captureStream(0);
@@ -227,6 +276,7 @@ export async function exportVideo(
       track = stream.getVideoTracks()[0];
     }
     const pushFrame = () => track?.requestFrame?.();
+    if (audioDest) stream = new MediaStream([...stream.getVideoTracks(), ...audioDest.stream.getAudioTracks()]);
     const rec = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: bitrateFor(width, height, s.fps, s.quality) });
     const chunks: Blob[] = [];
     rec.ondataavailable = (e) => { if (e.data && e.data.size) chunks.push(e.data); };
@@ -238,6 +288,12 @@ export async function exportVideo(
     renderer.render(project, 0, { density: 1 });
     rec.start(250);
     pushFrame();
+    if (actx && audioDest && mix) {
+      const src = actx.createBufferSource();
+      src.buffer = mix;
+      src.connect(audioDest);
+      src.start();
+    }
     const start = performance.now();
     let dropped = 0;
     let lastFrame = -1;
@@ -265,6 +321,7 @@ export async function exportVideo(
     rec.stop();
     await stopped;
     stream.getTracks().forEach((t) => t.stop());
+    actx?.close().catch(() => {});
     const type = rec.mimeType || mimeType;
     const blob = new Blob(chunks, { type: type.split(';')[0] });
     if (blob.size === 0) throw new Error('MediaRecorder produced an empty recording. Try the WebCodecs method or a lower resolution.');
@@ -272,6 +329,7 @@ export async function exportVideo(
     return {
       blob, filename: `${safeName(project.name)}-${width}x${height}.${ext}`, mimeType: type.split(';')[0], width, height, frames,
       method: 'mediarecorder', droppedFrames: dropped, elapsedMs: performance.now() - t0,
+      audio: mix ? 'included' : 'none',
     };
   }
 }

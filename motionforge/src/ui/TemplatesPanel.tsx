@@ -54,7 +54,7 @@ export function TemplatesPanel() {
     if (!tpl) return;
     if (!confirm(`Reset "${tpl.name}" to its default parameters? (Undo can restore.)`)) return;
     const b = tpl.build();
-    store.update((p) => ({ ...p, duration: b.duration, background: b.background, layers: b.layers }));
+    store.update((p) => ({ ...p, duration: b.duration, background: b.background, layers: b.layers, audio: b.audio ?? [] }));
     engine.player?.restart();
   };
 

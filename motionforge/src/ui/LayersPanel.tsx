@@ -7,7 +7,7 @@ import { engine } from '../state/engine';
 import { getStore, useStore } from '../state/store';
 import { LAYER_ICON } from './props';
 import { Sheet, toast } from './controls';
-import { loadImageFile } from './images';
+import { setLayerImageFromFile } from './imageActions';
 
 export function LayersPanel({ onEdit }: { onEdit: () => void }) {
   const layers = useStore((s) => s.project.layers);
@@ -67,8 +67,9 @@ export function LayersPanel({ onEdit }: { onEdit: () => void }) {
             const f = e.target.files?.[0];
             e.target.value = '';
             if (!f) return;
-            try { add(makeImage(dur, await loadImageFile(f), { name: f.name.slice(0, 24) })); }
-            catch (err) { toast((err as Error).message, 'error'); }
+            const l = makeImage(dur, '', { name: f.name.replace(/\.[^.]+$/, '').slice(0, 24) || 'Image' });
+            add(l);
+            await setLayerImageFromFile(l.id, f);
           }} />
         </label>
         <button onClick={() => add(makeParticles(dur))}>＋ Particles</button>

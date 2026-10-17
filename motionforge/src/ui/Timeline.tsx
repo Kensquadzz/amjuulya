@@ -3,7 +3,8 @@ import { updateKeyframe, removeKeyframe, upsertKeyframe, sortKfs, evalTrack } fr
 import { EASING_LABELS } from '../engine/easing';
 import { isHexColor } from '../engine/color';
 import { uid } from '../engine/util';
-import type { EasingId, Keyframe, Layer } from '../engine/types';
+import type { AudioClip, EasingId, Keyframe, Layer } from '../engine/types';
+import { updateClip, Waveform } from './AudioPanel';
 import { engine, useTime } from '../state/engine';
 import { getStore, useStore } from '../state/store';
 import { animatableProps, LAYER_ICON, propLabel } from './props';
@@ -108,6 +109,22 @@ export function Timeline() {
     });
   };
 
+  const dragAudio = (e: React.PointerEvent, c: AudioClip, mode: 'move' | 'start' | 'end') => {
+    const o = c;
+    drag(e, (dx) => {
+      const dt = snap(dx / pps, fps);
+      let patch: Partial<AudioClip>;
+      if (mode === 'move') patch = { start: Math.max(0, Math.min(duration - 0.05, o.start + dt)) };
+      else if (mode === 'end') patch = { duration: Math.max(0.05, o.duration + dt) };
+      else {
+        // trimming the head keeps the sound anchored in time
+        const d = Math.max(-o.offset, Math.max(-o.start, Math.min(o.duration - 0.05, dt)));
+        patch = { start: o.start + d, offset: o.offset + d, duration: o.duration - d };
+      }
+      updateClip(c.id, patch, `adrag:${c.id}:${mode}`);
+    });
+  };
+
   const dragKf = (e: React.PointerEvent, l: Layer, path: string, k: Keyframe) => {
     const t0 = k.t;
     drag(
@@ -204,6 +221,26 @@ export function Timeline() {
               </div>
             );
           })}
+          {(project.audio ?? []).length > 0 && (
+            <div className="tl-row tl-section" style={{ height: 22 }}>
+              <div className="tl-label sub" style={{ width: LABEL_W }}>♪ Audio</div>
+            </div>
+          )}
+          {(project.audio ?? []).map((c) => (
+            <div key={c.id} className={`tl-row tl-audio ${c.muted ? 'hidden' : ''}`} style={{ height: ROW_H }}>
+              <div className="tl-label" style={{ width: LABEL_W }}>
+                <span className="lt lt-audio">♪</span>
+                <span className="nm">{c.name}</span>
+              </div>
+              <div className="tl-lane" style={{ width: laneW }}>
+                <div className="tl-bar bar-audio" style={{ left: c.start * pps, width: Math.max(8, c.duration * pps) }} onPointerDown={(e) => dragAudio(e, c, 'move')}>
+                  <Waveform clip={c} height={24} />
+                  <span className="h h-l" onPointerDown={(e) => dragAudio(e, c, 'start')} />
+                  <span className="h h-r" onPointerDown={(e) => dragAudio(e, c, 'end')} />
+                </div>
+              </div>
+            </div>
+          ))}
           <div className="tl-playhead" ref={playheadRef} onPointerDown={onRulerDown} />
         </div>
       </div>

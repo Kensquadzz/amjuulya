@@ -112,7 +112,7 @@ export function makeLayer(type: LayerType, duration: number): Layer {
 export function newProject(name = 'Untitled', patch: Partial<Project> = {}): Project {
   const now = Date.now();
   return {
-    id: uid(), name, version: 1, aspect: '9:16', duration: 6, fps: 30, background: '#000000', layers: [], createdAt: now, updatedAt: now,
+    id: uid(), name, version: 1, aspect: '9:16', duration: 6, fps: 30, background: '#000000', layers: [], audio: [], createdAt: now, updatedAt: now,
     ...patch,
   };
 }
@@ -131,6 +131,12 @@ export function normalizeProject(raw: any): Project {
     fps: [24, 25, 30, 50, 60].includes(Number(raw.fps)) ? Number(raw.fps) : 30,
     background: typeof raw.background === 'string' ? raw.background : '#000000',
   };
+  out.audio = Array.isArray(raw.audio)
+    ? raw.audio
+        .filter((c: any) => c && typeof c.assetId === 'string' && Number.isFinite(c.start) && Number.isFinite(c.duration))
+        .map((c: any) => ({ id: typeof c.id === 'string' ? c.id : uid(), name: String(c.name ?? 'Audio'), assetId: c.assetId, start: +c.start, offset: +c.offset || 0, duration: +c.duration, volume: Number.isFinite(+c.volume) ? +c.volume : 1, fadeIn: +c.fadeIn || 0, fadeOut: +c.fadeOut || 0, muted: !!c.muted }))
+    : [];
+  delete (out as any)._assets;
   out.layers = raw.layers
     .filter((l: any) => l && typeof l === 'object' && typeof l.type === 'string')
     .map((l: any) => {

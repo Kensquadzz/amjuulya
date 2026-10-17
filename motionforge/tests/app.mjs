@@ -182,10 +182,33 @@ await page.locator('.tpl-main', { hasText: 'Red Glow Grid' }).tap();
 await wait(800);
 st = await S();
 check('template applies', st.name === 'Red Glow Grid' && st.layers.length === 3);
+await page.locator('.chip', { hasText: 'All' }).first().tap();
 await page.screenshot({ path: `${shots}/app-template.png` });
 await page.getByRole('button', { name: 'Save current as preset' }).tap();
 await wait(400);
 check('save as custom preset', (await page.locator('.tpl-main', { hasText: 'My Preset' }).count()) === 1);
+
+// 12b audio: add a sound effect from the picker; it shows in the list and on the timeline
+await tab('Audio');
+await page.getByRole('button', { name: '＋ Sound effect' }).tap();
+await page.getByRole('button', { name: 'Add Whoosh', exact: true }).tap();
+await wait(600);
+await page.getByRole('button', { name: 'Close' }).tap();
+st = await ev(() => (window.__motionforge.store.state.project.audio || []).map((c) => c.assetId));
+check('sound effect added to project', st.includes('sfx:whoosh'), JSON.stringify(st));
+await tab('Timeline');
+check('audio track shown on the timeline', (await page.locator('.tl-audio').count()) === 1);
+
+// 12c image layer with automatic background removal
+// (needs a local photo at tests/statue.jpg — not committed; the check is skipped without it)
+const { existsSync } = await import('node:fs');
+if (existsSync('tests/statue.jpg')) {
+await tab('Layers');
+await page.locator('.add-row label.file-btn', { hasText: 'Image' }).locator('input').setInputFiles('tests/statue.jpg');
+await page.waitForFunction(() => { const l = window.__motionforge.store.state.project.layers.find((x) => x.type === 'image'); return l && l.srcOriginal; }, null, { timeout: 120000 }).catch(() => {});
+const img = await ev(() => { const l = window.__motionforge.store.state.project.layers.find((x) => x.type === 'image'); return l ? { cut: !!l.srcOriginal, png: l.src.startsWith('data:image/png') } : null; });
+check('picked image gets its background removed automatically', !!img && img.cut && img.png, JSON.stringify(img));
+} else results.push('SKIP  background removal (no tests/statue.jpg)');
 
 // 13 save + reload restores project
 await page.getByRole('button', { name: 'Save project' }).tap();
@@ -194,7 +217,9 @@ await page.reload();
 await page.waitForFunction(() => window.__motionforge);
 await wait(800);
 st = await S();
-check('project persisted across reload (IndexedDB)', st.name === 'Red Glow Grid' && st.layers.length === 3, st.name);
+check('project persisted across reload (IndexedDB)', st.name === 'Red Glow Grid' && st.layers.length >= 3, st.name + ' ' + st.layers.length);
+const audioAfter = await ev(() => (window.__motionforge.store.state.project.audio || []).length);
+check('audio clips persisted across reload', audioAfter === 1);
 
 // 14 projects sheet: list contains saved projects
 await page.locator('.proj-name').tap();

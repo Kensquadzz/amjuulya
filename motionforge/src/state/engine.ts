@@ -5,6 +5,7 @@ import { Player } from '../engine/player';
 import { keyframeAt, upsertKeyframe, removeKeyframe, getPath, setPath, resolveLayer } from '../engine/keyframes';
 import type { KfValue, Layer, PreviewQuality } from '../engine/types';
 import { getStore } from './store';
+import { liveAudio } from '../engine/audio';
 
 export const QUALITY_SCALE: Record<PreviewQuality, number> = { low: 0.34, medium: 0.5, high: 0.75 };
 export const QUALITY_DENSITY: Record<PreviewQuality, number> = { low: 0.4, medium: 0.7, high: 1 };
@@ -24,12 +25,27 @@ class Engine {
     const store = getStore();
     this.player.setProject(store.state.project);
     let last = store.state.project;
-    this.unsub = store.subscribe(() => {
+    const unsubStore = store.subscribe(() => {
       if (store.state.project !== last) {
+        const audioChanged = store.state.project.audio !== last.audio;
         last = store.state.project;
         this.player?.setProject(last);
+        if (audioChanged && this.player?.playing) liveAudio.start(last, this.player.time);
       }
     });
+    // keep audio in sync with the picture clock: start/stop with playback,
+    // re-sync after seeks and loop wrap-around
+    let wasPlaying = false, lastT = 0, lastWall = 0;
+    const unsubPlayer = this.player.subscribe((t, playing) => {
+      const now = performance.now();
+      if (playing && !wasPlaying) liveAudio.start(store.state.project, t);
+      else if (!playing && wasPlaying) liveAudio.stop();
+      else if (playing && Math.abs(t - (lastT + (now - lastWall) / 1000)) > 0.25) liveAudio.start(store.state.project, t);
+      wasPlaying = playing;
+      lastT = t;
+      lastWall = now;
+    });
+    this.unsub = () => { unsubStore(); unsubPlayer(); liveAudio.stop(); };
     return this.renderer;
   }
 

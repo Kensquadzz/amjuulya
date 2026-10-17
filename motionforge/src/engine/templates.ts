@@ -2,8 +2,9 @@
 // project: real layers, real animation parameters, real keyframes.
 import { uid } from './util';
 import { makeBackground, makeParticles, makeShader, makeShape, makeText, newProject } from './project';
-import type { AspectId, EasingId, Keyframe, KfValue, Layer, Project } from './types';
+import type { AspectId, AudioClip, EasingId, Keyframe, KfValue, Layer, Project } from './types';
 import { REEL_TEMPLATES } from './templates-reels';
+import { NEON_TEMPLATES } from './templates-neon';
 
 export type TemplateCategory =
   | 'Reels'
@@ -18,7 +19,7 @@ export interface Template {
   name: string;
   categories: TemplateCategory[];
   swatch: [string, string];
-  build: () => { background: string; duration: number; layers: Layer[] };
+  build: () => { background: string; duration: number; layers: Layer[]; audio?: AudioClip[] };
 }
 
 const kf = (t: number, v: KfValue, ease: EasingId = 'easeInOutCubic'): Keyframe => ({ id: uid(), t, v, ease });
@@ -26,6 +27,7 @@ const kf = (t: number, v: KfValue, ease: EasingId = 'easeInOutCubic'): Keyframe 
 const D = 6;
 
 export const TEMPLATES: Template[] = [
+  ...NEON_TEMPLATES,
   ...REEL_TEMPLATES,
   {
     id: 'minimal-white', name: 'Minimal White Typography', categories: ['Typography', 'Minimal'], swatch: ['#f4f3ef', '#111111'],
@@ -291,5 +293,5 @@ export function sampleProject(aspect: AspectId = '9:16'): Project {
 
 export function projectFromTemplate(tpl: Template, aspect: AspectId): Project {
   const b = tpl.build();
-  return newProject(tpl.name, { aspect, duration: b.duration, background: b.background, layers: b.layers, templateId: tpl.id });
+  return newProject(tpl.name, { aspect, duration: b.duration, background: b.background, layers: b.layers, audio: b.audio ?? [], templateId: tpl.id });
 }

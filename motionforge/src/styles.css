@@ -288,3 +288,15 @@ input[type='color'] { width: 44px; height: 34px; padding: 0; border: 1px solid v
   .play-btn { min-width: 44px; }
   .timecode { min-width: 58px; font-size: 11px; }
 }
+
+/* ---------- audio ---------- */
+.lt-audio { background: #1971c2; }
+.bar-audio { background: #10324d; border-color: #1c7ed6; overflow: hidden; }
+.bar-audio .waveform { position: absolute; left: 0; top: 50%; transform: translateY(-50%); pointer-events: none; opacity: 0.9; }
+.tl-section .tl-label { color: var(--dim); font-size: 11px; letter-spacing: 0.08em; }
+.clip-row { flex-direction: column; align-items: stretch !important; }
+.clip-head { display: flex; align-items: center; gap: 4px; }
+.clip-editor { padding: 4px 8px 8px; border-top: 1px solid var(--line); }
+.clip-editor .waveform { display: block; background: #0f0f12; border-radius: 6px; margin: 6px 0; }
+.primary-file { background: #fff; color: #000; border-color: #fff; font-weight: 600; }
+.tabs .tl { font-size: 10.5px; }

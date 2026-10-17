@@ -3,16 +3,17 @@
 import type { Project } from './types';
 
 const DB_NAME = 'motionforge';
-const DB_VERSION = 1;
-const STORES = ['projects', 'shaders', 'presets', 'meta'] as const;
+const DB_VERSION = 2;
+const STORES = ['projects', 'shaders', 'presets', 'meta', 'assets'] as const;
 type StoreName = (typeof STORES)[number];
 
 export interface SavedShader { id: string; name: string; source: string; updatedAt: number }
 export interface SavedPreset { id: string; name: string; project: Project; updatedAt: number }
+export interface StoredAsset { id: string; name: string; mime: string; blob: Blob; size: number; duration: number; createdAt: number }
 export interface ProjectSummary { id: string; name: string; updatedAt: number; aspect: string; layers: number }
 
 let dbPromise: Promise<IDBDatabase | null> | null = null;
-const memory: Record<StoreName, Map<string, unknown>> = { projects: new Map(), shaders: new Map(), presets: new Map(), meta: new Map() };
+const memory: Record<StoreName, Map<string, unknown>> = { projects: new Map(), shaders: new Map(), presets: new Map(), meta: new Map(), assets: new Map() };
 export let storageMode: 'indexeddb' | 'memory' = 'indexeddb';
 
 function open(): Promise<IDBDatabase | null> {
@@ -55,7 +56,7 @@ async function put(store: StoreName, value: any) {
     await tx(store, 'readwrite', (s) => s.put(value));
   } catch (e) {
     if ((e as Error).message !== 'memory') throw e;
-    memory[store].set(value.id ?? value.key, JSON.parse(JSON.stringify(value)));
+    memory[store].set(value.id ?? value.key, store === 'assets' ? value : JSON.parse(JSON.stringify(value)));
   }
 }
 
@@ -110,6 +111,9 @@ export const storage = {
   savePreset: (p: SavedPreset) => put('presets', p),
   listPresets: () => all<SavedPreset>('presets').then((l) => l.sort((a, b) => b.updatedAt - a.updatedAt)),
   deletePreset: (id: string) => del('presets', id),
+  saveAsset: (a: StoredAsset) => put('assets', a),
+  getAsset: (id: string) => get<StoredAsset>('assets', id),
+  deleteAsset: (id: string) => del('assets', id),
   async estimate() {
     try {
       const e = await navigator.storage?.estimate?.();

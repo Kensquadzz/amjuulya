@@ -2,7 +2,7 @@
 import { clamp } from './easing';
 import { hexToRgb, mixHex, rgba } from './color';
 import { hash } from './util';
-import type { BackgroundLayer, ImageLayer, ParticleLayer, ShapeLayer } from './types';
+import type { BackgroundLayer, IconId, ImageLayer, ParticleLayer, ShapeLayer } from './types';
 
 export interface Env2D {
   ctx: CanvasRenderingContext2D;
@@ -112,6 +112,136 @@ function drawBarcode(ctx: CanvasRenderingContext2D, l: ShapeLayer, w: number, h:
   }
 }
 
+/** Vector icons drawn in a unit box (-0.5..0.5). Stroked/filled with the current styles. */
+export function iconPath(ctx: CanvasRenderingContext2D, icon: IconId): 'stroke' | 'fill' | 'both' {
+  ctx.beginPath();
+  switch (icon) {
+    case 'music':
+      ctx.moveTo(-0.12, 0.22); ctx.lineTo(-0.12, -0.28); ctx.lineTo(0.28, -0.36); ctx.lineTo(0.28, 0.14);
+      ctx.moveTo(-0.12, -0.12); ctx.lineTo(0.28, -0.2);
+      ctx.moveTo(-0.12 + 0.11, 0.24); ctx.arc(-0.2, 0.24, 0.11, 0, Math.PI * 2);
+      ctx.moveTo(0.28 + 0.11, 0.16); ctx.arc(0.2, 0.16, 0.11, 0, Math.PI * 2);
+      return 'stroke';
+    case 'image':
+      ctx.roundRect?.(-0.36, -0.3, 0.72, 0.6, 0.1);
+      ctx.moveTo(-0.3, 0.22); ctx.lineTo(-0.08, -0.02); ctx.lineTo(0.06, 0.12); ctx.lineTo(0.16, 0.02); ctx.lineTo(0.3, 0.2);
+      ctx.moveTo(0.2, -0.12); ctx.arc(0.13, -0.12, 0.07, 0, Math.PI * 2);
+      return 'stroke';
+    case 'eye':
+      ctx.moveTo(-0.42, 0); ctx.quadraticCurveTo(0, -0.38, 0.42, 0); ctx.quadraticCurveTo(0, 0.38, -0.42, 0);
+      ctx.moveTo(0.13, 0); ctx.arc(0, 0, 0.13, 0, Math.PI * 2);
+      return 'stroke';
+    case 'diamond':
+      ctx.moveTo(-0.38, -0.1); ctx.lineTo(-0.2, -0.32); ctx.lineTo(0.2, -0.32); ctx.lineTo(0.38, -0.1); ctx.lineTo(0, 0.38); ctx.closePath();
+      ctx.moveTo(-0.38, -0.1); ctx.lineTo(0.38, -0.1); ctx.moveTo(-0.08, -0.32); ctx.lineTo(0, 0.38); ctx.lineTo(0.08, -0.32);
+      return 'stroke';
+    case 'flower':
+      for (let i = 0; i < 5; i++) { const a = (i / 5) * Math.PI * 2 - Math.PI / 2; const x = Math.cos(a) * 0.22, y = Math.sin(a) * 0.22; ctx.moveTo(x + 0.13, y); ctx.arc(x, y, 0.13, 0, Math.PI * 2); }
+      ctx.moveTo(0.08, 0); ctx.arc(0, 0, 0.08, 0, Math.PI * 2);
+      return 'stroke';
+    case 'sparkle':
+      ctx.moveTo(0, -0.42); ctx.quadraticCurveTo(0.05, -0.05, 0.42, 0); ctx.quadraticCurveTo(0.05, 0.05, 0, 0.42); ctx.quadraticCurveTo(-0.05, 0.05, -0.42, 0); ctx.quadraticCurveTo(-0.05, -0.05, 0, -0.42);
+      return 'fill';
+    case 'search':
+      ctx.moveTo(0.04 + 0.22, -0.06); ctx.arc(-0.06, -0.06, 0.22, 0, Math.PI * 2);
+      ctx.moveTo(0.1, 0.1); ctx.lineTo(0.34, 0.34);
+      return 'stroke';
+    case 'heart':
+      ctx.moveTo(0, 0.34); ctx.bezierCurveTo(-0.5, 0.0, -0.32, -0.42, 0, -0.16); ctx.bezierCurveTo(0.32, -0.42, 0.5, 0.0, 0, 0.34);
+      return 'fill';
+    case 'dots':
+      for (const x of [-0.22, 0, 0.22]) { ctx.moveTo(x + 0.06, 0); ctx.arc(x, 0, 0.06, 0, Math.PI * 2); }
+      return 'fill';
+    case 'arrow':
+      ctx.moveTo(0, 0.36); ctx.lineTo(0, -0.34); ctx.moveTo(-0.26, -0.08); ctx.lineTo(0, -0.34); ctx.lineTo(0.26, -0.08);
+      return 'stroke';
+    case 'wave':
+      ctx.moveTo(-0.38, 0.06);
+      ctx.bezierCurveTo(-0.26, -0.3, -0.12, -0.3, -0.04, 0.02); ctx.bezierCurveTo(0.04, 0.32, 0.2, 0.32, 0.38, -0.06);
+      return 'stroke';
+    case 'chat':
+      ctx.roundRect?.(-0.36, -0.3, 0.72, 0.48, 0.16);
+      ctx.moveTo(-0.14, 0.18); ctx.lineTo(-0.22, 0.34); ctx.lineTo(0.02, 0.18);
+      return 'stroke';
+    case 'play':
+      ctx.moveTo(-0.16, -0.26); ctx.lineTo(0.28, 0); ctx.lineTo(-0.16, 0.26); ctx.closePath();
+      return 'fill';
+    default:
+      return 'stroke';
+  }
+}
+
+/** Glassmorphism app-icon tile: dark translucent body, gradient rim with glow, highlight, vector icon. */
+function drawGlassTile(env: Env2D, l: ShapeLayer, w: number, h: number) {
+  const { ctx, k } = env;
+  const r = Math.min(l.radius * k, w / 2, h / 2);
+  const c2 = l.stroke2 ?? l.stroke;
+  const rr = () => { ctx.beginPath(); if (ctx.roundRect) ctx.roundRect(-w / 2, -h / 2, w, h, r); else ctx.rect(-w / 2, -h / 2, w, h); };
+  // glow
+  if (l.glow > 0) {
+    ctx.save();
+    ctx.shadowColor = l.stroke;
+    ctx.shadowBlur = l.glow * k * l.scale;
+    rr();
+    ctx.fillStyle = 'rgba(0,0,0,0.6)';
+    ctx.fill();
+    ctx.restore();
+  }
+  // body
+  const body = ctx.createLinearGradient(0, -h / 2, 0, h / 2);
+  body.addColorStop(0, mixHex(l.fill, '#ffffff', 0.08));
+  body.addColorStop(1, mixHex(l.fill, '#000000', 0.35));
+  rr();
+  ctx.fillStyle = body;
+  ctx.fill();
+  // inner colour wash from the rim colours
+  const wash = ctx.createRadialGradient(-w * 0.25, -h * 0.3, 0, -w * 0.25, -h * 0.3, w * 0.9);
+  wash.addColorStop(0, rgba(c2, 0.22));
+  wash.addColorStop(1, rgba(l.stroke, 0.04));
+  ctx.fillStyle = wash;
+  ctx.fill();
+  // gradient rim
+  const rim = ctx.createLinearGradient(-w / 2, -h / 2, w / 2, h / 2);
+  rim.addColorStop(0, c2);
+  rim.addColorStop(0.5, rgba(l.stroke, 0.35));
+  rim.addColorStop(1, l.stroke);
+  ctx.lineWidth = Math.max(1, l.strokeWidth * k);
+  ctx.strokeStyle = rim;
+  rr();
+  ctx.stroke();
+  // top highlight
+  ctx.save();
+  rr();
+  ctx.clip();
+  const hl = ctx.createLinearGradient(0, -h / 2, 0, -h / 2 + h * 0.4);
+  hl.addColorStop(0, 'rgba(255,255,255,0.18)');
+  hl.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = hl;
+  ctx.fillRect(-w / 2, -h / 2, w, h * 0.4);
+  ctx.restore();
+  // icon
+  if (l.icon && l.icon !== 'none') {
+    const s = Math.min(w, h) * 0.62;
+    ctx.save();
+    ctx.scale(s, s);
+    const g = ctx.createLinearGradient(-0.4, -0.4, 0.4, 0.4);
+    g.addColorStop(0, '#ffffff');
+    g.addColorStop(0.45, c2);
+    g.addColorStop(1, l.stroke);
+    ctx.lineWidth = 0.075;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.strokeStyle = g;
+    ctx.fillStyle = g;
+    ctx.shadowColor = c2;
+    ctx.shadowBlur = 14 * k * l.scale;
+    const mode = iconPath(ctx, l.icon);
+    if (mode !== 'stroke') ctx.fill();
+    if (mode !== 'fill') ctx.stroke();
+    ctx.restore();
+  }
+}
+
 export function drawShape(env: Env2D, l: ShapeLayer) {
   const { ctx, W, H, k } = env;
   ctx.save();
@@ -124,7 +254,27 @@ export function drawShape(env: Env2D, l: ShapeLayer) {
     ctx.restore();
     return;
   }
-  const len = shapePath(ctx, l, w, h, l.radius * k);
+  if (l.shape === 'glassTile') {
+    drawGlassTile(env, l, w, h);
+    ctx.restore();
+    return;
+  }
+  if (l.shape === 'search') {
+    // stroked magnifier icon sized by w
+    const s = w;
+    ctx.save();
+    ctx.scale(s, s);
+    ctx.lineWidth = Math.max(0.02, (l.strokeWidth * k) / s);
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = l.stroke;
+    if (l.glow > 0) { ctx.shadowColor = l.stroke; ctx.shadowBlur = l.glow * k; }
+    iconPath(ctx, 'search');
+    ctx.stroke();
+    ctx.restore();
+    ctx.restore();
+    return;
+  }
+  const len = shapePath(ctx, l, w, h, l.radius * k) ?? w;
   const draw = clamp(l.draw);
   const glow = l.glow * k * l.scale;
   const strokeOnly = l.shape === 'line' || l.shape === 'ring' || l.shape === 'cross';

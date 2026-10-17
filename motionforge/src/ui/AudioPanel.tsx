@@ -9,7 +9,7 @@ import { engine, useTime } from '../state/engine';
 import { getStore, useStore } from '../state/store';
 import { Section, Sheet, toast } from './controls';
 
-const CATS: SfxCategory[] = ['Studio', 'Transitions', 'Hits', 'UI', 'Risers', 'Magic', 'Ambience', 'Music'];
+const CATS: SfxCategory[] = ['Studio', 'Transitions', 'Hits', 'Pops', 'UI', 'Notifications', 'Typing', 'Sci-fi', 'Risers', 'Magic', 'Ambience', 'Music'];
 const isIOS = () => /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 
 export function updateClip(id: string, patch: Partial<AudioClip>, coalesce?: string) {
@@ -266,7 +266,7 @@ function SfxPicker({ mode, onClose, onAdd }: { mode: 'sfx' | 'music'; onClose: (
   const row = (s: (typeof SFX)[number]) => (
     <li key={s.id}>
       <button className="vis" aria-label={`Preview ${s.label}`} onClick={() => play(s.id)}>{loading === s.id ? '…' : '▶'}</button>
-      <span className="lname"><span className="nm">{s.label}</span><small>{s.category} · {s.duration.toFixed(1)}s</small></span>
+      <span className="lname"><span className="nm">{s.label}</span><small>{s.pack ? `${s.pack} · ` : ''}{s.category} · {s.duration.toFixed(1)}s</small></span>
       <div className="lactions">
         <button aria-label={favs.includes(s.id) ? `Unstar ${s.label}` : `Star ${s.label}`} className={favs.includes(s.id) ? 'star on' : 'star'} onClick={() => toggle(s.id)}>★</button>
         <button aria-label={`Download ${s.label}`} onClick={async () => deliverFile(await sfxToMp3(s.id), `${s.label.replace(/[^\w\- ()]+/g, '').trim()}.mp3`, isIOS())}>⤓</button>

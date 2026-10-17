@@ -4,7 +4,9 @@
 // samples shipped with the app in /public/sfx; projects reference both kinds
 // by id only, so they stay small.
 
-export type SfxCategory = 'Studio' | 'Transitions' | 'Hits' | 'UI' | 'Risers' | 'Magic' | 'Ambience' | 'Music';
+import { KENYSET } from './sfx-kenyset';
+
+export type SfxCategory = 'Studio' | 'Transitions' | 'Hits' | 'UI' | 'Pops' | 'Notifications' | 'Typing' | 'Sci-fi' | 'Risers' | 'Magic' | 'Ambience' | 'Music';
 
 export interface SfxPreset {
   id: string;
@@ -14,6 +16,8 @@ export interface SfxPreset {
   build?: (ctx: OfflineAudioContext, out: AudioNode, rnd: () => number) => void;
   /** recorded sample bundled with the app (path under the site root) */
   file?: string;
+  /** sound pack it came from (shown in the library) */
+  pack?: string;
 }
 
 /** Recorded studio samples (see public/sfx). */
@@ -29,6 +33,11 @@ const STUDIO: SfxPreset[] = ([
   ['gear-shift', 'Gear shift', 5.15],
   ['gun-reload', 'Reload', 4.09],
 ] as const).map(([id, label, duration]) => ({ id: `rec-${id}`, label, category: 'Studio' as const, duration, file: `sfx/${id}.mp3` }));
+
+/** Kenyset free SFX pack (see sfx-kenyset.ts). */
+const KENYSET_SFX: SfxPreset[] = KENYSET.map(([slug, label, category, duration]) => ({
+  id: `ks-${slug}`, label, category: category as SfxCategory, duration, file: `sfx/kenyset/${slug}.mp3`, pack: 'Kenyset',
+}));
 
 const SR = 44100;
 
@@ -288,6 +297,7 @@ function sweep(ctx: OfflineAudioContext, out: AudioNode, rnd: () => number, d: n
 
 export const SFX: SfxPreset[] = [
   ...STUDIO,
+  ...KENYSET_SFX,
   { id: 'whoosh', label: 'Whoosh', category: 'Transitions', duration: 0.9, build: (c, o, r) => whoosh(c, o, r, 0.9) },
   { id: 'whooshFast', label: 'Fast whoosh', category: 'Transitions', duration: 0.45, build: (c, o, r) => whoosh(c, o, r, 0.45, 400, 5200) },
   { id: 'swipe', label: 'Swipe', category: 'Transitions', duration: 0.3, build: (c, o, r) => whoosh(c, o, r, 0.3, 900, 7000, false) },
@@ -493,7 +503,7 @@ async function loadSample(file: string): Promise<AudioBuffer> {
 export async function renderSfx(id: string, seed = 1): Promise<AudioBuffer> {
   const p = sfxById(id);
   if (!p) throw new Error(`Unknown sound effect "${id}"`);
-  if (p.file) return normalise(await loadSample(p.file), 0.8);
+  if (p.file) return normalise(await loadSample(p.file), p.category === 'Music' ? 0.7 : p.category === 'UI' || p.category === 'Typing' ? 0.6 : 0.8);
   if (!p.build) throw new Error(`Sound effect "${id}" has no source`);
   const ctx = new OfflineAudioContext(2, Math.ceil((p.duration + 0.05) * SR), SR);
   const master = ctx.createGain();

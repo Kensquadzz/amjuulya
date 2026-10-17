@@ -71,10 +71,10 @@ export function animatableProps(l: Layer): PropDef[] {
     case 'shader':
       return [
         { path: 'opacity', label: 'Opacity', kind: 'num', min: 0, max: 1, step: 0.01 },
-        ...parseShaderParams(l.source).map((p): PropDef =>
+        ...parseShaderParams(l.source).filter((p) => p.kind !== 'image' && p.kind !== 'glyph').map((p): PropDef =>
           p.kind === 'color' ? { path: `params.${p.key}`, label: p.label, kind: 'color' }
             : p.kind === 'float' ? { path: `params.${p.key}`, label: p.label, kind: 'num', min: p.min, max: p.max, step: p.step }
-              : { path: `params.${p.key}`, label: p.label, kind: 'num', min: 0, max: p.options.length - 1, step: 1 }),
+              : { path: `params.${p.key}`, label: p.label, kind: 'num', min: 0, max: (p as { options: string[] }).options.length - 1, step: 1 }),
       ];
   }
 }

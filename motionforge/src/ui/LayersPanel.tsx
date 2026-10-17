@@ -108,7 +108,7 @@ export function LayersPanel({ onEdit }: { onEdit: () => void }) {
   );
 }
 
-const CATS: ShaderCategory[] = ['Grid', 'Particles', 'Glitch', 'Distortion', 'Glow', 'Light', 'Gradient', 'Texture'];
+const CATS: ShaderCategory[] = ['Cinematic 3D', 'Grid', 'Particles', 'Glitch', 'Distortion', 'Glow', 'Light', 'Gradient', 'Texture'];
 
 export function EffectPicker({ onPick, onClose }: { onPick: (id: string) => void; onClose: () => void }) {
   return (

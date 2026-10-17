@@ -192,6 +192,8 @@ export async function exportVideo(
   const sizeErr = renderer.verifySize();
   if (sizeErr) { renderer.destroy(); canvas.remove(); throw new Error(sizeErr); }
   const warnings = missingFonts(project);
+  onProgress('Preparing 3D text and pictures', 0);
+  await renderer.prepareTextures(project);
   // compile every shader up-front so failures surface before encoding
   for (const l of project.layers) {
     if (l.type !== 'shader') continue;

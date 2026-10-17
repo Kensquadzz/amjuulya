@@ -17,6 +17,8 @@ function warmAudio(p: Project) {
 // capped at the screen's own pixel count, so High is retina-sharp on a phone
 // without rendering pixels nobody can see.
 export const QUALITY_SCALE: Record<PreviewQuality, number> = { low: 0.4, medium: 0.67, high: 1.5 }; // high may exceed 1080p in full screen on a 3× phone
+/** upper bound for @heavy 3D shaders in the preview */
+export const QUALITY_HEAVY: Record<PreviewQuality, number> = { low: 0.45, medium: 0.7, high: 1 };
 export const QUALITY_DENSITY: Record<PreviewQuality, number> = { low: 0.5, medium: 0.8, high: 1 };
 
 class Engine {
@@ -56,7 +58,20 @@ class Engine {
       lastT = t;
       lastWall = now;
     });
-    this.unsub = () => { unsubStore(); unsubPlayer(); liveAudio.stop(); };
+    // 3D (@heavy) shaders: full resolution whenever the picture stands still;
+    // while playing, step down if the device cannot keep up, so playback stays
+    // smooth. Exports always render at full size with their own renderer.
+    const adapt = setInterval(() => {
+      const r = this.renderer, pl = this.player;
+      if (!r || !pl) return;
+      const max = QUALITY_HEAVY[this.quality];
+      let next = r.heavyScale;
+      if (!pl.playing) next = max;
+      else if (pl.fpsEstimate < 40) next = Math.max(0.4, r.heavyScale * 0.85);
+      else if (pl.fpsEstimate > 55) next = Math.min(max, r.heavyScale * 1.08);
+      if (Math.abs(next - r.heavyScale) > 0.01) { r.heavyScale = next; pl.invalidate(); }
+    }, 400);
+    this.unsub = () => { clearInterval(adapt); unsubStore(); unsubPlayer(); liveAudio.stop(); };
     return this.renderer;
   }
 

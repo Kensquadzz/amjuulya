@@ -9,7 +9,7 @@ import { shaderById } from '../engine/shaders/library';
 import { storage } from '../engine/storage';
 import type { AspectId, Project } from '../engine/types';
 
-const VERSION = "v5";
+const VERSION = "v6";
 const W = 216, H = 384;
 let renderer: Renderer | null = null;
 const memory = new Map<string, string>();
@@ -46,6 +46,7 @@ function renderJob(key: string, build: () => { project: Project; t: number; w: n
       await loadFonts(project);
       const r = getRenderer();
       r.setSize(w, h);
+      await r.prepareTextures(project); // 3D text / pictures inside shaders
       r.render(project, t, { density: 0.8 });
       const url = (r.canvas as HTMLCanvasElement).toDataURL('image/jpeg', 0.82);
       await new Promise((res) => setTimeout(res, 16));

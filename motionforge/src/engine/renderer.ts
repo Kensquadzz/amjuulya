@@ -16,7 +16,8 @@ import { drawBackground, drawImageLayer, drawParticles, drawShape, type Env2D } 
 import { cssFont, drawSweep, drawText, textNeedsIsolation } from './text';
 import { ensureFont } from './fonts';
 import { hexToVec3 } from './color';
-import { BUILTIN_UNIFORMS, defaultParams } from './shaderParams';
+import { BUILTIN_UNIFORMS, defaultParams, parseShaderParams } from './shaderParams';
+import { TextureStore, type TexParam } from './textures';
 import type { BlendMode, Layer, Project, ShaderLayer, ShapeLayer } from './types';
 
 const COMPOSITE_FS = `#version 300 es
@@ -58,6 +59,10 @@ interface ProgEntry {
   program: WebGLProgram | null;
   uniforms: Map<string, UniformInfo>;
   defaults: Record<string, number | string>;
+  /** sampler uniforms fed from @image / @glyph parameters */
+  textures: Map<string, TexParam>;
+  /** `// @heavy` shaders (3D scenes) may render below full size in the preview */
+  heavy: boolean;
   failedSource?: string;
   errors: ShaderError[];
 }
@@ -81,6 +86,8 @@ export class Renderer {
   private mctx: CanvasRenderingContext2D;
   private accum: [Target, Target] | null = null;
   private temp: Target | null = null;
+  private small: Target | null = null;
+  private tex: TextureStore | null = null;
   private layerTex: WebGLTexture | null = null;
   private quad: { vao: WebGLVertexArrayObject; buf: WebGLBuffer } | null = null;
   private compositeProg: { p: WebGLProgram; u: Record<string, WebGLUniformLocation | null> } | null = null;
@@ -93,6 +100,8 @@ export class Renderer {
   pointer: { x: number; y: number; down: boolean } | null = null; // normalized, y down
   /** editor preview only: draw empty image slots (never set for export) */
   placeholders = false;
+  /** editor preview only: render `@heavy` 3D shaders at this fraction of the frame (exports keep 1) */
+  heavyScale = 1;
   onStatus?: (s: RendererStatus) => void;
   /** called when an async resource (font, image) becomes ready */
   onNeedsRedraw?: () => void;
@@ -131,6 +140,8 @@ export class Renderer {
     e.preventDefault();
     this.lost = true;
     this.programs.clear();
+    this.tex = null; // textures died with the context
+    this.small = null;
     this.onStatus?.('lost');
   };
 
@@ -154,6 +165,7 @@ export class Renderer {
     };
     this.compositeProg = mk(COMPOSITE_FS, ['u_dst', 'u_src', 'u_opacity', 'u_mode', 'u_premult']);
     this.copyProg = mk(COPY_FS, ['u_src']);
+    this.tex = new TextureStore(gl, () => this.onNeedsRedraw?.());
     this.layerTex = gl.createTexture();
     gl.bindTexture(gl.TEXTURE_2D, this.layerTex);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
@@ -204,7 +216,7 @@ export class Renderer {
     const r = compileProgram(gl, src);
     let e = this.programs.get(layerId);
     if (!e) {
-      e = { source: '', program: null, uniforms: new Map(), defaults: {}, errors: [] };
+      e = { source: '', program: null, uniforms: new Map(), defaults: {}, textures: new Map(), heavy: false, errors: [] };
       this.programs.set(layerId, e);
     }
     if (!r.ok || !r.program) {
@@ -218,6 +230,12 @@ export class Renderer {
     e.failedSource = undefined;
     e.errors = [];
     e.defaults = defaultParams(src);
+    e.textures = new Map();
+    for (const p of parseShaderParams(src)) {
+      if (p.kind === 'image') e.textures.set(p.key, { kind: 'image' });
+      else if (p.kind === 'glyph') e.textures.set(p.key, { kind: 'glyph', family: p.family, weight: p.weight });
+    }
+    e.heavy = /\/\/\s*@heavy\b/.test(src);
     e.uniforms = new Map();
     const n = gl.getProgramParameter(r.program, gl.ACTIVE_UNIFORMS) as number;
     for (let i = 0; i < n; i++) {
@@ -440,9 +458,16 @@ export class Renderer {
     const e = this.ensureProgram(L);
     if (!e || !e.program) return;
     const gl = this.gl!;
-    const temp = this.temp!;
+    let temp = this.temp!;
+    let rw = this.width, rh = this.height;
+    if (e.heavy && this.heavyScale < 0.999) {
+      rw = Math.max(2, Math.round(this.width * this.heavyScale));
+      rh = Math.max(2, Math.round(this.height * this.heavyScale));
+      if (!this.small || this.small.w !== rw || this.small.h !== rh) { deleteTarget(gl, this.small); this.small = createTarget(gl, rw, rh); }
+      temp = this.small;
+    }
     gl.bindFramebuffer(gl.FRAMEBUFFER, temp.fb);
-    gl.viewport(0, 0, this.width, this.height);
+    gl.viewport(0, 0, rw, rh);
     gl.useProgram(e.program);
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, this.accum![this.cur].tex);
@@ -456,9 +481,10 @@ export class Renderer {
     }
     const mouse = this.pointer ? [this.pointer.x, 1 - this.pointer.y] : [0.5, 0.5];
     const span = Math.max(1e-3, L.end - L.start);
+    let unit = 0;
     for (const [name, u] of e.uniforms) {
       switch (name) {
-        case 'u_resolution': gl.uniform2f(u.loc, this.width, this.height); continue;
+        case 'u_resolution': gl.uniform2f(u.loc, rw, rh); continue;
         case 'u_time': gl.uniform1f(u.loc, t); continue;
         case 'u_deltaTime': gl.uniform1f(u.loc, dt); continue;
         case 'u_progress': gl.uniform1f(u.loc, Math.max(0, Math.min(1, (t - L.start) / span))); continue;
@@ -470,6 +496,18 @@ export class Renderer {
           continue;
       }
       if (BUILTIN_UNIFORMS.has(name)) continue;
+      const tp = e.textures.get(name);
+      if (tp) {
+        unit++;
+        const val = String(L.params[name] ?? e.defaults[name] ?? '');
+        const ent = this.tex?.get(tp, val, L.params[`${name}Font`] as string | undefined);
+        gl.activeTexture(gl.TEXTURE0 + unit);
+        gl.bindTexture(gl.TEXTURE_2D, ent?.tex ?? this.tex!.placeholder());
+        gl.uniform1i(u.loc, unit);
+        const iu = e.uniforms.get(`${name}Info`);
+        if (iu) gl.uniform4f(iu.loc, ...(ent?.tex ? ent.info : [1, 0, 0, 0] as [number, number, number, number]));
+        continue;
+      }
       const v = L.params[name] ?? e.defaults[name];
       if (v === undefined) continue;
       if (u.type === gl.FLOAT && typeof v === 'number') gl.uniform1f(u.loc, v);
@@ -479,6 +517,7 @@ export class Renderer {
       else if (u.type === gl.FLOAT_VEC4 && typeof v === 'string') { const c = hexToVec3(v); gl.uniform4f(u.loc, c[0], c[1], c[2], 1); }
     }
     gl.drawArrays(gl.TRIANGLES, 0, 3);
+    gl.activeTexture(gl.TEXTURE0);
     if (lod) gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR); // still bound on unit 0
     this.composite(temp.tex, L.opacity, L.blend, false);
   }
@@ -492,6 +531,10 @@ export class Renderer {
     this.programs.clear();
     if (this.accum) { deleteTarget(gl, this.accum[0]); deleteTarget(gl, this.accum[1]); }
     deleteTarget(gl, this.temp);
+    deleteTarget(gl, this.small);
+    this.small = null;
+    this.tex?.dispose();
+    this.tex = null;
     if (this.layerTex) gl.deleteTexture(this.layerTex);
     if (this.quad) { gl.deleteBuffer(this.quad.buf); gl.deleteVertexArray(this.quad.vao); }
     if (this.compositeProg) gl.deleteProgram(this.compositeProg.p);
@@ -501,6 +544,20 @@ export class Renderer {
   }
 
   /** Release the GL context entirely (export renderers). */
+  /** Load every picture and build every text/logo field the project's shaders use (exports await this). */
+  async prepareTextures(p: Project) {
+    if (!this.tex) return;
+    const items: Parameters<TextureStore['prepare']>[0] = [];
+    for (const l of p.layers) {
+      if (l.type !== 'shader') continue;
+      for (const sp of parseShaderParams(l.source)) {
+        if (sp.kind === 'image') items.push({ p: { kind: 'image' }, value: String(l.params[sp.key] ?? '') });
+        else if (sp.kind === 'glyph') items.push({ p: { kind: 'glyph', family: sp.family, weight: sp.weight }, value: String(l.params[sp.key] ?? sp.def), font: l.params[`${sp.key}Font`] as string | undefined });
+      }
+    }
+    await this.tex.prepare(items);
+  }
+
   /**
    * Confirm the GPU and 2D buffers really have the requested size. Browsers
    * may silently clamp a WebGL drawing buffer, and iOS Safari blanks 2D

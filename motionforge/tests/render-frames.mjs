@@ -20,6 +20,7 @@ const data = await p.evaluate(async ({ id, times, ph }) => {
   const c = document.createElement('canvas');
   const r = new Renderer(c, { preserveDrawingBuffer: true });
   r.placeholders = ph === '1';
+  await r.prepareTextures(proj);
   r.setSize(360, 640);
   const ts = times.split(',').map(Number);
   const strip = document.createElement('canvas');

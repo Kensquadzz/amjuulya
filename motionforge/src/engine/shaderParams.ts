@@ -4,6 +4,9 @@
 //   uniform float u_spacing;  // @ui 10 200 60 | Grid spacing
 //   uniform vec3  u_colorA;   // @color #ff2a55 | Primary
 //   uniform int   u_mode;     // @select 0 Wave,Radial,Ripple | Mode
+//   uniform sampler2D u_photo; // @image | Product photo
+//   uniform sampler2D u_logo;  // @glyph Montserrat:900 YOUR BRAND | Logo text
+// (texture parameters: see textures.ts)
 // Unannotated floats get a 0..1 slider, vec3 gets a color picker.
 
 export const BUILTIN_UNIFORMS = new Set(['u_resolution', 'u_time', 'u_deltaTime', 'u_mouse', 'u_progress', 'u_input']);
@@ -11,7 +14,9 @@ export const BUILTIN_UNIFORMS = new Set(['u_resolution', 'u_time', 'u_deltaTime'
 export type ShaderParam =
   | { key: string; kind: 'float'; label: string; min: number; max: number; def: number; step: number }
   | { key: string; kind: 'color'; label: string; def: string }
-  | { key: string; kind: 'select'; label: string; options: string[]; def: number };
+  | { key: string; kind: 'select'; label: string; options: string[]; def: number }
+  | { key: string; kind: 'image'; label: string; def: string }
+  | { key: string; kind: 'glyph'; label: string; def: string; family: string; weight: number };
 
 const STANDARD_DEFAULTS: Record<string, ShaderParam> = {
   u_intensity: { key: 'u_intensity', kind: 'float', label: 'Intensity', min: 0, max: 2, def: 1, step: 0.01 },
@@ -25,7 +30,7 @@ const pretty = (k: string) =>
 
 export function parseShaderParams(src: string): ShaderParam[] {
   const out: ShaderParam[] = [];
-  const re = /^\s*uniform\s+(?:(?:lowp|mediump|highp)\s+)?(float|vec3|int)\s+(u_\w+)\s*;[ \t]*(?:\/\/(.*))?$/gm;
+  const re = /^\s*uniform\s+(?:(?:lowp|mediump|highp)\s+)?(float|vec3|int|sampler2D)\s+(u_\w+)\s*;[ \t]*(?:\/\/(.*))?$/gm;
   let m: RegExpExecArray | null;
   while ((m = re.exec(src))) {
     const [, type, key, comment = ''] = m;
@@ -46,6 +51,10 @@ export function parseShaderParams(src: string): ShaderParam[] {
       const a = /@color\s+(#[0-9a-fA-F]{6})/.exec(s);
       const std = STANDARD_DEFAULTS[key];
       out.push({ key, kind: 'color', label, def: a ? a[1] : std && std.kind === 'color' ? std.def : '#ffffff' });
+    } else if (type === 'sampler2D') {
+      const g = /@glyph\s+([^:|]+):(\d+)\s*([^|]*)/.exec(s);
+      if (g) out.push({ key, kind: 'glyph', label, family: g[1].trim(), weight: +g[2], def: g[3].trim().replace(/\\n/g, '\n') });
+      else if (/@image/.test(s)) out.push({ key, kind: 'image', label, def: '' });
     } else if (type === 'int') {
       const a = /@select\s+(\d+)\s+([^|]+)/.exec(s);
       if (a) out.push({ key, kind: 'select', label, def: +a[1], options: a[2].split(',').map((x) => x.trim()) });

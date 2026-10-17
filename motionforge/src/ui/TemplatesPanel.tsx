@@ -7,7 +7,7 @@ import { Renderer } from '../engine/renderer';
 import { liveAudio } from '../engine/audio';
 import { cssFont } from '../engine/text';
 import { deepClone, uid } from '../engine/util';
-import type { Project } from '../engine/types';
+import type { AspectId, Project } from '../engine/types';
 import { engine } from '../state/engine';
 import { getStore, useStore } from '../state/store';
 import { Sheet, toast } from './controls';
@@ -35,14 +35,27 @@ export function useThumb(load: () => Promise<string>, key: string) {
   return { src, ref };
 }
 
-function facts(tpl: Template) {
-  const b = tpl.build();
+// favourite templates (per device)
+const FAV_KEY = 'mf.favTemplates';
+const readFavs = (): string[] => { try { return JSON.parse(localStorage.getItem(FAV_KEY) || '[]'); } catch { return []; } };
+function useFavTemplates() {
+  const [favs, setFavs] = useState<string[]>(readFavs);
+  const toggle = (id: string) => setFavs((f) => {
+    const n = f.includes(id) ? f.filter((x) => x !== id) : [...f, id];
+    try { localStorage.setItem(FAV_KEY, JSON.stringify(n)); } catch { /* private mode */ }
+    return n;
+  });
+  return { favs, toggle };
+}
+
+function facts(tpl: Template, duration?: number) {
+  const b = tpl.build(duration ? { duration } : undefined);
   const slots = b.layers.filter((l) => l.type === 'image' && !l.src).length;
   const scenes = TEMPLATE_INFO[tpl.id]?.scenes ?? 1;
   return { duration: b.duration, sound: (b.audio?.length ?? 0) > 0, slots, scenes, texts: b.layers.filter((l) => l.type === 'text').length };
 }
 
-function TemplateCard({ tpl, current, onOpen }: { tpl: Template; current: boolean; onOpen: () => void }) {
+function TemplateCard({ tpl, current, onOpen, fav, onFav }: { tpl: Template; current: boolean; onOpen: () => void; fav: boolean; onFav: () => void }) {
   const aspect = useStore((s) => s.project.aspect);
   const { src, ref } = useThumb(() => templateThumb(tpl.id, aspect), `${tpl.id}:${aspect}`);
   const f = useState(() => facts(tpl))[0];
@@ -52,7 +65,9 @@ function TemplateCard({ tpl, current, onOpen }: { tpl: Template; current: boolea
         <span className={`thumb ar-${aspect.replace(':', 'x')}`} style={{ background: `linear-gradient(135deg, ${tpl.swatch[0]} 0%, ${tpl.swatch[0]} 45%, ${tpl.swatch[1]} 100%)` }}>
           {src ? <img src={src} alt="" /> : <span className="thumb-wait">rendering…</span>}
           <span className="badges">
+            {tpl.categories.includes('Cinematic 3D') && <span className="b3d">3D</span>}
             <span>{f.duration}s</span>
+            <span>{aspect}</span>
             {f.sound && <span>🔊</span>}
             {f.slots > 0 && <span>🖼 {f.slots}</span>}
           </span>
@@ -61,23 +76,26 @@ function TemplateCard({ tpl, current, onOpen }: { tpl: Template; current: boolea
         <b>{tpl.name}</b>
         <small>{TEMPLATE_INFO[tpl.id]?.desc ?? tpl.categories.join(' · ')}</small>
       </button>
+      <button className={`tpl-fav ${fav ? 'on' : ''}`} aria-label={fav ? `Unfavourite ${tpl.name}` : `Favourite ${tpl.name}`} aria-pressed={fav} onClick={onFav}>★</button>
     </div>
   );
 }
 
 /** Live animated preview of a template (own renderer), with optional sound. */
-function PreviewSheet({ tpl, onClose, onUse, onDuplicate }: { tpl: Template; onClose: () => void; onUse: () => void; onDuplicate: () => void }) {
-  const aspect = useStore((s) => s.project.aspect);
+function PreviewSheet({ tpl, onClose, onUse, onDuplicate }: { tpl: Template; onClose: () => void; onUse: (o: { aspect: AspectId; duration?: number }) => void; onDuplicate: () => void }) {
+  const projectAspect = useStore((s) => s.project.aspect);
+  const [aspect, setAspect] = useState<AspectId>(projectAspect);
+  const [duration, setDuration] = useState<number | undefined>(tpl.defaultDuration);
   const holder = useRef<HTMLDivElement>(null);
   const [sound, setSound] = useState(false);
   const [t, setT] = useState(0);
   const projRef = useRef<Project | null>(null);
   const soundRef = useRef(false);
   const tRef = useRef(0);
-  const f = useState(() => facts(tpl))[0];
+  const f = facts(tpl, duration);
 
   useEffect(() => {
-    const p = projectFromTemplate(tpl, aspect);
+    const p = projectFromTemplate(tpl, aspect, duration);
     projRef.current = p;
     const canvas = document.createElement('canvas');
     canvas.className = 'preview-live';
@@ -93,7 +111,7 @@ function PreviewSheet({ tpl, onClose, onUse, onDuplicate }: { tpl: Template; onC
     r.setSize(A[0] * k, A[1] * k);
     let raf = 0, start = performance.now(), last = 0, lastUi = 0, dead = false;
     engine.player?.pause();
-    Promise.all(p.layers.filter((l) => l.type === 'text').map((l) => document.fonts?.load(cssFont(l as any, 64), (l as any).text || 'A').catch(() => {}))).then(() => {
+    Promise.all([r.prepareTextures(p), ...p.layers.filter((l) => l.type === 'text').map((l) => document.fonts?.load(cssFont(l as any, 64), (l as any).text || 'A').catch(() => {}))]).then(() => {
       if (dead) return;
       start = performance.now();
       const tick = (now: number) => {
@@ -114,7 +132,7 @@ function PreviewSheet({ tpl, onClose, onUse, onDuplicate }: { tpl: Template; onC
       r.destroy();
       canvas.remove();
     };
-  }, [tpl, aspect]);
+  }, [tpl, aspect, duration]);
 
   const toggleSound = () => {
     const on = !soundRef.current;
@@ -131,16 +149,27 @@ function PreviewSheet({ tpl, onClose, onUse, onDuplicate }: { tpl: Template; onC
         {f.sound && <button onClick={toggleSound}>{sound ? '🔇 Sound off' : '🔊 Play with sound'}</button>}
         <span className="hint" style={{ margin: 0, alignSelf: 'center' }}>{t.toFixed(1)}s / {f.duration}s</span>
       </div>
+      <div className="tpl-opts">
+        <div className="seg" role="radiogroup" aria-label="Aspect ratio">
+          {(['9:16', '16:9', '1:1', '4:5'] as AspectId[]).map((a) => <button key={a} className={aspect === a ? 'on' : ''} onClick={() => setAspect(a)}>{a}</button>)}
+        </div>
+        {tpl.durations && (
+          <div className="seg" role="radiogroup" aria-label="Duration">
+            {tpl.durations.map((d) => <button key={d} className={duration === d ? 'on' : ''} onClick={() => setDuration(d)}>{d}s</button>)}
+          </div>
+        )}
+      </div>
       <p>{TEMPLATE_INFO[tpl.id]?.desc}</p>
       <ul className="facts">
         <li>⏱ {f.duration} seconds{f.scenes > 1 ? ` · ${f.scenes} scenes` : ''}</li>
         <li>✏️ {f.texts} editable text layer{f.texts === 1 ? '' : 's'}</li>
         {f.slots > 0 && <li>🖼 {f.slots} image slot{f.slots === 1 ? '' : 's'} — dashed boxes; add your photos (background is removed automatically). They are not exported when empty.</li>}
         <li>{f.sound ? '🔊 Includes sound design (editable in the Audio tab)' : '🔇 No sound — add music or effects in the Audio tab'}</li>
-        <li>🏷 {tpl.categories.join(' · ')}</li>
+        <li>🏷 {tpl.categories.join(' · ')} · {aspect}</li>
+        {tpl.categories.includes('Cinematic 3D') && <li>🎥 Real-time 3D scene: change the brand text, logo, pictures, colours, lighting and camera movement under the 3D layer’s “Adjust”.</li>}
       </ul>
       <div className="row-btns">
-        <button className="primary" onClick={onUse}>Use this template</button>
+        <button className="primary" onClick={() => onUse({ aspect, duration })}>Use this template</button>
         <button onClick={onDuplicate}>Save a copy to My presets</button>
       </div>
     </Sheet>
@@ -148,7 +177,9 @@ function PreviewSheet({ tpl, onClose, onUse, onDuplicate }: { tpl: Template; onC
 }
 
 export function TemplatesPanel({ onUsed }: { onUsed?: () => void } = {}) {
-  const [cat, setCat] = useState<TemplateCategory | 'All' | 'Mine'>('All');
+  const [cat, setCat] = useState<TemplateCategory | 'All' | 'Mine' | 'Fav'>('All');
+  const [q, setQ] = useState('');
+  const { favs, toggle } = useFavTemplates();
   const [mine, setMine] = useState<SavedPreset[]>([]);
   const [preview, setPreview] = useState<Template | null>(null);
   const store = getStore();
@@ -158,9 +189,9 @@ export function TemplatesPanel({ onUsed }: { onUsed?: () => void } = {}) {
 
   const confirmReplace = () => !store.state.dirty || confirm('Replace the current composition? (Your current project stays in Projects if it was saved; Undo also works.)');
 
-  const apply = (tpl: Template) => {
+  const apply = (tpl: Template, o?: { aspect: AspectId; duration?: number }) => {
     if (!confirmReplace()) return;
-    const p = projectFromTemplate(tpl, store.state.project.aspect);
+    const p = projectFromTemplate(tpl, o?.aspect ?? store.state.project.aspect, o?.duration);
     store.load(p);
     setPreview(null);
     engine.player?.seek(0);
@@ -201,7 +232,9 @@ export function TemplatesPanel({ onUsed }: { onUsed?: () => void } = {}) {
     engine.player?.seek(0);
   };
 
-  const list = cat === 'All' ? TEMPLATES : cat === 'Mine' ? [] : TEMPLATES.filter((t) => t.categories.includes(cat));
+  const needle = q.trim().toLowerCase();
+  const list = (cat === 'All' ? TEMPLATES : cat === 'Mine' ? [] : cat === 'Fav' ? TEMPLATES.filter((t) => favs.includes(t.id)) : TEMPLATES.filter((t) => t.categories.includes(cat)))
+    .filter((t) => !needle || `${t.name} ${t.categories.join(' ')} ${TEMPLATE_INFO[t.id]?.desc ?? ''}`.toLowerCase().includes(needle));
 
   return (
     <div className="templates">
@@ -211,13 +244,15 @@ export function TemplatesPanel({ onUsed }: { onUsed?: () => void } = {}) {
         {project.templateId && TEMPLATES.some((t) => t.id === project.templateId) && <button onClick={resetPreset}>Reset preset</button>}
         <button onClick={() => { if (confirmReplace()) store.load(newProject('Untitled', { aspect: project.aspect })); }}>Blank</button>
       </div>
+      <input className="name-input tpl-search" type="search" placeholder="Search templates…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search templates" />
       <div className="chips">
-        {(['All', 'Mine', ...TEMPLATE_CATEGORIES] as const).map((c) => (
-          <button key={c} className={`chip ${cat === c ? 'on' : ''}`} onClick={() => setCat(c)}>{c === 'Mine' ? `My presets (${mine.length})` : c}</button>
+        {(['All', 'Fav', 'Mine', ...TEMPLATE_CATEGORIES] as const).map((c) => (
+          <button key={c} className={`chip ${cat === c ? 'on' : ''}`} onClick={() => setCat(c)}>{c === 'Mine' ? `My presets (${mine.length})` : c === 'Fav' ? `★ (${favs.length})` : c}</button>
         ))}
       </div>
+      {!list.length && cat !== 'Mine' && <p className="hint">{cat === 'Fav' ? 'Tap ★ on a template to keep it here.' : 'No template matches.'}</p>}
       <div className="tpl-grid">
-        {list.map((t) => <TemplateCard key={t.id} tpl={t} current={project.templateId === t.id} onOpen={() => setPreview(t)} />)}
+        {list.map((t) => <TemplateCard key={t.id} tpl={t} current={project.templateId === t.id} onOpen={() => setPreview(t)} fav={favs.includes(t.id)} onFav={() => toggle(t.id)} />)}
         {cat === 'Mine' && mine.map((m) => (
           <div key={m.id} className="tpl">
             <button className="tpl-main" onClick={() => applyMine(m)}>
@@ -230,7 +265,7 @@ export function TemplatesPanel({ onUsed }: { onUsed?: () => void } = {}) {
         ))}
         {cat === 'Mine' && !mine.length && <p className="hint">No custom presets yet. Edit a composition and tap “Save current as preset”.</p>}
       </div>
-      {preview && <PreviewSheet tpl={preview} onClose={() => setPreview(null)} onUse={() => apply(preview)} onDuplicate={() => duplicateTemplate(preview)} />}
+      {preview && <PreviewSheet tpl={preview} onClose={() => setPreview(null)} onUse={(o) => apply(preview, o)} onDuplicate={() => duplicateTemplate(preview)} />}
     </div>
   );
 }

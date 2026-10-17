@@ -5,13 +5,14 @@ import { makeBackground, makeParticles, makeShader, makeShape, makeText, newProj
 import type { AspectId, AudioClip, EasingId, Keyframe, KfValue, Layer, Project } from './types';
 import { REEL_TEMPLATES } from './templates-reels';
 import { NEON_TEMPLATES } from './templates-neon';
+import { CINEMATIC_TEMPLATES } from './templates-cinematic';
 
 export type TemplateCategory =
-  | 'Reels'
+  | 'Cinematic 3D' | 'Reels'
   | 'Typography' | 'Text reveal' | 'Minimal' | 'Kinetic type' | 'Glitch' | 'Glow' | 'Particles' | 'Grid' | 'Distortion' | 'Light effects' | 'Shader effects';
 
 export const TEMPLATE_CATEGORIES: TemplateCategory[] = [
-  'Reels', 'Typography', 'Text reveal', 'Minimal', 'Kinetic type', 'Glitch', 'Glow', 'Particles', 'Grid', 'Distortion', 'Light effects', 'Shader effects',
+  'Cinematic 3D', 'Reels', 'Typography', 'Text reveal', 'Minimal', 'Kinetic type', 'Glitch', 'Glow', 'Particles', 'Grid', 'Distortion', 'Light effects', 'Shader effects',
 ];
 
 export interface Template {
@@ -19,7 +20,10 @@ export interface Template {
   name: string;
   categories: TemplateCategory[];
   swatch: [string, string];
-  build: () => { background: string; duration: number; layers: Layer[]; audio?: AudioClip[] };
+  /** lengths the template can be built at (seconds); choreography re-times to fit */
+  durations?: number[];
+  defaultDuration?: number;
+  build: (o?: { duration?: number }) => { background: string; duration: number; layers: Layer[]; audio?: AudioClip[] };
 }
 
 const kf = (t: number, v: KfValue, ease: EasingId = 'easeInOutCubic'): Keyframe => ({ id: uid(), t, v, ease });
@@ -27,6 +31,7 @@ const kf = (t: number, v: KfValue, ease: EasingId = 'easeInOutCubic'): Keyframe 
 const D = 6;
 
 export const TEMPLATES: Template[] = [
+  ...CINEMATIC_TEMPLATES,
   ...NEON_TEMPLATES,
   ...REEL_TEMPLATES,
   {
@@ -291,7 +296,7 @@ export function sampleProject(aspect: AspectId = '9:16'): Project {
   return p;
 }
 
-export function projectFromTemplate(tpl: Template, aspect: AspectId): Project {
-  const b = tpl.build();
+export function projectFromTemplate(tpl: Template, aspect: AspectId, duration?: number): Project {
+  const b = tpl.build(duration ? { duration } : undefined);
   return newProject(tpl.name, { aspect, duration: b.duration, background: b.background, layers: b.layers, audio: b.audio ?? [], templateId: tpl.id });
 }

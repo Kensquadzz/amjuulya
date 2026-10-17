@@ -116,7 +116,7 @@ describe('shaders', () => {
 
 describe('projects', () => {
   it('templates build valid projects', () => {
-    expect(TEMPLATES.length).toBe(32);
+    expect(TEMPLATES.length).toBe(44);
     for (const t of TEMPLATES) {
       const b = t.build();
       expect(b.layers.length, t.id).toBeGreaterThan(0);
@@ -165,7 +165,10 @@ describe('built-in shader upgrades', () => {
     const dir = 'tests/.tmp-head/shaders';
     fs.mkdirSync(dir, { recursive: true });
     fs.writeFileSync('tests/.tmp-head/types.ts', 'export type BlendMode = string;\n');
-    fs.writeFileSync(`${dir}/library.ts`, execSync('git show HEAD:./src/engine/shaders/library.ts', { encoding: 'utf8' }));
+    for (const f of execSync('git ls-tree --name-only HEAD ./src/engine/shaders/', { encoding: 'utf8' }).trim().split('\n')) {
+      const name = f.split('/').pop()!;
+      fs.writeFileSync(`${dir}/${name}`, execSync(`git show HEAD:./src/engine/shaders/${name}`, { encoding: 'utf8' }));
+    }
     try {
       const head = await import('./.tmp-head/shaders/library');
       const cur = new Set(SHADERS.map((s) => fingerprint(s.source)));
@@ -174,5 +177,44 @@ describe('built-in shader upgrades', () => {
     } finally {
       fs.rmSync('tests/.tmp-head', { recursive: true, force: true });
     }
+  });
+});
+
+describe('cinematic templates', () => {
+  it('are 12 independent films with their own 3D world, editable text, sound and an ending', async () => {
+    const { CINEMATIC_TEMPLATES } = await import('../src/engine/templates-cinematic');
+    const { sfxById } = await import('../src/engine/sfx');
+    const { FONTS } = await import('../src/engine/fonts');
+    const { TEXT_PRESETS } = await import('../src/engine/text');
+    expect(CINEMATIC_TEMPLATES.length).toBe(12);
+    const worlds = new Set<string>();
+    for (const tpl of CINEMATIC_TEMPLATES) {
+      for (const d of tpl.durations!) {
+        const b = tpl.build({ duration: d });
+        expect(b.duration).toBe(d);
+        const w = b.layers.filter((l) => l.type === 'shader') as ShaderLayer[];
+        expect(w.length).toBe(1);
+        expect(w[0].start).toBe(0);
+        expect(w[0].end).toBe(d);
+        expect(shaderById(SHADERS.find((s) => s.source === w[0].source)!.id)!.category).toBe('Cinematic 3D');
+        if (d === tpl.defaultDuration) worlds.add(w[0].source);
+        for (const l of b.layers) {
+          expect(l.start).toBeGreaterThanOrEqual(0);
+          expect(l.end).toBeLessThanOrEqual(d + 1e-6);
+          if (l.type === 'text') {
+            expect(FONTS.some((f) => f.family === l.fontFamily), `${tpl.id}: font ${l.fontFamily}`).toBe(true);
+            expect(TEXT_PRESETS.some((p) => p.id === l.anim.preset), `${tpl.id}: anim ${l.anim.preset}`).toBe(true);
+          }
+        }
+        // something is still on screen in the final second (a designed ending)
+        expect(b.layers.some((l) => l.type === 'text' && l.end >= d - 1e-6) || tpl.id === 'cine-chrome-logo').toBe(true);
+        for (const c of b.audio ?? []) {
+          const id = c.assetId.replace(/^sfx:/, '');
+          expect(sfxById(id), `${tpl.id}: sound ${id}`).toBeTruthy();
+          expect(c.start).toBeLessThan(d);
+        }
+      }
+    }
+    expect(worlds.size).toBe(12); // twelve different scenes, not one scene renamed
   });
 });

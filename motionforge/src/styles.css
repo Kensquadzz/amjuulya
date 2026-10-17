@@ -457,3 +457,11 @@ input[type='color'] { width: 44px; height: 34px; padding: 0; border: 1px solid v
   .cap-tool .ci { font-size: 18px; height: 22px; line-height: 22px; }
   .tool-sheet, .tool-sheet.tall { height: 70dvh; }
 }
+
+/* template library: favourites, 3D badge, options in the preview */
+.tpl { position: relative; }
+.tpl-fav { position: absolute; right: 6px; top: 6px; min-width: 36px; min-height: 36px; padding: 0; border-radius: 50%; background: #0009; border: 1px solid #ffffff22; color: #ffffff88; font-size: 16px; z-index: 2; }
+.tpl-fav.on { color: #ffc24d; }
+.badges .b3d { background: var(--accent); border-color: var(--accent); font-weight: 800; }
+.tpl-search { width: 100%; margin: 6px 0; }
+.tpl-opts { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0; }

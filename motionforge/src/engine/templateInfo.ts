@@ -1,6 +1,18 @@
 // Short descriptions and the most representative moment ("hero time") of each
 // template, used for gallery thumbnails and the preview sheet.
 export const TEMPLATE_INFO: Record<string, { desc: string; at?: number; scenes?: number }> = {
+  'cine-liquid-glass': { desc: 'Refractive glass drops flow and merge in a colour field, then pour into your brand mark in solid glass. Thick-glass refraction with dispersion. Edit the brand, palette, glass tint and camera.', at: 11.5 },
+  'cine-product-orbit': { desc: 'Studio turntable for a product can: macro on the rim, a full camera orbit with a glossy floor, three feature call-outs and a hero end card. Wrap your own label artwork around it.', at: 5.5 },
+  'cine-chrome-logo': { desc: 'Your logo (text or picture) as bevelled chrome rising from smoke; a light streak races across it and the final frame lands with a glint.', at: 9.0 },
+  'cine-floating-ui': { desc: 'Five glass app screens hang in deep space; the camera dollies between them and they fan out around the hero screen. Drop in up to three screenshots.', at: 13.0 },
+  'cine-typography': { desc: 'Two monumental extruded words: a macro skim over the first, a whip-around as the second rises, ending on a lit title card.', at: 10.5 },
+  'cine-perfume': { desc: 'Glass flacon with amber fragrance and a gold cap on a polished plinth, silk folds behind; an elegant arc and a highlight that glides across the glass.', at: 13.0 },
+  'cine-holo-ui': { desc: 'A wireframe hologram globe powers up with orbiting data rings, curved HUD panels and a pulsing grid floor while the camera circles and rises.', at: 9.0 },
+  'cine-abstract': { desc: 'A flight through three procedural worlds (twisting monoliths, a ring lattice, a crystal field), each with its own light and palette, joined by light transitions.', at: 8.5 },
+  'cine-particles': { desc: 'Drifting sparks wake up, swirl in a vortex and lock into your brand; a shockwave fires and the mark ignites while sparks keep orbiting.', at: 10.5 },
+  'cine-watch': { desc: 'Steel chronometer with sunburst dial and sweeping hands: macro over crown and bezel, a grazing glide across the dial, then the pull-back hero shot.', at: 13.5 },
+  'cine-devices': { desc: 'Three phones with your screens: the film starts inside the hero screen, pulls back past the camera bumps and ends on a lineup on a studio floor.', at: 12.0 },
+  'cine-event': { desc: 'A fast flight down a neon hexagon tunnel that opens into a laser-lit void; the event title slams in as neon type with date, venue and ticket call to action.', at: 13.5 },
   'neon-promo': { desc: 'Six-scene app/brand promo: glass card logo, typing neon search bar, orb ring, floating glass icons, glowing tile and a planet with lens flare. Full sound design included.', at: 8.3, scenes: 6 },
   'neon-card': { desc: 'Your brand name, then a glowing gradient glass card rises behind it. Whoosh + soft hit.', at: 2.4 },
   'neon-search': { desc: 'Neon search bar that types and deletes your phrases with keyboard sounds.', at: 1.6 },

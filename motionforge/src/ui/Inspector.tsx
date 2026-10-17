@@ -9,7 +9,8 @@ import { engine, setProp, useTime } from '../state/engine';
 import { getStore, useSelectedLayer, useStore } from '../state/store';
 import { autoRemoveBg, cutOutLayer, restoreOriginal, setAutoRemoveBg, setLayerImageFromFile } from './imageActions';
 import { useState } from 'react';
-import { ColorProp, NumProp, Section, SelectProp, ToggleProp, KfButton } from './controls';
+import { ColorProp, NumProp, Section, SelectProp, ToggleProp, KfButton, toast } from './controls';
+import { loadImageFile } from './images';
 
 const EASE_OPTS = (Object.keys(EASING_LABELS) as EasingId[]).map((id) => ({ value: id, label: EASING_LABELS[id] }));
 const BLEND_OPTS = [
@@ -217,6 +218,8 @@ export function ShaderParamControls({ l, t }: { l: ShaderLayer; t: number }) {
         const path = `params.${p.key}`;
         if (p.kind === 'float') return <NumProp key={p.key} layer={l} path={path} label={p.label} min={p.min} max={p.max} step={p.step} t={t} />;
         if (p.kind === 'color') return <ColorProp key={p.key} layer={l} path={path} label={p.label} t={t} />;
+        if (p.kind === 'image') return <ShaderImageParam key={p.key} l={l} k={p.key} label={p.label} />;
+        if (p.kind === 'glyph') return <ShaderGlyphParam key={p.key} l={l} k={p.key} label={p.label} def={p.def} family={p.family} weight={p.weight} />;
         return (
           <div className="prop" key={p.key}>
             <label>{p.label}</label>
@@ -228,6 +231,59 @@ export function ShaderParamControls({ l, t }: { l: ShaderLayer; t: number }) {
         );
       })}
     </>
+  );
+}
+
+/** Picture used inside a 3D shader (product shot, screenshot, label…). */
+function ShaderImageParam({ l, k, label }: { l: ShaderLayer; k: string; label: string }) {
+  const v = String(l.params[k] ?? '');
+  const set = (val: string) => getStore().updateLayer(l.id, (x) => ({ ...(x as ShaderLayer), params: { ...(x as ShaderLayer).params, [k]: val } }));
+  return (
+    <div className="prop tex-prop">
+      <label>{label}</label>
+      {v ? <img className="tex-thumb" src={v} alt="" /> : <span className="tex-thumb empty">—</span>}
+      <label className="file-btn">{v ? 'Replace…' : '＋ Add…'}
+        <input type="file" accept="image/*" hidden onChange={async (e) => {
+          const f = e.target.files?.[0];
+          e.target.value = '';
+          if (!f) return;
+          try { set(await loadImageFile(f)); } catch (err) { toast((err as Error).message, 'error'); }
+        }} />
+      </label>
+      {v && <button className="chip small" onClick={() => set('')}>Remove</button>}
+    </div>
+  );
+}
+
+/** Text (or a logo picture) a 3D shader extrudes into real geometry. */
+function ShaderGlyphParam({ l, k, label, def, family, weight }: { l: ShaderLayer; k: string; label: string; def: string; family: string; weight: number }) {
+  const v = String(l.params[k] ?? def);
+  const font = String(l.params[`${k}Font`] ?? `${family}:${weight}`);
+  const isImg = /^(data:|blob:|https?:)/.test(v);
+  const set = (patch: Record<string, string>) => getStore().updateLayer(l.id, (x) => ({ ...(x as ShaderLayer), params: { ...(x as ShaderLayer).params, ...patch } }), `glyph:${l.id}:${k}`);
+  return (
+    <div className="glyph-prop">
+      <label className="cap-prop-l">{label}</label>
+      {isImg ? <img className="tex-thumb" src={v} alt="" /> : (
+        <textarea rows={2} value={v} onChange={(e) => set({ [k]: e.target.value })} aria-label={label} />
+      )}
+      <div className="row-btns">
+        {!isImg && (
+          <select aria-label={`${label} font`} value={font} onChange={(e) => set({ [`${k}Font`]: e.target.value })}>
+            {FONTS.flatMap((f) => f.weights.filter((w) => w >= 500).map((w) => <option key={`${f.family}:${w}`} value={`${f.family}:${w}`}>{f.family} {w}</option>))}
+          </select>
+        )}
+        <label className="file-btn">{isImg ? 'Replace logo…' : 'Use a logo image…'}
+          <input type="file" accept="image/png,image/svg+xml,image/webp,image/*" hidden onChange={async (e) => {
+            const f = e.target.files?.[0];
+            e.target.value = '';
+            if (!f) return;
+            try { set({ [k]: await loadImageFile(f, 2048) }); } catch (err) { toast((err as Error).message, 'error'); }
+          }} />
+        </label>
+        {isImg && <button className="chip small" onClick={() => set({ [k]: def })}>Use text</button>}
+      </div>
+    </div>
   );
 }
 

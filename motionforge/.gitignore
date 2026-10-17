@@ -8,3 +8,4 @@ tests/ref-video.mov
 tests/ref-opus.webm
 tests/statue.jpg
 tests/chess.jpg
+.wrangler/

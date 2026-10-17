@@ -1,0 +1,6 @@
+# Cloudflare Pages project for MOTIONFORGE STUDIO (static Vite build, no server runtime).
+# Dashboard Git integration uses: root directory "motionforge", build "npm run build", output "dist".
+# CLI: npx wrangler pages deploy dist --project-name motionforge-studio
+name = "motionforge-studio"
+pages_build_output_dir = "dist"
+compatibility_date = "2026-10-01"

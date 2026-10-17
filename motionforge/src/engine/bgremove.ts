@@ -8,7 +8,8 @@ const SIZE = 320; // U²-Net input resolution
 let sessionPromise: Promise<{ ort: typeof import('onnxruntime-web'); session: InferenceSession }> | null = null;
 
 function assetUrl(path: string) {
-  return new URL(path, document.baseURI).href;
+  // relative to the app's base, not the page URL (deep links fall back to index.html)
+  return new URL(path.replace(/^\.\//, ''), new URL(import.meta.env.BASE_URL, location.origin)).href;
 }
 
 async function getSession() {

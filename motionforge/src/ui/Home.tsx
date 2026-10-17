@@ -9,12 +9,14 @@ import { setLang, useLang } from './i18n';
 import { toast } from './controls';
 import { restoreAssets } from '../engine/audio';
 import { uid } from '../engine/util';
+import { VoiceVideoSheet } from './VoiceVideoSheet';
 
 export function Home({ onOpen }: { onOpen: () => void }) {
   const { t, lang } = useLang();
   const project = useStore((s) => s.project);
   const [list, setList] = useState<ProjectSummary[]>([]);
   const [picking, setPicking] = useState(false);
+  const [voiceSheet, setVoiceSheet] = useState(false);
   const refresh = () => storage.listProjects().then(setList).catch(() => {});
   useEffect(() => { refresh(); }, []);
 
@@ -69,6 +71,10 @@ export function Home({ onOpen }: { onOpen: () => void }) {
           <span className="plus">＋</span>
           <span>{t('newProject')}</span>
         </button>
+        <button className="open-file voice-video" onClick={() => setVoiceSheet(true)}>
+          <span className="plus">🎙</span>
+          <span>{t('voiceVideo')}</span>
+        </button>
         <label className="open-file">
           <span className="plus">⤓</span>
           <span>{t('openProjectFile')}</span>
@@ -121,6 +127,7 @@ export function Home({ onOpen }: { onOpen: () => void }) {
           </>
         )}
       </div>
+      {voiceSheet && <VoiceVideoSheet onClose={() => setVoiceSheet(false)} onCreated={() => { setVoiceSheet(false); onOpen(); }} />}
     </div>
   );
 }

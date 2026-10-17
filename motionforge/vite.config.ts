@@ -1,10 +1,12 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
-// base './' keeps asset paths relative so the build works from any sub-path
-// (GitHub Pages project sites, Netlify, Cloudflare Pages, Vercel, a plain folder).
+// Absolute base: the app is served from the site root (Cloudflare Pages, Netlify),
+// so assets resolve from any URL path, including deep links that fall back to
+// index.html. For a sub-path host (e.g. GitHub Pages project site) build with
+// MF_BASE=/repo-name/ npm run build.
 export default defineConfig({
-  base: './',
+  base: process.env.MF_BASE || '/',
   plugins: [react()],
   build: { target: 'es2020', chunkSizeWarningLimit: 1200 },
 });

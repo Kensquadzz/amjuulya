@@ -57,7 +57,7 @@ export class Scene2DHost {
     x.clearRect(0, 0, W, H);
     const span = Math.max(1e-3, l.end - l.start);
     x.save();
-    e.inst.draw(x, { p: Math.max(0, Math.min(1, (env.t - l.start) / span)), t: Math.max(0, env.t - l.start), W, H, params: this.params(l) });
+    e.inst.draw(x, { p: Math.max(0, Math.min(1, (env.t - l.start) / span)), t: Math.max(0, env.t - l.start), W, H, params: this.params(l), dur: span });
     x.restore();
     ctx.save();
     ctx.translate(l.x * W, l.y * H);

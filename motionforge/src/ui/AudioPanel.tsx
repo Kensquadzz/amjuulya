@@ -31,6 +31,20 @@ function setMusic(assetId: string, name: string, srcDuration: number) {
   }));
 }
 
+/**
+ * Add a voice-over: it is never trimmed — the video is lengthened to the
+ * voice's real (decoded) duration when it is shorter.
+ */
+function addVoice(assetId: string, name: string, srcDuration: number) {
+  const before = getStore().state.project.duration;
+  getStore().update((p) => ({
+    ...p,
+    duration: Math.max(p.duration, +srcDuration.toFixed(2)),
+    audio: [...(p.audio ?? []), { id: uid(), name: `Voice — ${name}`, assetId, start: 0, offset: 0, duration: srcDuration, volume: 1, fadeIn: 0, fadeOut: 0, role: 'sfx' }],
+  }));
+  return before;
+}
+
 const FAV_KEY = 'mf.sfxFavs';
 function useFavs() {
   const [favs, setFavs] = useState<string[]>(() => { try { return JSON.parse(localStorage.getItem(FAV_KEY) || '[]'); } catch { return []; } });
@@ -63,6 +77,16 @@ export function AudioPanel() {
     catch (e) { toast((e as Error).message, 'error'); }
     setBusy(null);
   };
+  const pickVoiceFile = async (f: File) => {
+    setBusy('Loading the voice-over…');
+    try {
+      const a = /^video\//.test(f.type) ? await extractAudioFromVideo(f) : await importAudioFile(f);
+      const before = addVoice(a.assetId, a.name, a.duration);
+      toast(a.duration > before ? `Voice-over ${a.duration.toFixed(1)} s — video lengthened from ${before.toFixed(1)} s. Layers still end at ${before.toFixed(1)} s: use “Voice-over → Video” on Home to build scenes for the whole narration.` : `Voice-over ${a.duration.toFixed(1)} s added`, 'ok');
+      refreshLib();
+    } catch (e) { toast((e as Error).message, 'error'); }
+    setBusy(null);
+  };
   const pickVideoSound = async (f: File) => {
     setBusy('Extracting the sound from your video…');
     try {
@@ -78,6 +102,7 @@ export function AudioPanel() {
     try {
       const a = await importAudioFile(f);
       addClips({ id: uid(), name: a.name, assetId: a.assetId, start: at(), offset: 0, duration: Math.min(a.duration, duration - at()), volume: 1, fadeIn: 0, fadeOut: 0.05, role: 'sfx' });
+      if (a.duration > duration - at() + 0.05) toast(`“${a.name}” is ${a.duration.toFixed(1)} s but only ${(duration - at()).toFixed(1)} s of video remain — it was shortened. For narration use 🎙 Voice-over.`, 'info');
       toast(`Added ${a.name} at the playhead`, 'ok');
       refreshLib();
     } catch (e) { toast((e as Error).message, 'error'); }
@@ -92,6 +117,9 @@ export function AudioPanel() {
         {music.length === 0 && <p className="hint">No background music. Use your own song, the sound of a video, or a built-in pad / beat.</p>}
         <ClipList clips={music} open={open} setOpen={setOpen} />
         <div className="row-btns">
+          <label className="file-btn primary-file">🎙 Voice-over (sets the video length)…
+            <input type="file" accept="audio/*,video/*,.mp3,.m4a,.wav,.aac,.mp4,.mov" hidden onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) pickVoiceFile(f); }} />
+          </label>
           <label className="file-btn primary-file">🎵 Use my music…
             <input type="file" accept="audio/*,.mp3,.m4a,.wav,.aac,.ogg" hidden onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) pickMusicFile(f); }} />
           </label>

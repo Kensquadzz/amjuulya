@@ -231,3 +231,38 @@ describe('template sounds', () => {
     }
   });
 });
+
+describe('voice-over drives the video', () => {
+  // synthetic narration: noise bursts (speech) separated by silences
+  const fakeVoice = (dur: number, phrases: number) => {
+    const sr = 8000, len = Math.round(dur * sr), data = new Float32Array(len);
+    const slot = (dur - 1) / phrases;
+    for (let p = 0; p < phrases; p++) {
+      const a = 0.5 + p * slot, b = a + slot * 0.8;
+      for (let i = Math.round(a * sr); i < Math.round(b * sr); i++) data[i] = Math.sin(i * 0.3) * 0.4 * (0.6 + 0.4 * Math.sin(i * 0.0021));
+    }
+    return { sampleRate: sr, length: len, numberOfChannels: 1, getChannelData: () => data };
+  };
+  for (const [dur, n] of [[16, 4], [45, 11], [90, 20]] as const) {
+    it(`${dur} s narration -> ${dur} s video, every section its own shot`, async () => {
+      const { buildVoiceProject } = await import('../src/engine/voiceVideo');
+      const script = Array.from({ length: n }, (_, i) => i === 0 ? 'Та оффист ажилладаг уу?' : i === n - 1 ? 'Дэлгэрэнгүйг «1» гэж коммент бичээрэй.' : i % 3 === 0 ? `Үнэ ${i}0,000₮` : i % 3 === 1 ? 'Гэрээ, тушаал, маягт, анкет бүгд бэлэн' : `Хэсэг ${i}: шинэ загвар хайж олох`).join('\n');
+      const r = buildVoiceProject({ voice: { assetId: 'asset:v', name: 'v', duration: dur, buffer: fakeVoice(dur, n) }, script, brand: 'HR PACK', accent: '#2f5bff', images: [], outro: 0.6, aspect: '9:16', subtitles: true, music: false });
+      expect(r.speech.length).toBe(n);
+      expect(r.project.duration).toBeCloseTo(dur + 0.6, 1);
+      expect(r.issues.filter((x) => x.level === 'error')).toEqual([]);
+      const shots = r.project.layers.filter((l) => l.type === 'scene3d') as any[];
+      expect(shots.length).toBe(n);
+      expect(shots[0].start).toBe(0);
+      expect(shots[shots.length - 1].end).toBeCloseTo(r.project.duration, 2);
+      for (let i = 1; i < shots.length; i++) {
+        expect(shots[i].start).toBeLessThanOrEqual(shots[i - 1].end); // no holes
+        expect(shots[i].params.shot).not.toBe(shots[i - 1].params.shot); // no back-to-back repeats
+      }
+      // the part after the old 16 s cutoff is developed with new sections
+      if (dur > 16) expect(shots.filter((s) => s.start > 16).length).toBeGreaterThanOrEqual(3);
+      expect(shots[shots.length - 1].params.shot).toBe('cta');
+      expect(r.project.audio[0].duration).toBe(dur); // the voice is never trimmed
+    });
+  }
+});

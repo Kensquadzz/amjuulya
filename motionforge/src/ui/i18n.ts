@@ -5,7 +5,7 @@ import { useSyncExternalStore } from 'react';
 export type Lang = 'mn' | 'en';
 
 const MN = {
-  home: 'Нүүр', newProject: 'Шинэ төсөл', continue: 'Үргэлжлүүлэх', templates: 'Загварууд', myProjects: 'Миний төслүүд', openProjectFile: 'Төслийн файл нээх (.json)', imported: 'Нээгдлээ', importFailed: 'Нээж чадсангүй',
+  home: 'Нүүр', newProject: 'Шинэ төсөл', continue: 'Үргэлжлүүлэх', templates: 'Загварууд', myProjects: 'Миний төслүүд', openProjectFile: 'Төслийн файл нээх (.json)', voiceVideo: 'Voice over → Видео', imported: 'Нээгдлээ', importFailed: 'Нээж чадсангүй',
   allTemplates: 'Бүх загвар', chooseRatio: 'Хэмжээ сонгох', open: 'Нээх', export: 'Экспорт', undo: 'Буцаах', redo: 'Дахин',
   play: 'Тоглуулах', pause: 'Зогсоох',
   // main tools
@@ -52,7 +52,7 @@ const MN = {
 };
 
 const EN: typeof MN = {
-  home: 'Home', newProject: 'New project', continue: 'Continue', templates: 'Templates', myProjects: 'My projects', openProjectFile: 'Open project file (.json)', imported: 'Opened', importFailed: 'Could not open',
+  home: 'Home', newProject: 'New project', continue: 'Continue', templates: 'Templates', myProjects: 'My projects', openProjectFile: 'Open project file (.json)', voiceVideo: 'Voice-over → Video', imported: 'Opened', importFailed: 'Could not open',
   allTemplates: 'All templates', chooseRatio: 'Choose size', open: 'Open', export: 'Export', undo: 'Undo', redo: 'Redo',
   play: 'Play', pause: 'Pause',
   tTemplates: 'Templates', tText: 'Text', tAudio: 'Audio', tImage: 'Photo', tEffects: 'Effects', tStickers: 'Stickers', tRatio: 'Ratio',

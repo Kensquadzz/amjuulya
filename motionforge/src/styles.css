@@ -467,3 +467,12 @@ input[type='color'] { width: 44px; height: 34px; padding: 0; border: 1px solid v
 .badges .b3d { background: var(--accent); border-color: var(--accent); font-weight: 800; }
 .tpl-search { width: 100%; margin: 6px 0; }
 .tpl-opts { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0; }
+.open-file.voice-video { border-color: var(--accent); }
+.vv { display: flex; flex-direction: column; gap: 10px; }
+.vv-l { font-size: 13px; color: var(--dim); }
+.vv-script { width: 100%; min-height: 150px; font: inherit; font-size: 15px; line-height: 1.4; padding: 10px; border-radius: 12px; }
+.vv-check { display: flex; gap: 8px; align-items: center; font-size: 14px; }
+.vv-sum { font-size: 14px; }
+.vv-plan { margin: 0; padding-left: 22px; display: flex; flex-direction: column; gap: 6px; font-size: 14px; }
+.vv-plan .t { font-variant-numeric: tabular-nums; color: var(--dim); }
+.vv-plan small { display: block; color: var(--faint); }

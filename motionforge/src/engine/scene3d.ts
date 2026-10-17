@@ -28,6 +28,8 @@ export interface FrameState {
   W: number;
   H: number;
   params: Record<string, number | string>;
+  /** layer length in seconds (2D scenes) */
+  dur?: number;
 }
 
 export interface SceneInstance {

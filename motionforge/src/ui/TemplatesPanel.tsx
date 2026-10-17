@@ -85,7 +85,12 @@ function PreviewSheet({ tpl, onClose, onUse, onDuplicate }: { tpl: Template; onC
     const r = new Renderer(canvas);
     r.placeholders = true;
     const A = { '9:16': [1080, 1920], '16:9': [1920, 1080], '1:1': [1080, 1080], '4:5': [1080, 1350] }[aspect];
-    r.setSize(A[0] * 0.32, A[1] * 0.32);
+    // render at the pixel size the sheet actually shows (retina-sharp), up to full 1080p
+    const dpr = Math.min(window.devicePixelRatio || 1, 3);
+    const boxW = (holder.current?.clientWidth ?? 360) - 16;
+    const cssH = Math.min(window.innerHeight * 0.52, (boxW * A[1]) / A[0]);
+    const k = Math.min(1, (cssH * dpr) / A[1]);
+    r.setSize(A[0] * k, A[1] * k);
     let raf = 0, start = performance.now(), last = 0, lastUi = 0, dead = false;
     engine.player?.pause();
     Promise.all(p.layers.filter((l) => l.type === 'text').map((l) => document.fonts?.load(cssFont(l as any, 64), (l as any).text || 'A').catch(() => {}))).then(() => {
@@ -96,7 +101,7 @@ function PreviewSheet({ tpl, onClose, onUse, onDuplicate }: { tpl: Template; onC
         if (tt < last && soundRef.current) liveAudio.start(p, 0); // looped: restart the sound with the picture
         last = tt;
         tRef.current = tt;
-        r.render(p, tt, { density: 0.7 });
+        r.render(p, tt, { density: 1 });
         if (now - lastUi > 200) { lastUi = now; setT(tt); }
         raf = requestAnimationFrame(tick);
       };

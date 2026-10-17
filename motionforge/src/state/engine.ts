@@ -13,13 +13,16 @@ function warmAudio(p: Project) {
   for (const c of p.audio ?? []) getBuffer(c.assetId).catch(() => {});
 }
 
-export const QUALITY_SCALE: Record<PreviewQuality, number> = { low: 0.34, medium: 0.5, high: 0.75 };
-export const QUALITY_DENSITY: Record<PreviewQuality, number> = { low: 0.4, medium: 0.7, high: 1 };
+// Fraction of the export size the preview renders at. The result is also
+// capped at the screen's own pixel count, so High is retina-sharp on a phone
+// without rendering pixels nobody can see.
+export const QUALITY_SCALE: Record<PreviewQuality, number> = { low: 0.4, medium: 0.67, high: 1.5 }; // high may exceed 1080p in full screen on a 3× phone
+export const QUALITY_DENSITY: Record<PreviewQuality, number> = { low: 0.5, medium: 0.8, high: 1 };
 
 class Engine {
   renderer: Renderer | null = null;
   player: Player | null = null;
-  quality: PreviewQuality = 'medium';
+  quality: PreviewQuality = 'high';
   private unsub: (() => void) | null = null;
 
   attach(canvas: HTMLCanvasElement) {

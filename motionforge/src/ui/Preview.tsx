@@ -12,7 +12,7 @@ export function Preview({ simple = false }: { simple?: boolean }) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const aspect = useStore((s) => s.project.aspect);
-  const [quality, setQuality] = useState<PreviewQuality>(() => (localStorage.getItem('mf.quality') as PreviewQuality) || 'medium');
+  const [quality, setQuality] = useState<PreviewQuality>(() => { try { return (localStorage.getItem('mf.quality2') as PreviewQuality) || 'high'; } catch { return 'high'; } });
   const [box, setBox] = useState({ w: 0, h: 0 });
   const [focus, setFocus] = useState(false);
   const [glStatus, setGlStatus] = useState<string | null>(null);
@@ -48,7 +48,7 @@ export function Preview({ simple = false }: { simple?: boolean }) {
     if (engine.player) engine.player.density = QUALITY_DENSITY[quality];
     engine.quality = quality;
     engine.player?.invalidate();
-    try { localStorage.setItem('mf.quality', quality); } catch { /* private mode */ }
+    try { localStorage.setItem('mf.quality2', quality); } catch { /* private mode */ }
   }, [cssW, cssH, quality, A.w, A.h]);
 
   // ---- pointer: tap selects (simple mode), one finger drags the selected
@@ -160,6 +160,12 @@ export function Preview({ simple = false }: { simple?: boolean }) {
         {simple && <SelectionFrame cssW={cssW} cssH={cssH} />}
         {glStatus && <div className="stage-msg">{glStatus}</div>}
         {simple && <button className="stage-fs icon-btn" onClick={toggleFocus} aria-label="Fullscreen preview">{focus ? '⤡' : '⤢'}</button>}
+        {simple && (
+          <button className="stage-q icon-btn" aria-label={`Preview quality: ${quality}`} title="Preview quality (export is always full quality)"
+            onClick={() => setQuality(quality === 'high' ? 'medium' : quality === 'medium' ? 'low' : 'high')}>
+            {quality === 'high' ? 'HD' : quality === 'medium' ? 'SD' : 'LQ'}
+          </button>
+        )}
       </div>
       {simple ? <PlayRow /> : <Transport />}
     </div>

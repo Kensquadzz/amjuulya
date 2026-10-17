@@ -338,6 +338,7 @@ input[type='color'] { width: 44px; height: 34px; padding: 0; border: 1px solid v
 .preview.simple { flex: 1 1 auto; height: auto; min-height: 160px; background: var(--bg); border-bottom: 0; }
 .preview.simple .stage { padding: 6px 6px 0; }
 .stage-fs { position: absolute; right: 8px; bottom: 8px; background: #0008; border-color: #ffffff22; }
+.stage-q { position: absolute; left: 8px; bottom: 8px; background: #0008; border-color: #ffffff22; font-size: 11px; font-weight: 800; letter-spacing: 0.04em; min-width: 40px; }
 .sel-frame { position: absolute; border: 2px solid #fff; border-radius: 4px; box-shadow: 0 0 0 1px #0006, inset 0 0 0 1px #0004; pointer-events: none; }
 .play-row { display: flex; align-items: center; justify-content: space-between; padding: 2px 12px 4px; background: var(--bg); }
 .play-row .time { flex: 1; font: 12px 'JetBrains Mono', Menlo, monospace; color: #aaa; }

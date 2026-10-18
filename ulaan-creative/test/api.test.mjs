@@ -154,6 +154,13 @@ test('campaign inquiry stores the selected (published) influencers', async () =>
   for (const x of [pub, draft]) await fetch(`${BASE}/api/admin/influencers/${x.id}`, { method: 'DELETE', headers: A });
 });
 
+test('first-admin web setup is closed once an admin exists (or without ADMIN_SETUP_TOKEN)', async () => {
+  const st = await (await fetch(`${BASE}/api/admin/setup`)).json();
+  assert.equal(st.needed, false);
+  const r = await fetch(`${BASE}/api/admin/setup`, { method: 'POST', headers: H, body: JSON.stringify({ token: 'x'.repeat(20), email: 'intruder@example.com', password: 'Intruder-pass-2026' }) });
+  assert.ok([403, 410].includes(r.status), `got ${r.status}`);
+});
+
 test('security headers on public and admin pages', async () => {
   const home = await fetch(`${BASE}/`);
   assert.match(home.headers.get('content-security-policy'), /script-src 'self' 'nonce-/);

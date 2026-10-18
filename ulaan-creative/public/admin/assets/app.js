@@ -65,8 +65,37 @@ setRouteHandler(async (view, params, path) => {
 
 /* ------------------------------- login ------------------------------- */
 
+/** First run: no admin exists yet → create the owner account here (needs the ADMIN_SETUP_TOKEN code). */
+function setupView({ tokenConfigured }) {
+  const err = h('p.error', { role: 'alert' });
+  const field = (id, label, attrs) => [h('label', { for: id }, label), h(`input#${id}`, attrs)];
+  const [lt, token] = field('su-token', 'Setup код (Vercel дээрх ADMIN_SETUP_TOKEN)', { type: 'password', autocomplete: 'off', required: true });
+  const [le, email] = field('su-email', 'Таны имэйл (нэвтрэх нэр)', { type: 'email', autocomplete: 'username', required: true });
+  const [lp, pw] = field('su-pw', 'Нууц үг (12+ тэмдэгт, үсэг + тоо)', { type: 'password', autocomplete: 'new-password', minlength: 12, required: true });
+  const [lr, pw2] = field('su-pw2', 'Нууц үгээ давтах', { type: 'password', autocomplete: 'new-password', required: true });
+  const btn = h('button.btn.btn--block', { type: 'submit', disabled: !tokenConfigured }, 'Админ эрх үүсгэх');
+  const form = h('form.login__form', { novalidate: true }, lt, token, le, email, lp, pw, lr, pw2, err, btn);
+  form.onsubmit = async (e) => {
+    e.preventDefault(); err.textContent = '';
+    if (pw.value !== pw2.value) { err.textContent = 'Нууц үг таарахгүй байна.'; return; }
+    busy(btn, true, 'Үүсгэж байна…');
+    try {
+      await api('/setup', { method: 'POST', body: { token: token.value, email: email.value, password: pw.value } });
+      me = null; toast('Админ эрх үүслээ'); navigate('/dashboard', { replace: true });
+    } catch (ex) { err.textContent = ex.message; } finally { busy(btn, false); }
+  };
+  app.replaceChildren(h('main.login', h('div.login__card',
+    h('img.login__logo', { src: '/assets/img/ulaan-logo-dark.webp', alt: 'Ulaan Creative', width: 640, height: 252 }),
+    h('h1', h('small', 'Анхны тохиргоо — админ эрх үүсгэх')),
+    tokenConfigured
+      ? h('p.muted', 'Админ хараахан үүсээгүй байна. Vercel дээр тавьсан Setup кодоо оруулж, өөрийн имэйл, нууц үгээр эрх үүсгэнэ. Нэг л удаа хийгдэнэ.')
+      : h('div.notice.notice--warn', 'Vercel → Settings → Environment Variables дээр ADMIN_SETUP_TOKEN (16+ тэмдэгт) нэмээд Redeploy хийсний дараа энд эрх үүсгэнэ.'),
+    form)));
+}
+
 async function loginView() {
   try { const r = await api('/auth/me'); if (r.user) { me = r.user; return navigate('/dashboard', { replace: true }); } } catch { /* not logged in */ }
+  try { const st = await api('/setup'); if (st.needed) return setupView(st); } catch { /* no database yet: normal login form shows the error */ }
   const err = h('p.error', { role: 'alert' });
   const email = h('input#l-email', { type: 'email', autocomplete: 'username', required: true });
   const pw = h('input#l-pw', { type: 'password', autocomplete: 'current-password', required: true });

@@ -2,7 +2,7 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "cleanUrls": true,
   "functions": {
-    "api/router.js": { "maxDuration": 30 }
+    "api/router.js": { "maxDuration": 30, "includeFiles": "migrations/**" }
   },
   "rewrites": [
     { "source": "/:path((?!api/|admin/assets/|assets/).*)", "has": [{ "type": "host", "value": "admin.ulaancreative.mn" }], "destination": "/api/router?__p=/admin/:path" },

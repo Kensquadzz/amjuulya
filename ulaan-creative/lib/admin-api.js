@@ -83,6 +83,42 @@ export async function login(req, res) {
   json(res, 200, { ok: true, user: { email: user.email } });
 }
 
+/* ------------------------- first admin (web setup) ------------------------- */
+// Lets the owner create the FIRST admin account from a phone, without a terminal.
+// Works only while no admin exists AND the ADMIN_SETUP_TOKEN environment variable is set;
+// the token must be typed into the form. Once an admin exists the endpoint is closed for good.
+
+const setupToken = () => (process.env.ADMIN_SETUP_TOKEN || '').trim();
+
+export async function setupStatus(req, res) {
+  const r = await one('select exists(select 1 from admin_users) as has');
+  json(res, 200, { needed: !r.has, tokenConfigured: setupToken().length >= 16 });
+}
+
+export async function setupFirstAdmin(req, res) {
+  assertSameOrigin(req);
+  const ipKey = hashIp(clientIp(req));
+  const rl = await hit('admin-setup', ipKey, { limit: 10, windowSec: 900 });
+  if (!rl.allowed) throw new HttpError(429, 'too_many_attempts', 'Хэт олон оролдлого. 15 минутын дараа дахин оролдоно уу.');
+  const body = await readJson(req, 8 * 1024);
+  const expected = setupToken();
+  if (expected.length < 16) throw new HttpError(403, 'setup_disabled', 'Vercel дээр ADMIN_SETUP_TOKEN (16+ тэмдэгт) тохируулаагүй байна.');
+  const given = Buffer.from(String(body.token || ''));
+  const want = Buffer.from(expected);
+  if (given.length !== want.length || !crypto.timingSafeEqual(given, want)) throw new HttpError(403, 'bad_token', 'Setup код буруу байна.');
+  const email = str(body.email, 200, 'Имэйл', { required: true }).toLowerCase();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new HttpError(400, 'invalid', 'Зөв имэйл оруулна уу.', { field: 'email' });
+  const password = typeof body.password === 'string' ? body.password : '';
+  const problem = validatePasswordStrength(password);
+  if (problem) throw new HttpError(400, 'invalid', problem, { field: 'password' });
+  const hash = await hashPassword(password);
+  // atomic: inserts only if there is still no admin at all
+  const user = await one(`insert into admin_users (email, password_hash) select $1, $2 where not exists (select 1 from admin_users) returning id, email`, [email, hash]);
+  if (!user) throw new HttpError(410, 'setup_done', 'Админ аль хэдийн үүссэн байна. Нэвтрэх хуудсаар орно уу.');
+  await createSession(res, req, user.id);
+  json(res, 200, { ok: true, user: { email: user.email } });
+}
+
 export async function logout(req, res) {
   assertSameOrigin(req);
   await destroySession(req, res);

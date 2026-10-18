@@ -8,6 +8,7 @@ import { requireAdmin } from '../lib/auth.js';
 import { handleLocalStorage, storageDriver } from '../lib/storage.js';
 import { getPublishedContent, getDraftContent, getPublishedProjects, getPublishedInfluencers, getInfluencerCategories, getProject, getMediaView, getContentMediaMap } from '../lib/content.js';
 import { DEFAULT_CONTENT } from '../lib/defaults.js';
+import { ensureMigrated } from '../lib/migrate.js';
 import { renderHome, renderProject, renderNotFound } from '../lib/render.js';
 import { handleContact } from '../lib/contact.js';
 import { adminShell } from '../lib/admin-shell.js';
@@ -170,6 +171,8 @@ const routes = [
 
 async function adminApi(req, res, sub, searchParams) {
   if (!dbConfigured()) throw new HttpError(503, 'db_not_configured', 'DATABASE_URL тохируулаагүй байна.');
+  if (sub === '/setup' && req.method === 'GET') return A.setupStatus(req, res);
+  if (sub === '/setup' && req.method === 'POST') return A.setupFirstAdmin(req, res);
   if (sub === '/auth/login' && req.method === 'POST') return A.login(req, res);
   if (sub === '/auth/logout' && req.method === 'POST') return A.logout(req, res);
   if (sub === '/auth/me' && req.method === 'GET') return A.me(req, res);
@@ -192,6 +195,8 @@ export default async function handler(req, res) {
   url.searchParams.delete('__p');
   const isApi = path.startsWith('/api/');
   try {
+    // a fresh database gets its tables on the first request (no terminal step needed)
+    if (dbConfigured()) await ensureMigrated().catch(() => {});
     if (path === '/' && (req.method === 'GET' || req.method === 'HEAD')) return await homePage(req, res);
     if (path.startsWith('/work/')) return await projectPage(req, res, decodeURIComponent(path.slice(6)));
     if (path === '/sitemap.xml') return await sitemap(req, res);

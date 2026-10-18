@@ -119,6 +119,10 @@ This folder lives inside the `amjuulya` repository, so deploy it as its **own Ve
 
 ## 5. Admin account
 
+**From a phone (no terminal):** set `ADMIN_SETUP_TOKEN` (16+ random characters) in Vercel, redeploy, open `https://<your-site>/admin`, enter that code with your e-mail and password. This works only while no admin exists; afterwards the form is closed — delete the variable. Database tables are created automatically on the first request (no `db:migrate` needed).
+
+**From a computer:**
+
 There is **no default account and no default password**. Create the owner account from a computer that can reach the production DB:
 
 ```bash

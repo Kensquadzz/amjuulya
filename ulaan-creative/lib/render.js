@@ -17,6 +17,9 @@ const initials = (name) => plain(name).split(/\s+/).filter(Boolean).slice(0, 2).
 
 const ARROW = '<svg viewBox="0 0 16 16"><path d="M4 12 12 4M6 4h6v6" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>';
 
+// Changes with every deploy, so phones never pair new HTML with yesterday's cached CSS/JS
+const ASSET_V = encodeURIComponent(String(process.env.VERCEL_DEPLOYMENT_ID || process.env.VERCEL_GIT_COMMIT_SHA || Date.now().toString(36)).slice(-12));
+
 function mediaImg(m, { alt, sizes = '100vw', eager = false, cls = '' } = {}) {
   if (!m) return '';
   const w = m.width ? ` width="${m.width}" height="${m.height}"` : '';
@@ -81,8 +84,8 @@ ${noindex ? '<meta name="robots" content="noindex, nofollow">' : `<link rel="can
 <link rel="preload" href="/assets/fonts/oswald-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/assets/fonts/oswald-cyrillic-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/assets/fonts/inter-cyrillic-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/assets/css/fonts.css">
-<link rel="stylesheet" href="/assets/css/styles.css">
+<link rel="stylesheet" href="/assets/css/fonts.css?v=${ASSET_V}">
+<link rel="stylesheet" href="/assets/css/styles.css?v=${ASSET_V}">
 ${jsonLd ? `<script type="application/ld+json" nonce="${nonce}">${JSON.stringify(jsonLd).replace(/</g, '\\u003c')}</script>` : ''}
 </head>`;
 }
@@ -148,7 +151,7 @@ const scripts = (nonce) => `
 <script src="/assets/vendor/gsap.min.js" defer></script>
 <script src="/assets/vendor/ScrollTrigger.min.js" defer></script>
 <script src="/assets/vendor/lenis.min.js" defer></script>
-<script src="/assets/js/main.js" defer></script>`;
+<script src="/assets/js/main.js?v=${ASSET_V}" defer></script>`;
 
 const previewBar = (label) => label ? `<div class="preview-bar mono" role="status">${esc(label)}</div>` : '';
 

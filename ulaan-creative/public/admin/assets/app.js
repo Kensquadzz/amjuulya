@@ -23,7 +23,7 @@ const NAV = [
 function layout(content, path) {
   const toggle = h('button.nav-toggle', { type: 'button', 'aria-expanded': 'false', 'aria-controls': 'side' }, h('span.sr-only', 'Цэс'), '☰');
   const side = h('aside.side#side',
-    h('div.side__brand', h('img', { src: '/assets/img/favicon.svg', alt: '', width: 28, height: 28 }), h('span', 'ULAAN', h('small', 'Admin'))),
+    h('div.side__brand', h('img.side__logo', { src: '/assets/img/ulaan-logo-light.webp', alt: 'Ulaan Creative', width: 640, height: 252 }), h('small', 'Admin')),
     h('nav', { 'aria-label': 'Админ цэс' }, NAV.map(([p, l, en]) => link(p, { class: 'side__link' + (path.startsWith(p) ? ' is-active' : ''), 'aria-current': path.startsWith(p) ? 'page' : null }, h('span', l), h('small', en)))),
     h('div.side__foot',
       h('a.side__link', { href: '/', target: '_blank', rel: 'noopener' }, h('span', 'Вэбсайт үзэх ↗')),
@@ -85,8 +85,8 @@ async function loginView() {
     } catch (ex) { err.textContent = ex.message; pw.value = ''; pw.focus(); } finally { busy(btn, false); }
   };
   app.replaceChildren(h('main.login', h('div.login__card',
-    h('img', { src: '/assets/img/favicon.svg', alt: '', width: 48, height: 48 }),
-    h('h1', 'Ulaan Creative', h('small', 'Админ хэсэгт нэвтрэх')), form)));
+    h('img.login__logo', { src: '/assets/img/ulaan-logo-dark.webp', alt: 'Ulaan Creative', width: 640, height: 252 }),
+    h('h1', h('small', 'Админ хэсэгт нэвтрэх')), form)));
   email.focus();
 }
 

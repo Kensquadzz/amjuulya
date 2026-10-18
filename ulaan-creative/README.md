@@ -153,16 +153,25 @@ Without an admin subdomain, the dashboard works at `https://ulaancreative.mn/adm
 * The visitor sees success only if the submission was stored or e-mailed. Otherwise they see an error and are told nothing was sent.
 * Visitor IPs are stored only as a salted hash. Delete old submissions from the admin when they are no longer needed.
 
-## 8. Mascot — "Ulaan"
+## 8. Brand: logo + mascot "Ulaan"
 
-An original character, drawn in code (`lib/mascot.js`):
-* **Speech-bubble body:** brand voice and marketing.
-* **Black camera-visor:** production and digital.
-* **LED pill eyes:** expressive, and they follow the cursor on desktop.
-* **Spark antenna:** ideas.
-* **White "U" emblem.**
+**Logo:** the owner-supplied ULAAN CREATIVE logo, extracted onto a transparent background in three versions (`public/assets/img/`):
 
-Expressions: `default`, `happy`, `wink`, `surprised`, `focused`. `npm`-free export: `node scripts/export-mascot.mjs` writes `public/assets/mascot/*.svg` and the favicon. The icon version (`ulaan-icon.svg`) stays readable at 16 px.
+| File | Look | Used for |
+| --- | --- | --- |
+| `ulaan-logo-light.webp` / `.png` | white + red stripe | dark backgrounds: scrolled nav, mobile menu, footer, admin sidebar, structured data |
+| `ulaan-logo-dark.webp` | black + red stripe | light backgrounds: admin login |
+| `ulaan-logo-on-red.webp` | white + black stripe | the red hero and the loader (a red stripe would disappear on red) |
+
+For print or large formats, ask the designer for the original vector (SVG/AI) file.
+
+**Mascot "Ulaan":** a red cartoon bomb with a lit fuse, an "idea bomb". It is original artwork drawn in code (`lib/mascot.js`):
+* glossy red body, black metal cap, rope fuse with a spark;
+* sly half-lidded eyes whose pupils follow the cursor on desktop;
+* blinks, waves, and the spark flickers;
+* the "Start a project" line points to its eye.
+
+Expressions: `default` (sly), `happy`, `wink`, `surprised`, `focused`. `node scripts/export-mascot.mjs` writes `public/assets/mascot/*.svg` and the favicon. PNG renders (`ulaan-mascot-default.png`, `ulaan-mascot-happy.png`, `ulaan-icon-512.png`) are included for social media. The icon version stays readable at 16 px.
 
 ## 9. Tests
 

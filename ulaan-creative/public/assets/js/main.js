@@ -444,7 +444,7 @@
   const lineEl = svgLine && $('line', svgLine);
   const dotEl = svgLine && $('circle', svgLine);
   const heroEye = $('.hero .m-eye-l');
-  const eyesGroup = $('.hero .m-eyes');
+  const pupils = $$('.hero .m-pupil');
   let lineReady = false;
 
   function heroIntro() {
@@ -514,8 +514,8 @@
       const mx = gsap.quickTo(mascotWrap, 'x', { duration: 1.2, ease: 'power3.out' });
       const my = gsap.quickTo(mascotWrap, 'y', { duration: 1.2, ease: 'power3.out' });
       const mr = gsap.quickTo(mascotWrap, 'rotation', { duration: 1.4, ease: 'power3.out' });
-      const ex = eyesGroup && gsap.quickTo(eyesGroup, 'x', { duration: 0.5, ease: 'power3.out' });
-      const ey = eyesGroup && gsap.quickTo(eyesGroup, 'y', { duration: 0.5, ease: 'power3.out' });
+      const ex = pupils.length && gsap.quickTo(pupils, 'x', { duration: 0.5, ease: 'power3.out' });
+      const ey = pupils.length && gsap.quickTo(pupils, 'y', { duration: 0.5, ease: 'power3.out' });
       const title = $('.hero__title');
       const tx = gsap.quickTo(title, 'x', { duration: 1.4, ease: 'power3.out' });
       const ty = gsap.quickTo(title, 'y', { duration: 1.4, ease: 'power3.out' });
@@ -525,7 +525,7 @@
         const ny = e.clientY / window.innerHeight - 0.5;
         mx(nx * 22); my(ny * 14); mr(nx * 2);
         tx(nx * -10); ty(ny * -6);
-        if (ex) { ex(gsap.utils.clamp(-46, 30, nx * 90)); ey(gsap.utils.clamp(-18, 18, ny * 40)); }
+        if (ex) { ex(gsap.utils.clamp(-26, 10, nx * 60)); ey(gsap.utils.clamp(-14, 6, ny * 30)); }
       }, { passive: true });
     }
     // Keep the dotted line attached while the mascot / CTA move (only while the hero is on screen).

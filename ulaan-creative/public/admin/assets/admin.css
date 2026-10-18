@@ -211,3 +211,9 @@ fieldset.field { border: 1px solid var(--line); border-radius: var(--r); padding
   .upload progress { grid-column: 1 / -1; }
 }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+
+.side__logo { width: 120px; height: auto; display: block; }
+.side__brand { flex-direction: column; align-items: flex-start; gap: 4px; }
+.side__brand small { color: #888; }
+.login__logo { width: 200px; height: auto; display: block; }
+.login__card h1 { margin: 10px 0 20px; }

@@ -177,9 +177,6 @@ ul, ol { padding: 0; list-style: none; }
 .nav.is-scrolled { background: rgba(17,17,17,.9); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); }
 .nav.is-hidden { transform: translateY(-100%); }
 .logo { display: inline-flex; align-items: center; gap: 12px; }
-.logo__mark { width: 30px; height: 30px; color: var(--white); transition: transform .8s var(--ease); }
-.logo:hover .logo__mark { transform: rotate(-360deg); }
-.logo__word { font-family: var(--f-mono); font-size: 13px; letter-spacing: .14em; font-weight: 500; }
 .nav__links { display: flex; gap: clamp(18px, 2.4vw, 40px); margin-inline: auto; }
 .nav__links a { font-family: var(--f-mono); font-size: 12.5px; letter-spacing: .08em; text-transform: uppercase; }
 .nav__cta { border-color: rgba(255,255,255,.75); }
@@ -829,3 +826,12 @@ html:not(.motion-ok) .marquee__track { animation: none; }
 .notfound h1 { font-size: clamp(56px, 9vw, 140px); margin: 10px 0 28px; }
 .notfound .mascot { width: 100%; height: auto; }
 @media (max-width: 700px) { .notfound { grid-template-columns: 1fr; text-align: left; } .notfound__art { max-width: 200px; } }
+
+/* Brand logo (white + red on dark, white + black on the red hero) */
+.logo__img { display: block; height: 34px; width: auto; }
+.logo__img--light { display: none; }
+.nav.is-scrolled .logo__img--on-red, .page-project .logo__img--on-red, .nav:has([aria-expanded="true"]) .logo__img--on-red { display: none; }
+.nav.is-scrolled .logo__img--light, .page-project .logo__img--light, .nav:has([aria-expanded="true"]) .logo__img--light { display: block; }
+.footer__logo { width: min(220px, 60vw); height: auto; margin-bottom: 18px; }
+.loader__logo { width: min(260px, 50vw); height: auto; }
+@media (max-width: 760px) { .logo__img { height: 28px; } }

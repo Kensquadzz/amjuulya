@@ -91,8 +91,8 @@ function nav({ hasInfluencers, base = '' }) {
   return `<header class="nav" data-nav>
   <div class="nav__inner">
     <a class="logo" href="${base || '#top'}" aria-label="Ulaan Creative — нүүр хуудас">
-      <span class="logo__mark" aria-hidden="true"><svg viewBox="0 0 32 32"><circle cx="16" cy="16" r="16" fill="currentColor"/><path d="M10 9v8.2a6 6 0 0 0 12 0V9" fill="none" stroke="var(--logo-ink, #E50920)" stroke-width="3.2" stroke-linecap="round"/></svg></span>
-      <span class="logo__word">ULAAN CREATIVE</span>
+      <img class="logo__img logo__img--on-red" src="/assets/img/ulaan-logo-on-red.webp" width="640" height="252" alt="Ulaan Creative">
+      <img class="logo__img logo__img--light" src="/assets/img/ulaan-logo-light.webp" width="640" height="252" alt="" aria-hidden="true">
     </a>
     <nav class="nav__links" aria-label="Үндсэн цэс">
       ${links.map(([id, l]) => `<a href="${base}#${id}" class="link-line">/ ${l}</a>`).join('\n      ')}
@@ -125,7 +125,7 @@ function footer(c, { hasInfluencers, base = '' }) {
   return `<footer class="footer" data-cursor-theme="light">
   <div class="container footer__top">
     <div class="footer__col">
-      <p class="label mono">Ulaan Creative</p>
+      <img class="footer__logo" src="/assets/img/ulaan-logo-light.webp" width="640" height="252" alt="Ulaan Creative" loading="lazy">
       <p class="footer__tag">${rich(c.footer.tagline)}</p>
     </div>
     <nav class="footer__col" aria-label="Footer цэс">
@@ -160,7 +160,7 @@ function hero(h) {
   const words = lines(h.headline);
   return `<section class="hero" id="top" aria-labelledby="hero-title" data-cursor-theme="light">
   <div class="hero__mascot" data-hero-mascot>
-    <div class="hero__mascot-float" data-hero-float>${mascotSVG({ id: 'hero-m', title: 'Ulaan Creative-ийн дүр — Улаан', className: 'mascot--hero' })}</div>
+    <div class="hero__mascot-float" data-hero-float>${mascotSVG({ id: 'hero-m', title: 'Ulaan Creative-ийн дүр — улаан бөмбөг Улаан', className: 'mascot--hero' })}</div>
   </div>
   <div class="hero__grain" aria-hidden="true"></div>
   <svg class="hero__line" aria-hidden="true" data-hero-line><line x1="0" y1="0" x2="0" y2="0"/><circle r="3.5" cx="0" cy="0"/></svg>
@@ -356,7 +356,7 @@ function about(a) {
   <div class="container about__grid">
     <figure class="about__figure" data-reveal-media>
       <div class="about__mascot" data-parallax-img>${mascotSVG({ id: 'about-m', expression: 'happy', shadow: true })}</div>
-      <figcaption class="mono">Fig. 01 — Ulaan, our mascot</figcaption>
+      <figcaption class="mono">Fig. 01 — Ulaan, the idea bomb</figcaption>
     </figure>
     <div class="about__copy">
       <h3 class="display" data-split>${rich(a.title)}</h3>
@@ -428,7 +428,7 @@ function ogImageUrl(content, site, ogMedia) {
 export function renderHome({ content, projects, influencers, site, nonce, ogMedia, preview }) {
   const c = content;
   const hasInfluencers = influencers.length > 0;
-  const jsonLd = { '@context': 'https://schema.org', '@type': 'Organization', name: 'Ulaan Creative', url: site + '/', logo: `${site}/assets/img/apple-touch-icon.png` };
+  const jsonLd = { '@context': 'https://schema.org', '@type': 'Organization', name: 'Ulaan Creative', url: site + '/', logo: `${site}/assets/img/ulaan-logo-light.png` };
   const sameAs = ['instagram', 'facebook', 'tiktok', 'youtube'].map((k) => c.contact_details[k]).filter((u) => /^https:\/\//.test(u || ''));
   if (sameAs.length) jsonLd.sameAs = sameAs;
   if (c.contact_details.email) jsonLd.email = c.contact_details.email;
@@ -436,7 +436,7 @@ export function renderHome({ content, projects, influencers, site, nonce, ogMedi
 <body>
 <a class="skip-link" href="#main">Үндсэн агуулга руу шилжих</a>
 ${previewBar(preview)}
-<div class="loader" aria-hidden="true"><div class="loader__inner"><span class="loader__brand">ULAAN CREATIVE</span><span class="loader__count"><span data-loader-count>000</span>%</span></div><div class="loader__bar"><span></span></div></div>
+<div class="loader" aria-hidden="true"><div class="loader__inner"><img class="loader__logo" src="/assets/img/ulaan-logo-on-red.webp" width="640" height="252" alt=""><span class="loader__count"><span data-loader-count>000</span>%</span></div><div class="loader__bar"><span></span></div></div>
 <div class="cursor" aria-hidden="true"><span class="cursor__label"></span></div>
 ${nav({ hasInfluencers })}
 <main id="main">

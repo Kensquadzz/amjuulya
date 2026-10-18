@@ -259,6 +259,7 @@ ul, ol { padding: 0; list-style: none; }
   padding: calc(var(--nav-h) + clamp(16px, 4vh, 48px)) var(--pad) 96px; max-width: 1680px; margin-inline: auto;
 }
 .hero__title {
+  display: flex; flex-direction: column; align-items: flex-start; /* flex: line margins don't collapse */
   font-family: var(--f-display); font-weight: 400; text-transform: uppercase;
   font-size: var(--hero-fs); line-height: .86; letter-spacing: .005em;
   color: #FFF4F2; text-shadow: 0 0 28px rgba(255, 210, 210, .45), 0 0 2px rgba(255,255,255,.6);

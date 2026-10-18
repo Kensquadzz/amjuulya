@@ -3,8 +3,8 @@
 // bytes of the stored object and checks the real format ("magic numbers").
 
 export const LIMITS = {
-  image: (Number(process.env.MAX_IMAGE_MB) || 15) * 1024 * 1024,
-  video: (Number(process.env.MAX_VIDEO_MB) || 500) * 1024 * 1024,
+  image: (Number(process.env.MAX_IMAGE_MB) || 50) * 1024 * 1024,
+  video: (Number(process.env.MAX_VIDEO_MB) || 2048) * 1024 * 1024,
   thumb: 2 * 1024 * 1024,
 };
 

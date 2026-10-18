@@ -211,26 +211,61 @@ route('/portfolio/:id', projectEditor);
 
 /* ----------------------------- influencers ----------------------------- */
 
+/** Category manager: add, rename, reorder, delete (deleting never removes influencer profiles). */
+function categoryManager(cats, reload) {
+  const addInput = h('input', { type: 'text', maxlength: 60, placeholder: 'Шинэ ангиллын нэр', 'aria-label': 'Шинэ ангиллын нэр' });
+  const add = async () => {
+    const name = addInput.value.trim(); if (!name) return;
+    try { await api('/influencer-categories', { method: 'POST', body: { name } }); toast('Ангилал нэмэгдлээ'); reload(); } catch (e) { toast(e.message, 'error'); }
+  };
+  const row = (c, mv) => {
+    const input = h('input', { type: 'text', value: c.name, maxlength: 60, 'aria-label': 'Ангиллын нэр' });
+    const save = async () => {
+      const name = input.value.trim();
+      if (!name || name === c.name) { input.value = c.name; return; }
+      try { await api(`/influencer-categories/${c.id}`, { method: 'PUT', body: { name } }); c.name = name; toast('Нэр солигдлоо'); } catch (e) { input.value = c.name; toast(e.message, 'error'); }
+    };
+    input.onchange = save;
+    input.onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); save(); } };
+    return h('li.row-item', orderButtons(mv),
+      h('div.row-item__main', input, h('span.muted', `${c.influencers} influencer`)),
+      h('div.row-item__actions', h('button.btn.btn--danger.btn--sm', { type: 'button', onclick: async () => {
+        if (!(await confirmDialog(`"${c.name}" ангиллыг устгах уу? Influencer-ууд устахгүй — зөвхөн энэ ангиллаас хасагдана.`, { okLabel: 'Ангилал устгах', danger: true }))) return;
+        try { await api(`/influencer-categories/${c.id}`, { method: 'DELETE' }); toast('Ангилал устгагдлаа'); reload(); } catch (e) { toast(e.message, 'error'); }
+      } }, 'Устгах')));
+  };
+  return h('div.card',
+    h('div.card__head', h('h2', 'Ангиллууд'), h('span.muted', 'Сайтын influencer хэсгийн мөрүүд энэ дарааллаар гарна')),
+    cats.length ? h('div.cat-list', sortableList({ items: cats, render: row, endpoint: '/influencer-categories/reorder', onChanged: reload })) : h('p.muted', 'Ангилал алга.'),
+    h('div.row.cat-add', addInput, h('button.btn.btn--ghost', { type: 'button', onclick: add }, '+ Ангилал нэмэх')));
+}
+
 route('/influencers', async () => {
-  const { items } = await api('/influencers');
+  const [{ items }, { items: cats }] = await Promise.all([api('/influencers'), api('/influencer-categories')]);
   const reload = () => render();
   const row = (p, mv) => h('li.row-item',
     orderButtons(mv), mediaThumb(p.photo, { size: 'sm' }),
-    h('div.row-item__main', link(`/influencers/${p.id}`, { class: 'row-item__title' }, p.name), h('span.muted', [p.category, p.followers != null ? `${p.followers.toLocaleString()} дагагч` : ''].filter(Boolean).join(' · '))),
+    h('div.row-item__main', link(`/influencers/${p.id}`, { class: 'row-item__title' }, p.name), h('span.muted', [p.featured ? '★ Онцлох' : '', p.categories.map((c) => c.name).join(', ') || p.category, p.followers != null ? `${p.followers.toLocaleString()} дагагч` : ''].filter(Boolean).join(' · '))),
     statusBadge(p.status),
     h('div.row-item__actions',
       h('button.btn.btn--ghost.btn--sm', { type: 'button', onclick: async () => { const s = p.status === 'published' ? 'draft' : 'published'; try { await api(`/influencers/${p.id}/status`, { method: 'POST', body: { status: s } }); toast(s === 'published' ? 'Нийтлэгдлээ' : 'Нийтлэлээс буцаагдлаа'); reload(); } catch (e) { toast(e.message, 'error'); } } }, p.status === 'published' ? 'Нуух' : 'Нийтлэх'),
       link(`/influencers/${p.id}`, { class: 'btn btn--sm' }, 'Засах')));
   return h('section.page',
     h('header.page__head', h('h1', 'Influencer-ууд'), link('/influencers/new', { class: 'btn' }, '+ Influencer нэмэх')),
-    h('p.muted', 'Зөвхөн баталгаажсан мэдээллийг оруулна уу. Хоосон талбарууд сайт дээр харагдахгүй. Сайтын цэсний «Influencers»-ийг дарахад нийтлэгдсэн influencer-ууд карт хэлбэрээр гарна. Үнэ зөвхөн энд харагдана, сайт болон public API-д хэзээ ч гарахгүй.'),
-    items.length ? sortableList({ items, render: row, endpoint: '/influencers/reorder', onChanged: reload }) : h('div.empty', h('p', 'Одоогоор influencer бүртгэгдээгүй.'), link('/influencers/new', { class: 'btn' }, 'Эхнийхийг нэмэх')));
+    h('p.muted', 'Зөвхөн баталгаажсан мэдээллийг оруулна уу. Хоосон талбарууд сайт дээр харагдахгүй. Сайтын цэсний «Influencers»-ийг дарахад нийтлэгдсэн influencer-ууд ангиллын мөрүүдээр гарна. Дараалал = «Санал болгосон» эрэмбэ. Үнэ зөвхөн энд харагдана, сайт болон public API-д хэзээ ч гарахгүй.'),
+    items.length ? sortableList({ items, render: row, endpoint: '/influencers/reorder', onChanged: reload }) : h('div.empty', h('p', 'Одоогоор influencer бүртгэгдээгүй.'), link('/influencers/new', { class: 'btn' }, 'Эхнийхийг нэмэх')),
+    categoryManager(cats, reload));
 });
 
 async function influencerEditor({ id }) {
   const isNew = id === 'new';
-  const p = isNew ? { name: '', photo: null, instagram: '', tiktok: '', youtube: '', facebook: '', followers: null, category: '', bio: '', engagement: '', price: '', status: 'draft' } : (await api(`/influencers/${id}`)).item;
-  const v = { ...p, followers: p.followers ?? '' };
+  const { items: allCats } = await api('/influencer-categories');
+  const p = isNew ? { name: '', photo: null, instagram: '', tiktok: '', youtube: '', facebook: '', followers: null, category: '', bio: '', engagement: '', engagementVerified: false, featured: false, categoryIds: [], price: '', status: 'draft' } : (await api(`/influencers/${id}`)).item;
+  const v = { ...p, followers: p.followers ?? '', categoryIds: [...(p.categoryIds || [])] };
+  const toggle = (name, label, help) => { const el = h('input', { type: 'checkbox', id: `i-${name}`, checked: Boolean(v[name]) }); el.onchange = () => { v[name] = el.checked; setDirty(true); }; return h('div.field.field--toggle', h('label.switch', { for: `i-${name}` }, el, h('span', label)), help ? h('p.help', help) : null); };
+  const catBoxes = h('fieldset.field.field--wide', h('legend', 'Ангиллууд (олныг сонгож болно)'),
+    allCats.length ? h('div.row', allCats.map((c) => { const el = h('input', { type: 'checkbox', checked: v.categoryIds.includes(c.id) }); el.onchange = () => { v.categoryIds = el.checked ? [...v.categoryIds, c.id] : v.categoryIds.filter((x) => x !== c.id); setDirty(true); }; return h('label.check-inline', el, ' ', c.name); })) : h('p.muted', 'Ангилал алга — Influencer-ууд хуудаснаас нэмнэ үү.'),
+    h('p.help', 'Ангилалгүй influencer сайт дээр «Other» мөрөнд гарна.'));
   const input = (name, label, { textarea, wide, ...attrs } = {}) => {
     const el = h(textarea ? 'textarea' : 'input', { id: `i-${name}`, value: v[name] ?? '', ...attrs });
     el.oninput = () => { v[name] = el.value; setDirty(true); };
@@ -242,7 +277,7 @@ async function influencerEditor({ id }) {
   const save = async (status) => {
     errorBox.textContent = '';
     if (!v.name.trim()) { errorBox.textContent = 'Нэр оруулна уу.'; return; }
-    const body = { name: v.name, photoId: v.photo?.id || null, instagram: v.instagram, tiktok: v.tiktok, youtube: v.youtube, facebook: v.facebook, price: v.price, followers: v.followers, category: v.category, bio: v.bio, engagement: v.engagement, status: status || v.status };
+    const body = { name: v.name, photoId: v.photo?.id || null, instagram: v.instagram, tiktok: v.tiktok, youtube: v.youtube, facebook: v.facebook, price: v.price, featured: v.featured, engagementVerified: v.engagementVerified, categoryIds: v.categoryIds, followers: v.followers, category: v.category, bio: v.bio, engagement: v.engagement, status: status || v.status };
     try {
       const r = await api(isNew ? '/influencers' : `/influencers/${id}`, { method: isNew ? 'POST' : 'PUT', body });
       setDirty(false); toast('Хадгалагдлаа');
@@ -258,7 +293,8 @@ async function influencerEditor({ id }) {
     h('form.editor', { onsubmit: (e) => { e.preventDefault(); save(); } },
       h('div.card', h('div.form-grid',
         input('name', 'Нэр *', { maxlength: 120, required: true }),
-        input('category', 'Ангилал / чиглэл', { maxlength: 100, placeholder: 'Lifestyle, Beauty…' }),
+        catBoxes,
+        toggle('featured', 'Онцлох бүтээгч (сайтын дээд хэсэгт том харагдана)', 'Олон онцлох байвал жагсаалтын эхнийх нь харагдана.'),
         mediaField({ label: 'Профайл зураг', kind: 'image', value: v.photo, onChange: (m) => { v.photo = m; setDirty(true); } }),
         input('followers', 'Дагагчдын тоо (заавал биш)', { inputmode: 'numeric', maxlength: 14, placeholder: 'Жишээ: 125000' }),
         input('instagram', 'Instagram URL', { type: 'url', maxlength: 500 }),
@@ -266,7 +302,8 @@ async function influencerEditor({ id }) {
         input('youtube', 'YouTube URL', { type: 'url', maxlength: 500 }),
         input('facebook', 'Facebook URL', { type: 'url', maxlength: 500 }),
         input('price', 'Үнэ — зөвхөн admin-д (сайт дээр хэзээ ч харагдахгүй)', { maxlength: 200, placeholder: 'Жишээ: 1 пост ₮…, 1 reels ₮…' }),
-        input('engagement', 'Engagement (заавал биш)', { maxlength: 100, placeholder: 'Жишээ: 4.2% (баталгаажсан бол)' }),
+        input('engagement', 'Engagement (заавал биш)', { maxlength: 100, placeholder: 'Жишээ: 4.2%' }),
+        toggle('engagementVerified', 'Engagement баталгаажсан — сайт дээр харуулах', 'Тэмдэглээгүй бол engagement сайт дээр харагдахгүй.'),
         input('bio', 'Товч танилцуулга', { textarea: true, rows: 4, maxlength: 600, wide: true }),
         h('div.field', h('label', { for: 'i-status' }, 'Төлөв'), statusSel))),
       errorBox,
@@ -417,6 +454,10 @@ route('/submissions', async () => {
       h('dl.meta',
         h('dt', 'Холбоо барих'), h('dd', h('a', { href: isEmail ? `mailto:${s.contact}` : `tel:${s.contact.replace(/[^\d+]/g, '')}` }, s.contact)),
         h('dt', 'Үйлчилгээ'), h('dd', s.service), h('dt', 'Төсөв'), h('dd', s.budget || '—'),
+        s.kind === 'influencer' ? [h('dt', 'Төрөл'), h('dd', 'Influencer кампанит ажил')] : null,
+        s.influencers && s.influencers.length ? [h('dt', 'Сонгосон influencer'), h('dd', s.influencers.map((i) => i.name).join(', '))] : null,
+        s.campaign_dates ? [h('dt', 'Кампанит ажлын огноо'), h('dd', s.campaign_dates)] : null,
+        s.notes ? [h('dt', 'Нэмэлт тэмдэглэл'), h('dd', s.notes)] : null,
         h('dt', 'Зөвшөөрөл'), h('dd', s.consent ? 'Тийм' : 'Үгүй'), h('dt', 'Имэйл мэдэгдэл'), h('dd', s.email_sent ? 'Илгээгдсэн' : 'Илгээгдээгүй')),
       h('p.sub__msg', s.message),
       h('div.row',

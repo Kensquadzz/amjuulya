@@ -146,8 +146,6 @@
       el.addEventListener('pointerleave', () => cursor.classList.remove('is-active'));
     };
     $$('[data-cursor]').forEach((el) => bind(el, el.dataset.cursor));
-    const infStage = $('[data-inf-stage]');
-    if (infStage) bind(infStage, 'Drag', true);
   }
 
   /* ---------------- Text splitting ---------------- */
@@ -208,48 +206,18 @@
     $$('.vis-vid').forEach((el) => vio.observe(el));
   }
 
-  /* ---------------- Influencers panel (fanned cards, swipe sideways) ---------------- */
+  /* ---------------- Influencers: rows, search/filter, multi-select → campaign inquiry ---------------- */
   const inf = $('[data-inf]');
-  let infIndex = 0, infLastFocus = null;
-  function infLayout() {
-    if (!inf) return;
-    const stage = $('[data-inf-stage]', inf);
-    stage.style.setProperty('--stage-h', `${stage.clientHeight}px`);
-    const cards = $$('[data-inf-card]', inf);
-    const w = cards[0] ? cards[0].offsetWidth : 200;
-    const step = w * (window.innerWidth < 760 ? 0.72 : 0.86);
-    cards.forEach((c, i) => {
-      const d = i - infIndex + infDrag / step, a = Math.abs(d);
-      c.style.transform = `translateX(${d * step}px) translateY(${a * a * w * 0.06}px) rotate(${d * 7}deg) scale(${1 - Math.min(a, 3) * 0.07})`;
-      c.style.zIndex = String(100 - Math.round(a * 10));
-      c.style.opacity = a > 3.2 ? '0' : '1';
-      c.style.filter = a > 0.5 ? `brightness(${Math.max(0.45, 1 - a * 0.22)})` : '';
-      c.classList.toggle('is-active', i === infIndex);
-      const btn = c.querySelector('button');
-      if (btn && !c.classList.contains('inf-card--empty')) btn.tabIndex = i === infIndex ? 0 : -1;
-    });
-  }
-  function infGo(i) {
-    const n = $$('[data-inf-card]', inf).length;
-    infIndex = Math.max(0, Math.min(n - 1, i));
-    $$('[data-inf-info]', inf).forEach((el) => { el.hidden = el.dataset.infInfo !== String(infIndex); });
-    $$('[data-inf-bg]', inf).forEach((el) => el.classList.toggle('is-on', el.dataset.infBg === String(infIndex)));
-    const count = $('[data-inf-count]', inf); if (count) count.textContent = `${infIndex + 1} / ${n}`;
-    const prev = $('[data-inf-prev]', inf), next = $('[data-inf-next]', inf);
-    if (prev) prev.disabled = infIndex === 0;
-    if (next) next.disabled = infIndex === n - 1;
-    infLayout();
-  }
-  let infDrag = 0;
+  let infLastFocus = null;
   function openInf() {
     if (!inf) return;
     infLastFocus = document.activeElement;
     inf.classList.add('is-open');
     document.documentElement.classList.add('inf-open');
     if (lenis) lenis.stop();
-    infGo(infIndex);
     if (history.replaceState) history.replaceState(null, '', '#influencers');
-    setTimeout(() => { const c = $('.inf__close', inf); if (c) c.focus(); }, 30);
+    $$('[data-inf-track]', inf).forEach(updateRowNav);
+    setTimeout(() => { const c = $('.inf__close', inf); if (c) c.focus({ preventScroll: true }); }, 30);
   }
   function closeInf(toHash) {
     if (!inf || !inf.classList.contains('is-open')) return;
@@ -259,61 +227,237 @@
     if (history.replaceState) history.replaceState(null, '', toHash || location.pathname);
     if (infLastFocus && infLastFocus.focus) infLastFocus.focus({ preventScroll: true });
   }
+  function updateRowNav(track) {
+    const row = track.closest('.inf-row');
+    const prev = $('[data-inf-row-prev]', row), next = $('[data-inf-row-next]', row);
+    const max = track.scrollWidth - track.clientWidth;
+    if (prev) prev.disabled = track.scrollLeft <= 4;
+    if (next) next.disabled = track.scrollLeft >= max - 4;
+  }
+
   if (inf) {
-    infIndex = Number(inf.dataset.start) || 0;
-    $$('[data-inf-close]', inf).forEach((a) => a.addEventListener('click', (e) => {
-      const href = a.getAttribute('href');
-      e.preventDefault(); e.stopPropagation();
-      closeInf();
-      if (href && href !== '#top') { const t = document.getElementById(href.slice(1)); if (t) scrollToTarget(t); }
-    }));
-    const prev = $('[data-inf-prev]', inf), next = $('[data-inf-next]', inf);
-    if (prev) prev.addEventListener('click', () => infGo(infIndex - 1));
-    if (next) next.addEventListener('click', () => infGo(infIndex + 1));
-    $$('[data-inf-card]', inf).forEach((c, i) => c.addEventListener('click', () => { if (!infMoved) infGo(i); }));
+    const dataEl = $('[data-inf-data]', inf);
+    const people = dataEl ? JSON.parse(dataEl.textContent) : {};
+    const nameOf = (id) => (people[id] ? people[id].name : '');
+
+    /* --- selection (kept while browsing; survives reloads in this tab) --- */
+    const KEY = 'uc-inf-picked';
+    let saved = [];
+    try { saved = JSON.parse(sessionStorage.getItem(KEY) || '[]'); } catch (e) { saved = []; }
+    const picked = new Set((Array.isArray(saved) ? saved : []).filter((id) => people[id]));
+    const bar = $('[data-inf-bar]', inf);
+    const chip = (id) => { const li = document.createElement('li'); li.textContent = nameOf(id); const x = document.createElement('button'); x.type = 'button'; x.dataset.infUnpick = id; x.setAttribute('aria-label', `${nameOf(id)} — хасах`); x.textContent = '✕'; li.appendChild(x); return li; };
+    function syncPicked() {
+      try { sessionStorage.setItem(KEY, JSON.stringify([...picked])); } catch (e) { /* private mode */ }
+      $$('[data-inf-pick]', inf).forEach((b) => b.setAttribute('aria-pressed', String(picked.has(b.dataset.infPick))));
+      $$('[data-inf-item]', inf).forEach((c) => c.classList.toggle('is-picked', picked.has(c.dataset.infItem)));
+      if (bar) {
+        bar.hidden = picked.size === 0;
+        $('[data-inf-count]', bar).textContent = String(picked.size);
+        $('[data-inf-picked-list]', bar).replaceChildren(...[...picked].map(chip));
+        if (!picked.size) { $('[data-inf-picked-list]', bar).hidden = true; $('[data-inf-review]', bar).setAttribute('aria-expanded', 'false'); }
+      }
+      const formList = $('[data-inf-form-picked]', inf);
+      if (formList) formList.replaceChildren(...[...picked].map(chip));
+    }
+
+    /* --- sheets (details, inquiry) --- */
+    let sheetReturn = null;
+    const openSheet = (name, from) => {
+      const sheet = $(`[data-inf-sheet="${name}"]`, inf);
+      sheetReturn = from || document.activeElement;
+      sheet.hidden = false;
+      setTimeout(() => $('[data-inf-sheet-close]', sheet).focus(), 30);
+    };
+    const openSheetEl = () => $$('[data-inf-sheet]', inf).find((x) => !x.hidden);
+    const closeSheet = () => {
+      const open = openSheetEl();
+      if (!open) return false;
+      open.hidden = true;
+      if (sheetReturn && sheetReturn.isConnected) sheetReturn.focus({ preventScroll: true });
+      return true;
+    };
+    function openDetail(id, from) {
+      const tpl = $(`template[data-inf-detail="${CSS.escape(id)}"]`, inf);
+      if (!tpl) return;
+      $('[data-inf-detail-slot]', inf).replaceChildren(tpl.content.cloneNode(true));
+      syncPicked();
+      openSheet('detail', from);
+    }
+
+    /* --- search + filter --- */
+    const form = $('[data-inf-filter-form]', inf);
+    const panel = $('[data-inf-filter]', inf);
+    const toggleBtn = $('[data-inf-filter-toggle]', inf);
+    const search = $('[data-inf-search]', inf);
+    const RANGES = { all: [0, Infinity], '1k-10k': [1e3, 1e4], '10k-50k': [1e4, 5e4], '50k-100k': [5e4, 1e5], '100k-500k': [1e5, 5e5], '500k+': [5e5, Infinity] };
+    const state = { q: '', cats: new Set(), followers: 'all', sort: 'recommended' };
+    const readForm = () => {
+      if (!form) return;
+      state.cats = new Set($$('input[name="cat"]:checked', form).map((i) => i.value).filter((v) => v !== 'all'));
+      state.followers = (form.querySelector('input[name="followers"]:checked') || {}).value || 'all';
+      state.sort = form.elements.sort.value;
+    };
+    const filterActive = () => state.cats.size > 0 || state.followers !== 'all' || state.sort !== 'recommended';
+    function applyFilters() {
+      const q = state.q.trim().toLowerCase();
+      const [min, max] = RANGES[state.followers] || RANGES.all;
+      const matches = (id) => {
+        const d = people[id]; if (!d) return false;
+        if (q && !d.n.includes(q)) return false;
+        if (state.cats.size && !d.c.some((c) => state.cats.has(c))) return false;
+        if (state.followers !== 'all' && (d.f == null || d.f < min || d.f >= max)) return false;
+        return true;
+      };
+      const cmp = (a, b) => {
+        const da = people[a.dataset.infItem], db = people[b.dataset.infItem];
+        if (state.sort === 'recommended') return da.o - db.o;
+        const fa = da.f == null ? -1 : da.f, fb = db.f == null ? -1 : db.f;
+        if (fa === fb) return da.o - db.o;
+        if (da.f == null) return 1; if (db.f == null) return -1; // unknown follower counts last
+        return state.sort === 'followers-asc' ? fa - fb : fb - fa;
+      };
+      let shown = 0;
+      $$('[data-inf-row]', inf).forEach((row) => {
+        const track = $('[data-inf-track]', row);
+        const cards = $$('.inf-card', track);
+        const rowAllowed = !state.cats.size || state.cats.has(row.dataset.infRow);
+        let visible = 0;
+        cards.sort(cmp).forEach((c) => { track.appendChild(c); const ok = rowAllowed && matches(c.dataset.infItem); c.hidden = !ok; if (ok) visible++; });
+        row.hidden = visible === 0;
+        $('[data-inf-row-count]', row).textContent = String(visible);
+        track.scrollLeft = 0;
+        updateRowNav(track);
+        shown += visible;
+      });
+      const feat = $('[data-inf-featured]', inf);
+      if (feat) feat.hidden = Boolean(q) || filterActive();
+      const none = $('[data-inf-none]', inf); if (none) none.hidden = shown > 0;
+      const badge = $('[data-inf-filter-count]', inf);
+      if (badge) { const n = (state.cats.size ? 1 : 0) + (state.followers !== 'all' ? 1 : 0) + (state.sort !== 'recommended' ? 1 : 0); badge.hidden = !n; badge.textContent = String(n); }
+    }
+    const setFilterOpen = (open) => {
+      if (!panel) return;
+      panel.hidden = !open;
+      toggleBtn.setAttribute('aria-expanded', String(open));
+      if (open) { const first = panel.querySelector('input, select'); if (first) setTimeout(() => first.focus(), 30); }
+    };
+    if (toggleBtn) toggleBtn.addEventListener('click', (e) => { e.stopPropagation(); setFilterOpen(panel.hidden); });
+    if (form) {
+      // "All" and specific categories are mutually exclusive
+      form.addEventListener('change', (e) => {
+        if (e.target.name !== 'cat') return;
+        const all = $('[data-cat-all]', form);
+        if (e.target === all && all.checked) $$('input[name="cat"]', form).forEach((i) => { if (i !== all) i.checked = false; });
+        else if (e.target !== all && e.target.checked) all.checked = false;
+        if (!$$('input[name="cat"]:checked', form).length) all.checked = true;
+      });
+      form.addEventListener('submit', (e) => { e.preventDefault(); readForm(); applyFilters(); setFilterOpen(false); toggleBtn.focus(); });
+    }
+    const resetAll = () => {
+      if (form) { form.reset(); readForm(); }
+      if (search) search.value = '';
+      state.q = '';
+      applyFilters();
+    };
+    let qTimer = null;
+    if (search) search.addEventListener('input', () => { clearTimeout(qTimer); qTimer = setTimeout(() => { state.q = search.value; applyFilters(); }, 120); });
+    document.addEventListener('click', (e) => { if (panel && !panel.hidden && !panel.contains(e.target) && e.target !== toggleBtn) setFilterOpen(false); });
+
+    /* --- rows: arrows + state --- */
+    $$('[data-inf-track]', inf).forEach((track) => {
+      const row = track.closest('.inf-row');
+      const by = (d) => track.scrollBy({ left: d * track.clientWidth * 0.85, behavior: reduceMotion ? 'auto' : 'smooth' });
+      $('[data-inf-row-prev]', row).addEventListener('click', () => by(-1));
+      $('[data-inf-row-next]', row).addEventListener('click', () => by(1));
+      track.addEventListener('scroll', () => updateRowNav(track), { passive: true });
+    });
+    window.addEventListener('resize', () => $$('[data-inf-track]', inf).forEach(updateRowNav));
+
+    /* --- one click handler for the panel --- */
+    inf.addEventListener('click', (e) => {
+      const t = e.target;
+      const pick = t.closest('[data-inf-pick]');
+      if (pick) { const id = pick.dataset.infPick; if (picked.has(id)) picked.delete(id); else picked.add(id); syncPicked(); return; }
+      const un = t.closest('[data-inf-unpick]');
+      if (un) { picked.delete(un.dataset.infUnpick); syncPicked(); return; }
+      const open = t.closest('[data-inf-open]');
+      if (open) { openDetail(open.dataset.infOpen, open); return; }
+      if (t.closest('[data-inf-reset]')) { resetAll(); return; }
+      if (t.closest('[data-inf-filter-close]')) { setFilterOpen(false); toggleBtn.focus(); return; }
+      if (t.closest('[data-inf-sheet-close]') || t.matches('[data-inf-sheet]')) { closeSheet(); return; }
+      const review = t.closest('[data-inf-review]');
+      if (review) { const list = $('[data-inf-picked-list]', inf); list.hidden = !list.hidden; review.setAttribute('aria-expanded', String(!list.hidden)); return; }
+      if (t.closest('[data-inf-inquire]')) { syncPicked(); openSheet('inquiry', t.closest('[data-inf-inquire]')); return; }
+      const close = t.closest('[data-inf-close]');
+      if (close) {
+        const href = close.getAttribute('href');
+        e.preventDefault(); e.stopPropagation();
+        closeInf();
+        if (href && href !== '#top') { const target = document.getElementById(href.slice(1)); if (target) scrollToTarget(target); }
+      }
+    });
     document.addEventListener('keydown', (e) => {
       if (!inf.classList.contains('is-open')) return;
-      if (e.key === 'Escape') closeInf();
-      else if (e.key === 'ArrowLeft') infGo(infIndex - 1);
-      else if (e.key === 'ArrowRight') infGo(infIndex + 1);
-      else if (e.key === 'Tab') { // keep focus inside the panel
-        const f = $$('a[href], button:not([disabled])', inf).filter((el) => el.tabIndex >= 0 && el.offsetParent !== null);
+      if (e.key === 'Escape') {
+        if (closeSheet()) return;
+        if (panel && !panel.hidden) { setFilterOpen(false); toggleBtn.focus(); return; }
+        closeInf();
+      } else if (e.key === 'Tab') { // keep focus inside the panel (or the open sheet)
+        const scope = openSheetEl() || (panel && !panel.hidden && window.innerWidth <= 760 ? panel : inf);
+        const f = $$('a[href], button:not([disabled]), input:not([type="hidden"]), select, textarea', scope).filter((el) => el.offsetParent !== null && el.tabIndex >= 0);
         if (!f.length) return;
         if (e.shiftKey && document.activeElement === f[0]) { e.preventDefault(); f[f.length - 1].focus(); }
         else if (!e.shiftKey && document.activeElement === f[f.length - 1]) { e.preventDefault(); f[0].focus(); }
       }
     });
-    // drag / swipe sideways
-    const stage = $('[data-inf-stage]', inf);
-    let infDown = false, infX = 0, infMoved = false;
-    stage.addEventListener('dragstart', (e) => e.preventDefault());
-    stage.addEventListener('pointerdown', (e) => { if (e.button !== 0) return; infDown = true; infMoved = false; infX = e.clientX; });
-    window.addEventListener('pointermove', (e) => {
-      if (!infDown) return;
-      infDrag = e.clientX - infX;
-      if (Math.abs(infDrag) > 6 && !infMoved) { infMoved = true; stage.classList.add('is-dragging'); }
-      if (infMoved) infLayout();
-    });
-    const end = () => {
-      if (!infDown) return;
-      infDown = false; stage.classList.remove('is-dragging');
-      const cards = $$('[data-inf-card]', inf);
-      const step = (cards[0] ? cards[0].offsetWidth : 200) * (window.innerWidth < 760 ? 0.72 : 0.86);
-      const shift = Math.round(-infDrag / step) || (Math.abs(infDrag) > 40 ? -Math.sign(infDrag) : 0);
-      infDrag = 0;
-      infGo(infIndex + shift);
-      setTimeout(() => { infMoved = false; }, 0);
-    };
-    window.addEventListener('pointerup', end);
-    window.addEventListener('pointercancel', end);
-    // trackpad / horizontal wheel
-    let wheelLock = 0;
-    stage.addEventListener('wheel', (e) => {
-      const dx = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : 0;
-      if (!dx || Date.now() < wheelLock || Math.abs(dx) < 12) return;
-      e.preventDefault(); wheelLock = Date.now() + 380; infGo(infIndex + Math.sign(dx));
-    }, { passive: false });
-    window.addEventListener('resize', infLayout);
+
+    /* --- campaign inquiry (stored server-side; success shown only on a real OK) --- */
+    const qForm = $('[data-inf-form]', inf);
+    if (qForm) {
+      const qStatus = $('[data-inf-form-status]', inf);
+      const qSubmit = $('.inf-q__submit', qForm);
+      const shownAt = { t: Date.now() };
+      const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+      const phoneRe = /^\+?[\d\s\-()]{8,20}$/;
+      const rules = {
+        name: (v) => (v.trim().length < 2 ? 'Нэрээ оруулна уу.' : ''),
+        contact: (v) => { const t = v.trim(); if (!t) return 'Утас эсвэл имэйлээ оруулна уу.'; return emailRe.test(t) || (phoneRe.test(t) && t.replace(/\D/g, '').length >= 8) ? '' : 'Зөв утас эсвэл имэйл оруулна уу.'; },
+        message: (v) => (v.trim().length < 10 ? 'Кампанит ажлын зорилгоо товч бичнэ үү (дор хаяж 10 тэмдэгт).' : ''),
+        consent: (v, el) => (el.checked ? '' : 'Мэдээлэл хадгалахыг зөвшөөрнө үү.'),
+        campaignEnd: (v) => { const s0 = qForm.elements.campaignStart.value; return s0 && v && v < s0 ? 'Дуусах огноо эхлэх огнооноос өмнө байж болохгүй.' : ''; },
+      };
+      const errId = (n) => (n === 'campaignEnd' ? 'q-campaignDates-err' : `q-${n}-err`);
+      const check = (n) => { const el = qForm.elements[n]; const msg = rules[n](el.value, el); el.setAttribute('aria-invalid', msg ? 'true' : 'false'); const err = document.getElementById(errId(n)); if (err) err.textContent = msg; return !msg; };
+      const say = (msg, type) => { qStatus.textContent = msg; qStatus.classList.toggle('is-success', type === 'success'); qStatus.classList.toggle('is-error', type === 'error'); };
+      $$('[data-inf-inquire]', inf).forEach((b) => b.addEventListener('click', () => { shownAt.t = Date.now(); }));
+      qForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const ok = Object.keys(rules).map(check);
+        const pickErr = document.getElementById('q-influencers-err');
+        pickErr.textContent = picked.size ? '' : 'Дор хаяж нэг бүтээгч сонгоно уу.';
+        if (ok.includes(false) || !picked.size) { say('Шаардлагатай талбаруудыг бөглөнө үү.', 'error'); const bad = Object.keys(rules).find((n) => qForm.elements[n].getAttribute('aria-invalid') === 'true'); if (bad) qForm.elements[bad].focus(); return; }
+        const fd = Object.fromEntries(new FormData(qForm).entries());
+        const body = { ...fd, service: 'influencer', kind: 'influencer', influencers: [...picked], ts: shownAt.t };
+        qSubmit.disabled = true; say('Илгээж байна…', '');
+        try {
+          const res = await fetch(qForm.getAttribute('action'), { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify(body) });
+          let r = {}; try { r = await res.json(); } catch (_) { /* not JSON */ }
+          if (res.ok && r.ok) {
+            say('Баярлалаа! Таны кампанит ажлын хүсэлтийг хүлээн авлаа. Бид удахгүй эргэн холбогдоно.', 'success');
+            qForm.reset(); picked.clear(); syncPicked();
+          } else if (r.error === 'not_configured') say('Хүсэлт хүлээн авах сервер одоогоор тохируулагдаагүй байна. Таны хүсэлт илгээгдсэнгүй.', 'error');
+          else if (res.status === 429 || r.error === 'too_fast' || r.error === 'rate_limited') say('Түр хүлээгээд дахин оролдоно уу.', 'error');
+          else if (r.error === 'invalid') { if (r.fields && r.fields.influencers) pickErr.textContent = 'Сонгосон бүтээгч олдсонгүй — жагсаалтаа шалгана уу.'; Object.keys(r.fields || {}).forEach((n) => { if (rules[n]) check(n); }); say('Мэдээллээ шалгаад дахин илгээнэ үү.', 'error'); }
+          else say('Илгээх үед алдаа гарлаа. Таны хүсэлт илгээгдсэнгүй — дахин оролдоно уу.', 'error');
+        } catch (err) {
+          say('Сүлжээний алдаа гарлаа. Таны хүсэлт илгээгдсэнгүй — дахин оролдоно уу.', 'error');
+        } finally { qSubmit.disabled = false; }
+      });
+    }
+
+    syncPicked();
+    if (form) readForm();
     if (location.hash === '#influencers') openInf();
   }
 

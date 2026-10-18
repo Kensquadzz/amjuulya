@@ -4,7 +4,7 @@
 import { query, dbConfigured } from './db.js';
 import { hit } from './ratelimit.js';
 import { json, readJson, clientIp, hashIp, esc } from './http.js';
-import { getPublishedContent } from './content.js';
+import { getPublishedContent, isUuid } from './content.js';
 import { serviceOptions } from './render.js';
 import { BUDGET_OPTIONS } from './defaults.js';
 
@@ -15,6 +15,7 @@ const str = (v, max) => (typeof v === 'string' ? v.trim().slice(0, max) : '');
 const memHits = new Map(); // fallback limiter when no database is configured
 
 export function validateContact(body, services) {
+  const fields = {};
   const data = {
     name: str(body.name, 120),
     company: str(body.company, 160),
@@ -23,8 +24,14 @@ export function validateContact(body, services) {
     budget: str(body.budget, 40),
     message: str(body.message, 4000),
     consent: body.consent === true || body.consent === 'yes' || body.consent === 'on',
+    kind: body.kind === 'influencer' ? 'influencer' : 'project',
+    campaignDates: '',
+    notes: str(body.notes, 2000),
   };
-  const fields = {};
+  const date = (v) => (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v) && !Number.isNaN(Date.parse(v)) ? v : '');
+  const from = date(body.campaignStart), to = date(body.campaignEnd);
+  if ((body.campaignStart && !from) || (body.campaignEnd && !to) || (from && to && to < from)) fields.campaignDates = 'invalid';
+  data.campaignDates = from || to ? `${from || '…'} → ${to || '…'}` : '';
   if (data.name.length < 2) fields.name = 'required';
   const digits = data.contact.replace(/\D/g, '');
   if (!(EMAIL_RE.test(data.contact) || (PHONE_RE.test(data.contact) && digits.length >= 8))) fields.contact = 'invalid';
@@ -64,13 +71,26 @@ export async function handleContact(req, res) {
     return json(res, 503, { ok: false, error: 'not_configured' });
   }
 
+  // Selected influencers: only ids of currently published profiles are kept (names are
+  // looked up server-side, so the client can't inject arbitrary names). No prices involved.
+  const pickedIds = [...new Set((Array.isArray(body.influencers) ? body.influencers : []).filter(isUuid))].slice(0, 30);
+  data.influencers = [];
+  if (pickedIds.length && dbConfigured()) {
+    try {
+      const { rows } = await query(`select id, display_name from influencers where status = 'published' and id = any($1::uuid[]) order by sort_order`, [pickedIds]);
+      data.influencers = rows.map((r) => ({ id: r.id, name: r.display_name }));
+    } catch (e) { console.error('[contact] influencer lookup failed:', e.message); }
+  }
+  // a campaign inquiry must name at least one (published) influencer
+  if (data.kind === 'influencer' && dbConfigured() && !data.influencers.length) return json(res, 400, { ok: false, error: 'invalid', fields: { influencers: 'required' } });
+
   let stored = null;
   if (dbConfigured()) {
     try {
       const { rows } = await query(
-        `insert into contact_submissions (name, company, contact, service, budget, message, consent, ip_hash, user_agent)
-         values ($1,$2,$3,$4,$5,$6,$7,$8,$9) returning id`,
-        [data.name, data.company, data.contact, data.service, data.budget, data.message, data.consent, ipHash, String(req.headers['user-agent'] || '').slice(0, 300)],
+        `insert into contact_submissions (name, company, contact, service, budget, message, consent, ip_hash, user_agent, influencers, kind, campaign_dates, notes)
+         values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) returning id`,
+        [data.name, data.company, data.contact, data.service, data.budget, data.message, data.consent, ipHash, String(req.headers['user-agent'] || '').slice(0, 300), JSON.stringify(data.influencers), data.kind, data.campaignDates, data.notes],
       );
       stored = rows[0].id;
     } catch (e) {
@@ -92,13 +112,16 @@ async function sendEmail(data, services) {
   const serviceLabel = (services.find(([v]) => v === data.service) || [, data.service])[1];
   const budget = (BUDGET_OPTIONS.find(([v]) => v === data.budget) || [, '—'])[1];
   const rows = [['Name', data.name], ['Company / brand', data.company || '—'], ['Email / phone', data.contact], ['Service', serviceLabel], ['Budget', budget]];
+  if (data.influencers?.length) rows.push(['Influencers', data.influencers.map((i) => i.name).join(', ')]);
+  if (data.campaignDates) rows.push(['Campaign dates', data.campaignDates]);
+  if (data.notes) rows.push(['Notes', data.notes]);
   const r = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({
       from: process.env.CONTACT_FROM_EMAIL,
       to: process.env.CONTACT_TO_EMAIL.split(',').map((s) => s.trim()).filter(Boolean),
-      subject: `New project request — ${data.name}${data.company ? ` (${data.company})` : ''}`,
+      subject: `New ${data.kind === 'influencer' ? 'influencer campaign' : 'project'} request — ${data.name}${data.company ? ` (${data.company})` : ''}`,
       text: rows.map(([k, v]) => `${k}: ${v}`).join('\n') + `\n\nProject:\n${data.message}`,
       html: `<div style="font-family:Arial,sans-serif;font-size:15px;color:#111"><h2 style="color:#E50920">New project request — Ulaan Creative</h2><table cellpadding="6">${rows.map(([k, v]) => `<tr><td style="color:#666">${esc(k)}</td><td><strong>${esc(v)}</strong></td></tr>`).join('')}</table><p style="white-space:pre-wrap">${esc(data.message)}</p></div>`,
       ...(EMAIL_RE.test(data.contact) ? { reply_to: data.contact } : {}),

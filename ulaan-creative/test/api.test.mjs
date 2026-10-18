@@ -15,7 +15,8 @@ async function login() {
 }
 
 test('every admin endpoint requires a session', async () => {
-  const endpoints = [['GET', '/overview'], ['GET', '/projects'], ['POST', '/projects'], ['GET', '/media'], ['POST', '/media/uploads'], ['GET', '/submissions'], ['PUT', '/content/hero'], ['GET', '/influencers'],
+  const endpoints = [['GET', '/overview'], ['GET', '/projects'], ['POST', '/projects'], ['GET', '/media'], ['POST', '/media/uploads'], ['GET', '/submissions'], ['PUT', '/content/hero'], ['GET', '/influencers'], ['GET', '/influencer-categories'], ['POST', '/influencer-categories'],
+    ['PUT', '/influencer-categories/00000000-0000-0000-0000-000000000000'], ['DELETE', '/influencer-categories/00000000-0000-0000-0000-000000000000'],
     ['DELETE', '/projects/00000000-0000-0000-0000-000000000000'], ['DELETE', '/media/00000000-0000-0000-0000-000000000000']];
   for (const [method, p] of endpoints) {
     const r = await fetch(`${BASE}/api/admin${p}`, { method, headers: H, body: method === 'GET' || method === 'DELETE' ? undefined : '{}' });
@@ -89,6 +90,44 @@ test('influencer price is admin-only', async () => {
   assert.ok(!JSON.stringify(pub).includes(price), 'price not in public API');
   assert.ok(!(await (await fetch(`${BASE}/`)).text()).includes(price), 'price not in public HTML');
   await fetch(`${BASE}/api/admin/influencers/${item.id}`, { method: 'DELETE', headers: { ...H, Cookie: cookie } });
+});
+
+test('influencer categories: many-to-many, deleting a category keeps the profile', async () => {
+  const cookie = await login();
+  const A = { ...H, Cookie: cookie };
+  const mk = async (name) => (await (await fetch(`${BASE}/api/admin/influencer-categories`, { method: 'POST', headers: A, body: JSON.stringify({ name }) })).json()).item;
+  const c1 = await mk('Test Cat ' + Date.now()), c2 = await mk('Test Cat2 ' + Date.now());
+  assert.equal((await fetch(`${BASE}/api/admin/influencer-categories`, { method: 'POST', headers: A, body: JSON.stringify({ name: c1.name }) })).status, 409, 'duplicate name rejected');
+  const inf = (await (await fetch(`${BASE}/api/admin/influencers`, { method: 'POST', headers: A, body: JSON.stringify({ name: 'Category Test Creator', categoryIds: [c1.id, c2.id], status: 'published' }) })).json()).item;
+  assert.deepEqual(inf.categoryIds.sort(), [c1.id, c2.id].sort());
+  const renamed = await fetch(`${BASE}/api/admin/influencer-categories/${c1.id}`, { method: 'PUT', headers: A, body: JSON.stringify({ name: c1.name + ' renamed' }) });
+  assert.equal(renamed.status, 200);
+  assert.equal((await fetch(`${BASE}/api/admin/influencer-categories/${c1.id}`, { method: 'DELETE', headers: A })).status, 200);
+  const after = (await (await fetch(`${BASE}/api/admin/influencers/${inf.id}`, { headers: A })).json()).item;
+  assert.equal(after.name, 'Category Test Creator', 'profile survives category deletion');
+  assert.deepEqual(after.categoryIds, [c2.id]);
+  await fetch(`${BASE}/api/admin/influencers/${inf.id}`, { method: 'DELETE', headers: A });
+  await fetch(`${BASE}/api/admin/influencer-categories/${c2.id}`, { method: 'DELETE', headers: A });
+});
+
+test('campaign inquiry stores the selected (published) influencers', async () => {
+  const cookie = await login();
+  const A = { ...H, Cookie: cookie };
+  const pub = (await (await fetch(`${BASE}/api/admin/influencers`, { method: 'POST', headers: A, body: JSON.stringify({ name: 'Inquiry Test Creator', status: 'published' }) })).json()).item;
+  const draft = (await (await fetch(`${BASE}/api/admin/influencers`, { method: 'POST', headers: A, body: JSON.stringify({ name: 'Inquiry Draft Creator', status: 'draft' }) })).json()).item;
+  const post = (b, ip) => fetch(`${BASE}/api/contact`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Forwarded-For': ip }, body: JSON.stringify(b) });
+  const base = { name: 'Inquiry Test', contact: 'inq@example.com', service: 'influencer', kind: 'influencer', message: 'Campaign objective text', consent: 'yes', ts: Date.now() - 10000 };
+  assert.equal((await post({ ...base, influencers: [draft.id] }, '10.7.0.1')).status, 400, 'draft influencer is not selectable');
+  assert.equal((await post({ ...base, influencers: [pub.id], campaignStart: '2026-12-10', campaignEnd: '2026-12-01' }, '10.7.0.2')).status, 400, 'end before start');
+  const ok = await post({ ...base, influencers: [pub.id, draft.id], campaignStart: '2026-12-01', campaignEnd: '2026-12-20', notes: 'note' }, '10.7.0.3');
+  assert.equal(ok.status, 200);
+  const subs = (await (await fetch(`${BASE}/api/admin/submissions`, { headers: A })).json()).items;
+  const mine = subs.find((x) => x.contact === 'inq@example.com' && x.kind === 'influencer');
+  assert.ok(mine, 'submission stored');
+  assert.deepEqual(mine.influencers.map((i) => i.name), ['Inquiry Test Creator'], 'only published influencer kept');
+  assert.equal(mine.campaign_dates, '2026-12-01 → 2026-12-20');
+  await fetch(`${BASE}/api/admin/submissions/${mine.id}`, { method: 'DELETE', headers: A });
+  for (const x of [pub, draft]) await fetch(`${BASE}/api/admin/influencers/${x.id}`, { method: 'DELETE', headers: A });
 });
 
 test('security headers on public and admin pages', async () => {

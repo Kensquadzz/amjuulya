@@ -167,12 +167,15 @@ export function influencerView(r, media, { admin = false } = {}) {
     followers: r.follower_count != null ? Number(r.follower_count) : null,
     category: r.category,
     bio: r.bio,
-    engagement: r.engagement,
+    // engagement is public only once the admin marks it as verified
+    engagement: admin || r.engagement_verified ? r.engagement : '',
+    categories: r.categories || [],
+    featured: Boolean(r.featured),
     status: r.status,
     sortOrder: r.sort_order,
     updatedAt: r.updated_at,
   };
-  if (admin) view.price = r.price || '';
+  if (admin) Object.assign(view, { price: r.price || '', engagementVerified: Boolean(r.engagement_verified), categoryIds: view.categories.map((c) => c.id) });
   return view;
 }
 
@@ -180,7 +183,25 @@ export async function getPublishedInfluencers() {
   if (!dbConfigured()) return [];
   const { rows } = await query(`select * from influencers where status = 'published' order by sort_order, created_at`);
   const media = await mediaByIds(rows.map((r) => r.profile_media_id));
+  await attachCategories(rows);
   return rows.map((r) => influencerView(r, media));
+}
+
+/** Adds r.categories = [{ id, name }] (in category order) to influencer rows. */
+export async function attachCategories(rows) {
+  if (!rows.length) return rows;
+  const { rows: links } = await query(
+    `select l.influencer_id, c.id, c.name from influencer_category_links l
+       join influencer_categories c on c.id = l.category_id
+      where l.influencer_id = any($1::uuid[]) order by c.sort_order, c.name`, [rows.map((r) => r.id)]);
+  for (const r of rows) r.categories = links.filter((l) => l.influencer_id === r.id).map((l) => ({ id: l.id, name: l.name }));
+  return rows;
+}
+
+export async function getInfluencerCategories() {
+  if (!dbConfigured()) return [];
+  const { rows } = await query('select id, name from influencer_categories order by sort_order, name');
+  return rows;
 }
 
 /** Media referenced from website content (e.g. service showcase works), keyed by id. Ready media only. */

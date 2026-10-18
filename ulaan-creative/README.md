@@ -182,7 +182,17 @@ In the hero, the bomb sways around the hand, follows the cursor slightly, and th
 
 **Service visuals:** *AI Creative Production* shows real work (images / playable videos) added in *Admin → Үйлчилгээнүүд → Бүтээлүүд*; until then it shows "Бүтээлүүд удахгүй нэмэгдэнэ". *Brand & Digital* shows its own steps as a staircase. If a section was published before this update, press **Анхдагч руу буцаах** in the admin to load the new default texts.
 
-**Influencers:** the nav item *Influencers* opens a full-screen panel with the published influencers as fanned cards (swipe / drag / arrow keys; the active person's photo fills the background). Each card shows name, category, bio, followers, engagement and social links (Instagram, TikTok, YouTube, Facebook). The **price** field is stored for the admin only: it is never included in the public HTML or `/api/public/*` (covered by `test/api.test.mjs`). Run `npm run db:migrate` to add the new columns (`migrations/002_influencer_price.sql`).
+**Influencers (creator browser):** the nav item *Influencers* opens a full-screen browser:
+* optional **featured** creator (Admin → Influencer → «Онцлох»), then **horizontal rows per category** (admin-managed, many-to-many — a creator can appear in several rows; uncategorised creators appear under *Other*);
+* **search** by name, **Filter** panel (categories incl. *All*, follower ranges 1K–10K … 500K+, sort: recommended / followers ↑↓); filters combine, empty rows hide, a clear empty state shows when nothing matches;
+* **multi-select** (+ Сонгох on each card / featured / details) with a selection bar (review + remove) and a **campaign inquiry** form (name, company, phone/e-mail, objective, optional dates, notes). Inquiries are stored in `contact_submissions` (kind `influencer`, selected creators as `[{id,name}]`; only *published* creators are accepted) and appear in *Admin → Ирсэн хүсэлтүүд*;
+* engagement is shown only when the admin ticks «Engagement баталгаажсан».
+
+**Private price:** the influencer **price** is stored for the admin only. It is never in the public HTML, JS, `/api/public/*` or the contact flow (covered by `test/api.test.mjs`).
+
+**Categories:** Admin → Influencer-ууд → «Ангиллууд»: add, rename, reorder, delete. Deleting a category removes only its links, never the profiles. Default categories are seeded by `migrations/003_influencer_categories.sql`; run `npm run db:migrate` after updating.
+
+**Demo preview:** `npm run build:html -- --demo` writes `ulaan-creative-influencers-demo.html` with clearly labelled *DEMO Creator* profiles (no photos, invented numbers, red DEMO banner). Never publish it as the real site.
 
 ## 9. Tests
 

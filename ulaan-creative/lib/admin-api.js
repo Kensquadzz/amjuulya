@@ -7,7 +7,7 @@ import { createSession, destroySession, verifyPassword, hashPassword, validatePa
 import { hit, count, clear } from './ratelimit.js';
 import { assertStorage, presignPut, headObject, readHead, deleteObject, storageDriver } from './storage.js';
 import { checkDeclared, sniff, sniffMatches, LIMITS, TYPES } from './media-rules.js';
-import { sanitizeContent, getContentForAdmin, mediaView, influencerView, getProject, isUuid } from './content.js';
+import { sanitizeContent, getContentForAdmin, mediaView, influencerView, attachCategories, getProject, isUuid } from './content.js';
 import { CONTENT_KEYS, DEFAULT_CONTENT } from './defaults.js';
 import { embedFor } from './render.js';
 
@@ -236,6 +236,47 @@ async function reorder(table, req, res) {
 }
 export const reorderProjects = (req, res) => reorder('projects', req, res);
 export const reorderInfluencers = (req, res) => reorder('influencers', req, res);
+export const reorderInfluencerCategories = (req, res) => reorder('influencer_categories', req, res);
+
+/* ------------------------- influencer categories ------------------------- */
+
+export async function listInfluencerCategories(req, res) {
+  const { rows } = await query(
+    `select c.id, c.name, c.sort_order, count(l.influencer_id)::int as influencers
+       from influencer_categories c left join influencer_category_links l on l.category_id = c.id
+      group by c.id order by c.sort_order, c.name`);
+  json(res, 200, { items: rows });
+}
+
+async function categoryName(req) {
+  const name = str((await readJson(req)).name, 60, 'Ангиллын нэр', { required: true });
+  return name;
+}
+
+export async function createInfluencerCategory(req, res) {
+  const name = await categoryName(req);
+  const r = await one(
+    `insert into influencer_categories (name, sort_order) values ($1, (select coalesce(max(sort_order), 0) + 1 from influencer_categories))
+     on conflict do nothing returning id, name`, [name]);
+  if (!r) throw new HttpError(409, 'exists', 'Ийм нэртэй ангилал аль хэдийн байна.', { field: 'name' });
+  json(res, 200, { item: r });
+}
+
+export async function updateInfluencerCategory(req, res, id) {
+  const name = await categoryName(req);
+  let r;
+  try { r = await one('update influencer_categories set name = $2, updated_at = now() where id = $1 returning id, name', [id, name]); }
+  catch (e) { if (e.code === '23505') throw new HttpError(409, 'exists', 'Ийм нэртэй ангилал аль хэдийн байна.', { field: 'name' }); throw e; }
+  if (!r) throw new HttpError(404, 'not_found');
+  json(res, 200, { item: r });
+}
+
+/** Removes the category and its links only; influencer profiles are untouched. */
+export async function deleteInfluencerCategory(req, res, id) {
+  const r = await one('delete from influencer_categories where id = $1 returning id', [id]);
+  if (!r) throw new HttpError(404, 'not_found');
+  json(res, 200, { ok: true });
+}
 
 /* ----------------------------- influencers ----------------------------- */
 
@@ -253,6 +294,8 @@ function influencerInput(b) {
     category: str(b.category, 100, 'Ангилал'),
     bio: str(b.bio, 600, 'Намтар'),
     engagement: str(b.engagement, 100, 'Engagement'),
+    engagement_verified: b.engagementVerified === true,
+    featured: b.featured === true,
     price: str(b.price, 200, 'Үнэ'),
     status: status(b.status),
   };
@@ -263,6 +306,7 @@ export async function listInfluencers(req, res) {
   const ids = rows.map((r) => r.profile_media_id).filter(Boolean);
   const { rows: m } = ids.length ? await query('select * from media where id = any($1::uuid[])', [ids]) : { rows: [] };
   const media = Object.fromEntries(m.map((x) => [x.id, mediaView(x)]));
+  await attachCategories(rows);
   json(res, 200, { items: rows.map((r) => influencerView(r, media, { admin: true })) });
 }
 
@@ -270,11 +314,14 @@ export async function getInfluencer(req, res, id) {
   const r = await one('select * from influencers where id = $1', [id]);
   if (!r) throw new HttpError(404, 'not_found');
   const m = r.profile_media_id ? await one('select * from media where id = $1', [r.profile_media_id]) : null;
+  await attachCategories([r]);
   json(res, 200, { item: influencerView(r, m ? { [m.id]: mediaView(m) } : {}, { admin: true }) });
 }
 
 export async function saveInfluencer(req, res, id = null) {
-  const d = influencerInput(await readJson(req));
+  const body = await readJson(req);
+  const d = influencerInput(body);
+  const categoryIds = [...new Set((Array.isArray(body.categoryIds) ? body.categoryIds : []).filter(isUuid))].slice(0, 30);
   await assertMedia(d.profile_media_id, 'image', 'Профайл зураг');
   const cols = Object.keys(d);
   let row;
@@ -290,6 +337,13 @@ export async function saveInfluencer(req, res, id = null) {
          (select coalesce(max(sort_order), 0) + 1 from influencers), case when $${cols.indexOf('status') + 1} = 'published' then now() end) returning id`,
       cols.map((k) => d[k]));
   }
+  await tx(async (c) => {
+    await c.query('delete from influencer_category_links where influencer_id = $1', [row.id]);
+    if (categoryIds.length) {
+      await c.query(`insert into influencer_category_links (influencer_id, category_id)
+        select $1, id from influencer_categories where id = any($2::uuid[]) on conflict do nothing`, [row.id, categoryIds]);
+    }
+  });
   return getInfluencer(req, res, row.id);
 }
 
@@ -477,7 +531,7 @@ export async function discardContentDraft(req, res, key) {
 export async function listSubmissions(req, res, searchParams) {
   const st = ['new', 'read', 'archived'].includes(searchParams.get('status')) ? searchParams.get('status') : null;
   const { rows } = await query(
-    `select id, name, company, contact, service, budget, message, consent, status, email_sent, created_at
+    `select id, name, company, contact, service, budget, message, consent, status, email_sent, influencers, kind, campaign_dates, notes, created_at
        from contact_submissions where ($1::text is null or status = $1) order by created_at desc limit 200`, [st]);
   json(res, 200, { items: rows });
 }

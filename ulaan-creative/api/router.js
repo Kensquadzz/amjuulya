@@ -6,7 +6,7 @@ import { HttpError, json, html, send, siteUrl, isProd } from '../lib/http.js';
 import { dbConfigured } from '../lib/db.js';
 import { requireAdmin } from '../lib/auth.js';
 import { handleLocalStorage, storageDriver } from '../lib/storage.js';
-import { getPublishedContent, getDraftContent, getPublishedProjects, getPublishedInfluencers, getProject, getMediaView, getContentMediaMap } from '../lib/content.js';
+import { getPublishedContent, getDraftContent, getPublishedProjects, getPublishedInfluencers, getInfluencerCategories, getProject, getMediaView, getContentMediaMap } from '../lib/content.js';
 import { DEFAULT_CONTENT } from '../lib/defaults.js';
 import { renderHome, renderProject, renderNotFound } from '../lib/render.js';
 import { handleContact } from '../lib/contact.js';
@@ -44,14 +44,14 @@ function securityHeaders(res, { nonce, admin = false }) {
 
 async function loadPublic() {
   try {
-    const [content, projects, influencers] = await Promise.all([getPublishedContent(), getPublishedProjects(), getPublishedInfluencers()]);
+    const [content, projects, influencers, influencerCategories] = await Promise.all([getPublishedContent(), getPublishedProjects(), getPublishedInfluencers(), getInfluencerCategories()]);
     const ogMedia = content.seo.ogImageMediaId ? await getMediaView(content.seo.ogImageMediaId) : null;
     const mediaMap = await getContentMediaMap(content);
-    return { content, projects, influencers, ogMedia, mediaMap };
+    return { content, projects, influencers, influencerCategories, ogMedia, mediaMap };
   } catch (e) {
     // Database unreachable: keep the site up with built-in content.
     console.error('[site] falling back to defaults:', e.message);
-    return { content: structuredClone(DEFAULT_CONTENT), projects: [], influencers: [], ogMedia: null, mediaMap: {} };
+    return { content: structuredClone(DEFAULT_CONTENT), projects: [], influencers: [], influencerCategories: [], ogMedia: null, mediaMap: {} };
   }
 }
 
@@ -105,11 +105,11 @@ async function adminPage(req, res, path) {
     res.setHeader('Cache-Control', 'no-store');
     res.setHeader('X-Robots-Tag', 'noindex, nofollow');
     const content = await getDraftContent();
-    const [projects, influencers] = await Promise.all([getPublishedProjects(), getPublishedInfluencers()]);
+    const [projects, influencers, influencerCategories] = await Promise.all([getPublishedProjects(), getPublishedInfluencers(), getInfluencerCategories()]);
     if (sub === '/preview/site') {
       const ogMedia = content.seo.ogImageMediaId ? await getMediaView(content.seo.ogImageMediaId) : null;
       const mediaMap = await getContentMediaMap(content);
-      return html(res, 200, renderHome({ content, projects, influencers, ogMedia, mediaMap, site: siteUrl(req), nonce, preview: 'PREVIEW — нийтлээгүй өөрчлөлтүүдийг харуулж байна' }));
+      return html(res, 200, renderHome({ content, projects, influencers, influencerCategories, ogMedia, mediaMap, site: siteUrl(req), nonce, preview: 'PREVIEW — нийтлээгүй өөрчлөлтүүдийг харуулж байна' }));
     }
     const project = await getProject({ id: sub.split('/').pop(), includeDrafts: true }).catch(() => null);
     if (!project) throw new HttpError(404, 'not_found');
@@ -139,6 +139,11 @@ const routes = [
   ['GET', /^\/influencers$/, (q, s) => A.listInfluencers(q, s)],
   ['POST', /^\/influencers$/, (q, s) => A.saveInfluencer(q, s, null)],
   ['POST', /^\/influencers\/reorder$/, (q, s) => A.reorderInfluencers(q, s)],
+  ['GET', /^\/influencer-categories$/, (q, s) => A.listInfluencerCategories(q, s)],
+  ['POST', /^\/influencer-categories$/, (q, s) => A.createInfluencerCategory(q, s)],
+  ['POST', /^\/influencer-categories\/reorder$/, (q, s) => A.reorderInfluencerCategories(q, s)],
+  ['PUT', new RegExp(`^/influencer-categories/${UUID}$`), (q, s, c) => A.updateInfluencerCategory(q, s, c.id)],
+  ['DELETE', new RegExp(`^/influencer-categories/${UUID}$`), (q, s, c) => A.deleteInfluencerCategory(q, s, c.id)],
   ['GET', new RegExp(`^/influencers/${UUID}$`), (q, s, c) => A.getInfluencer(q, s, c.id)],
   ['PUT', new RegExp(`^/influencers/${UUID}$`), (q, s, c) => A.saveInfluencer(q, s, c.id)],
   ['POST', new RegExp(`^/influencers/${UUID}/status$`), (q, s, c) => A.setInfluencerStatus(q, s, c.id)],

@@ -329,56 +329,159 @@ const SOCIALS = [['instagram', 'Instagram'], ['tiktok', 'TikTok'], ['youtube', '
 
 /** Influencer list: full-screen panel opened from the nav ("Influencers"), cards fanned in an arc
  *  and swiped sideways. Price is never part of the public data, so it can't appear here. */
-function influencersPanel(s, list) {
-  const empty = !list.length;
-  const people = empty ? Array.from({ length: 5 }, () => null) : list;
-  const start = Math.floor((people.length - 1) / 2);
-  const card = (p, i) => `<li class="inf-card${p ? '' : ' inf-card--empty'}" data-inf-card="${i}">
-      <button type="button" class="inf-card__btn" aria-label="${p ? attr(p.name) : 'Удахгүй нэмэгдэнэ'}"${empty ? ' tabindex="-1"' : ''}>
-        <span class="inf-card__photo">${p && p.photo ? mediaImg(p.photo, { alt: '', sizes: '260px' }) : `<span class="display" aria-hidden="true">${p ? esc(initials(p.name)) : 'UC'}</span>`}</span>
-        <span class="inf-card__cap"><strong>${p ? esc(p.name) : 'Удахгүй'}</strong>${p && p.category ? `<span class="mono">${esc(p.category)}</span>` : ''}</span>
-      </button>
-    </li>`;
-  const info = (p, i) => {
-    const links = SOCIALS.filter(([k]) => p[k]);
-    const data = [p.followers != null && ['Дагагч', fmtFollowers(p.followers)], p.engagement && ['Engagement', p.engagement]].filter(Boolean);
-    return `<div class="inf-info" data-inf-info="${i}"${i === start ? '' : ' hidden'}>
-      <p class="mono inf-info__cat">${esc(p.category || 'Influencer')}</p>
-      <h3 class="display inf-info__name">${esc(p.name)}</h3>
-      ${p.bio ? `<p class="inf-info__bio">${esc(p.bio)}</p>` : ''}
-      ${data.length ? `<dl class="inf-info__data mono">${data.map(([k, v]) => `<div><dt>${k}</dt><dd>${esc(v)}</dd></div>`).join('')}</dl>` : ''}
-      ${links.length ? `<p class="inf-info__links">${links.map(([k, l]) => `<a class="mono" href="${attr(p[k])}" target="_blank" rel="noopener">${l} ↗</a>`).join('')}</p>` : ''}
-    </div>`;
-  };
-  return `<div class="inf" id="influencers" role="dialog" aria-modal="true" aria-labelledby="inf-title" data-inf data-lenis-prevent data-start="${start}">
-  <div class="inf__bg" aria-hidden="true">${empty ? '' : list.map((p, i) => p.photo ? `<div class="inf__bg-img${i === start ? ' is-on' : ''}" data-inf-bg="${i}">${mediaImg(p.photo, { alt: '', sizes: '100vw' })}</div>` : '').join('')}</div>
-  <div class="inf__top">
-    <p class="label mono">${esc(s.label)}</p>
-    <a class="inf__close" href="#top" data-inf-close aria-label="Хаах"><span aria-hidden="true">✕</span></a>
-  </div>
-  <div class="inf__head">
-    <h2 class="display inf__title" id="inf-title">${rich(s.title)}</h2>
-    <p>${esc(s.intro)}</p>
-  </div>
-  <div class="inf__stage" data-inf-stage>
-    <ul class="inf__cards" role="list" aria-label="Influencer-уудын жагсаалт">
-    ${people.map(card).join('\n    ')}
-    </ul>
-  </div>
-  <div class="inf__foot">
-    <div class="inf__detail" aria-live="polite">
-      ${empty ? `<div class="inf-info">
-        <h3 class="display inf-info__name">${esc(s.emptyTitle)}</h3>
-        <p class="inf-info__bio">${esc(s.emptyText)}</p>
-        <p><a class="btn-fill btn-fill--light" href="#contact" data-inf-close><span>Хамтран ажиллах</span><i class="dot" aria-hidden="true"></i></a></p>
-      </div>` : list.map(info).join('')}
+const FOLLOWER_RANGES = [['all', 'Бүгд'], ['1k-10k', '1K–10K'], ['10k-50k', '10K–50K'], ['50k-100k', '50K–100K'], ['100k-500k', '100K–500K'], ['500k+', '500K+']];
+const catNames = (p) => (p.categories && p.categories.length ? p.categories.map((c) => c.name) : p.category ? [p.category] : []);
+const platforms = (p) => SOCIALS.filter(([k]) => p[k]).map(([, l]) => l);
+
+/** Category / followers / sort controls in a compact panel (search lives in the toolbar). */
+function influencerFilter(categories) {
+  return `<div class="inf-filter" id="inf-filter" role="dialog" aria-label="Шүүлтүүр" data-inf-filter hidden>
+    <form class="inf-filter__form" data-inf-filter-form>
+      <div class="inf-filter__head"><p class="mono">Шүүлтүүр</p><button type="button" class="inf-filter__x" data-inf-filter-close aria-label="Шүүлтүүр хаах">✕</button></div>
+      ${categories.length ? `<fieldset class="inf-filter__group"><legend class="mono">Ангилал</legend><div class="inf-filter__chips">
+        <label class="inf-chip"><input type="checkbox" name="cat" value="all" checked data-cat-all><span>Бүгд</span></label>
+        ${categories.map((c) => `<label class="inf-chip"><input type="checkbox" name="cat" value="${attr(c.id)}"><span>${esc(c.name)}</span></label>`).join('')}
+      </div></fieldset>` : ''}
+      <fieldset class="inf-filter__group"><legend class="mono">Дагагч</legend><div class="inf-filter__chips">
+        ${FOLLOWER_RANGES.map(([v, l], i) => `<label class="inf-chip"><input type="radio" name="followers" value="${v}"${i ? '' : ' checked'}><span>${l}</span></label>`).join('')}
+      </div></fieldset>
+      <label class="inf-filter__group"><span class="mono">Эрэмбэ</span><span class="inf-filter__select"><select name="sort">
+        <option value="recommended">Санал болгосон</option><option value="followers-desc">Дагагч: ихээс бага</option><option value="followers-asc">Дагагч: багаас их</option>
+      </select></span></label>
+      <div class="inf-filter__foot">
+        <button type="button" class="inf-link mono" data-inf-reset>Цэвэрлэх</button>
+        <button type="submit" class="btn-fill btn-fill--light"><span>Хэрэглэх</span><i class="dot" aria-hidden="true"></i></button>
+      </div>
+    </form>
+  </div>`;
+}
+
+const pickBtn = (p, cls = '') => `<button type="button" class="inf-pick${cls}" data-inf-pick="${attr(p.id)}" aria-pressed="false" aria-label="${attr(p.name)} — кампанит ажилд сонгох"><span class="inf-pick__off">+ Сонгох</span><span class="inf-pick__on">✓ Сонгосон</span></button>`;
+const metaLine = (p) => [platforms(p).join(' · '), p.followers != null && `${fmtFollowers(p.followers)} дагагч`, p.engagement && `ER ${p.engagement}`].filter(Boolean).map(esc).join('<i aria-hidden="true">/</i>');
+
+function influencerCard(p) {
+  return `<li class="inf-card" data-inf-item="${attr(p.id)}">
+        <div class="inf-card__media">${p.photo ? mediaImg(p.photo, { alt: '', sizes: '(max-width: 760px) 46vw, 240px' }) : `<span class="display" aria-hidden="true">${esc(initials(p.name))}</span>`}</div>
+        <button type="button" class="inf-card__open" data-inf-open="${attr(p.id)}" aria-label="${attr(p.name)} — дэлгэрэнгүй">
+          <span class="inf-card__cat mono">${esc(catNames(p).join(' · ') || 'Influencer')}</span>
+          <strong class="inf-card__name">${esc(p.name)}</strong>
+          <span class="inf-card__meta mono">${metaLine(p)}</span>
+        </button>
+        ${pickBtn(p, ' inf-pick--card')}
+      </li>`;
+}
+
+/** Hidden per-creator detail (shown in the details sheet). Public fields only — never the price. */
+function influencerDetail(p) {
+  const links = SOCIALS.filter(([k]) => p[k]);
+  const data = [p.followers != null && ['Дагагч', fmtFollowers(p.followers)], p.engagement && ['Engagement (баталгаажсан)', p.engagement]].filter(Boolean);
+  return `<template data-inf-detail="${attr(p.id)}">
+    <div class="inf-detail__media">${p.photo ? mediaImg(p.photo, { alt: p.photo.alt || p.name, sizes: '(max-width: 760px) 100vw, 420px' }) : `<span class="display" aria-hidden="true">${esc(initials(p.name))}</span>`}</div>
+    <div class="inf-detail__body">
+      <p class="mono inf-detail__cat">${esc(catNames(p).join(' · ') || 'Influencer')}</p>
+      <h3 class="display inf-detail__name" id="inf-detail-title">${esc(p.name)}</h3>
+      ${p.bio ? `<p class="inf-detail__bio">${esc(p.bio)}</p>` : ''}
+      ${data.length ? `<dl class="inf-detail__data mono">${data.map(([k, v]) => `<div><dt>${k}</dt><dd>${esc(v)}</dd></div>`).join('')}</dl>` : ''}
+      ${links.length ? `<p class="inf-detail__links">${links.map(([k, l]) => `<a class="mono" href="${attr(p[k])}" target="_blank" rel="noopener">${l} ↗</a>`).join('')}</p>` : ''}
+      ${pickBtn(p, ' inf-pick--lg')}
     </div>
-    ${empty ? '' : `<div class="inf__ctrl">
-      <button type="button" class="round-btn" data-inf-prev aria-label="Өмнөх"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M10 3 5 8l5 5" fill="none" stroke="currentColor" stroke-width="1.6"/></svg></button>
-      <span class="mono" data-inf-count>${start + 1} / ${list.length}</span>
-      <button type="button" class="round-btn" data-inf-next aria-label="Дараагийн"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m6 3 5 5-5 5" fill="none" stroke="currentColor" stroke-width="1.6"/></svg></button>
+  </template>`;
+}
+
+/** Netflix-inspired creator browser, opened from the nav ("Influencers"): optional featured
+ *  creator, horizontal category rows, search + filter, multi-select → one campaign inquiry. */
+function influencersPanel(s, list, categories = []) {
+  const empty = !list.length;
+  // rows follow the admin-managed categories; creators without a category go to "Other"
+  const cats = categories.length ? categories : [...new Map(list.flatMap((p) => p.categories || []).map((c) => [c.id, c])).values()];
+  const other = cats.find((c) => /^other$|^бусад$/i.test(c.name));
+  const rows = cats.map((c) => ({ ...c, people: list.filter((p) => (p.categories || []).some((x) => x.id === c.id) || (c === other && !(p.categories || []).length)) }));
+  if (!other && list.some((p) => !(p.categories || []).length)) rows.push({ id: 'none', name: 'Other', people: list.filter((p) => !(p.categories || []).length) });
+  const featured = list.find((p) => p.featured);
+  const data = list.map((p, i) => [p.id, { n: plain(p.name).toLowerCase(), f: p.followers ?? null, c: (p.categories || []).map((x) => x.id), o: i, name: p.name }]);
+  return `<div class="inf" id="influencers" role="dialog" aria-modal="true" aria-labelledby="inf-title" data-inf>
+  <div class="inf__scroll" data-inf-scroll data-lenis-prevent>
+    <div class="inf__top">
+      <p class="label mono">${esc(s.label)}</p>
+      <a class="inf__close" href="#top" data-inf-close aria-label="Хаах"><span aria-hidden="true">✕</span></a>
+    </div>
+    <header class="inf__intro">
+      <div>
+        <h2 class="display inf__title" id="inf-title">${rich(s.title)}</h2>
+        <p>${esc(s.intro)}</p>
+      </div>
+      ${empty ? '' : `<div class="inf__tools">
+        <label class="inf__search"><span class="sr-only">Нэрээр хайх</span><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="m11 11 4 4" stroke="currentColor" stroke-width="1.5"/></svg><input type="search" placeholder="Нэрээр хайх" autocomplete="off" maxlength="80" data-inf-search></label>
+        <button type="button" class="inf__filter-btn mono" data-inf-filter-toggle aria-expanded="false" aria-controls="inf-filter">Filter<span class="inf__filter-count" data-inf-filter-count hidden></span></button>
+        ${influencerFilter(cats)}
+      </div>`}
+    </header>
+    ${featured ? `<article class="inf-feat" data-inf-item="${attr(featured.id)}" data-inf-featured>
+      <div class="inf-feat__media">${featured.photo ? mediaImg(featured.photo, { alt: featured.photo.alt || featured.name, sizes: '(max-width: 760px) 100vw, 60vw' }) : `<span class="display" aria-hidden="true">${esc(initials(featured.name))}</span>`}</div>
+      <div class="inf-feat__body">
+        <p class="mono inf-feat__label">Онцлох бүтээгч · ${esc(catNames(featured).join(' · ') || 'Influencer')}</p>
+        <h3 class="display inf-feat__name">${esc(featured.name)}</h3>
+        <p class="inf-card__meta mono">${metaLine(featured)}</p>
+        <div class="inf-feat__actions"><button type="button" class="inf-link mono" data-inf-open="${attr(featured.id)}">Дэлгэрэнгүй</button>${pickBtn(featured, ' inf-pick--lg')}</div>
+      </div>
+    </article>` : ''}
+    ${empty ? `<div class="inf__empty">
+      <h3 class="display">${esc(s.emptyTitle)}</h3>
+      <p>${esc(s.emptyText)}</p>
+      <p><a class="btn-fill btn-fill--light" href="#contact" data-inf-close><span>Хамтран ажиллах</span><i class="dot" aria-hidden="true"></i></a></p>
+    </div>` : `<div class="inf-rows">
+      ${rows.filter((r) => r.people.length).map((r) => `<section class="inf-row" data-inf-row="${attr(r.id)}" aria-label="${attr(r.name)}">
+        <div class="inf-row__head">
+          <h3 class="inf-row__title">${esc(r.name)} <span class="mono" data-inf-row-count>${r.people.length}</span></h3>
+          <div class="inf-row__nav">
+            <button type="button" class="inf-row__btn" data-inf-row-prev aria-label="${attr(r.name)} — өмнөх"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M10 3 5 8l5 5" fill="none" stroke="currentColor" stroke-width="1.6"/></svg></button>
+            <button type="button" class="inf-row__btn" data-inf-row-next aria-label="${attr(r.name)} — дараагийн"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m6 3 5 5-5 5" fill="none" stroke="currentColor" stroke-width="1.6"/></svg></button>
+          </div>
+        </div>
+        <ul class="inf-row__track" role="list" data-inf-track>
+      ${r.people.map(influencerCard).join('\n      ')}
+        </ul>
+      </section>`).join('\n      ')}
+      <div class="inf__none" data-inf-none hidden><p class="display">Бүтээгч олдсонгүй.</p><p>Шүүлтүүр эсвэл хайлтаа өөрчлөөд дахин оролдоно уу.</p><button type="button" class="inf-link mono" data-inf-reset>Шүүлтүүр цэвэрлэх</button></div>
     </div>`}
   </div>
+  ${empty ? '' : `<script type="application/json" data-inf-data>${JSON.stringify(Object.fromEntries(data)).replace(/</g, '\\u003c')}</script>
+  ${list.map(influencerDetail).join('\n  ')}
+  <div class="inf-bar" data-inf-bar hidden>
+    <button type="button" class="inf-bar__review" data-inf-review aria-expanded="false" aria-controls="inf-bar-list"><span class="inf-bar__count" data-inf-count>0</span> <span>бүтээгч сонгосон</span> <span class="inf-bar__caret" aria-hidden="true">▴</span></button>
+    <ul class="inf-bar__list" id="inf-bar-list" role="list" data-inf-picked-list hidden></ul>
+    <button type="button" class="btn-fill btn-fill--light inf-bar__go" data-inf-inquire><span>Хүсэлт илгээх</span><i class="dot" aria-hidden="true"></i></button>
+  </div>
+  <div class="inf-sheet" data-inf-sheet="detail" role="dialog" aria-modal="true" aria-labelledby="inf-detail-title" hidden>
+    <div class="inf-sheet__panel inf-detail"><button type="button" class="inf-sheet__x" data-inf-sheet-close aria-label="Хаах">✕</button><div class="inf-detail__inner" data-inf-detail-slot></div></div>
+  </div>
+  <div class="inf-sheet" data-inf-sheet="inquiry" role="dialog" aria-modal="true" aria-labelledby="inf-q-title" hidden>
+    <div class="inf-sheet__panel inf-q">
+      <button type="button" class="inf-sheet__x" data-inf-sheet-close aria-label="Хаах">✕</button>
+      <p class="mono inf-q__label">Кампанит ажлын хүсэлт</p>
+      <h3 class="display inf-q__title" id="inf-q-title">Request a campaign</h3>
+      <form class="inf-q__form" action="/api/contact" method="post" novalidate data-inf-form>
+        <div class="inf-q__picked"><p class="inf-q__lbl">Сонгосон бүтээгчид <b aria-hidden="true">*</b></p><ul class="form__picked-list" role="list" data-inf-form-picked></ul><p class="field__err" id="q-influencers-err" aria-live="polite"></p></div>
+        <div class="form__row">
+          <div class="field"><label for="q-name">Холбогдох хүний нэр <b aria-hidden="true">*</b></label><input id="q-name" name="name" type="text" autocomplete="name" required maxlength="120" aria-describedby="q-name-err"><p class="field__err" id="q-name-err" aria-live="polite"></p></div>
+          <div class="field"><label for="q-company">Компани / байгууллага</label><input id="q-company" name="company" type="text" autocomplete="organization" maxlength="160"></div>
+        </div>
+        <div class="field"><label for="q-contact">Утас эсвэл имэйл <b aria-hidden="true">*</b></label><input id="q-contact" name="contact" type="text" autocomplete="email" inputmode="email" required maxlength="160" aria-describedby="q-contact-err"><p class="field__err" id="q-contact-err" aria-live="polite"></p></div>
+        <div class="field"><label for="q-message">Кампанит ажлын зорилго, тайлбар <b aria-hidden="true">*</b></label><textarea id="q-message" name="message" rows="4" required minlength="10" maxlength="4000" aria-describedby="q-message-err"></textarea><p class="field__err" id="q-message-err" aria-live="polite"></p></div>
+        <div class="form__row">
+          <div class="field"><label for="q-start">Эхлэх огноо (заавал биш)</label><input id="q-start" name="campaignStart" type="date"></div>
+          <div class="field"><label for="q-end">Дуусах огноо (заавал биш)</label><input id="q-end" name="campaignEnd" type="date" aria-describedby="q-campaignDates-err"><p class="field__err" id="q-campaignDates-err" aria-live="polite"></p></div>
+        </div>
+        <div class="field"><label for="q-notes">Нэмэлт тэмдэглэл (заавал биш)</label><textarea id="q-notes" name="notes" rows="2" maxlength="2000"></textarea></div>
+        <div class="field field--check"><label class="check"><input type="checkbox" name="consent" value="yes" required aria-describedby="q-consent-err"><span>${esc(s.consentLabel || 'Ulaan Creative миний илгээсэн мэдээллийг зөвхөн энэ хүсэлтэд хариу өгөх зорилгоор хадгалж, ашиглахыг зөвшөөрч байна.')}</span></label><p class="field__err" id="q-consent-err" aria-live="polite"></p></div>
+        <div class="hp" aria-hidden="true"><label for="q-website">Website</label><input id="q-website" name="website" type="text" tabindex="-1" autocomplete="off"></div>
+        <div class="form__foot">
+          <button class="btn-fill btn-fill--light inf-q__submit" type="submit"><span>Хүсэлт илгээх</span><i class="dot" aria-hidden="true"></i></button>
+          <p class="form__status mono" role="status" aria-live="polite" data-inf-form-status></p>
+        </div>
+      </form>
+    </div>
+  </div>`}
 </div>`;
 }
 
@@ -487,7 +590,7 @@ function ogImageUrl(content, site, ogMedia) {
 }
 
 
-export function renderHome({ content, projects, influencers, site, nonce, ogMedia, preview, mediaMap = {} }) {
+export function renderHome({ content, projects, influencers, influencerCategories = [], site, nonce, ogMedia, preview, mediaMap = {} }) {
   const c = content;
   const hasInfluencers = influencers.length > 0;
   const jsonLd = { '@context': 'https://schema.org', '@type': 'Organization', name: 'Ulaan Creative', url: site + '/', logo: `${site}/assets/img/ulaan-logo-light.png` };
@@ -512,7 +615,7 @@ ${about(c.about)}
 ${faq(c.faq)}
 ${contact(c.contact, c)}
 </main>
-${influencersPanel(c.influencers, influencers)}
+${influencersPanel({ ...c.influencers, consentLabel: c.contact.consentLabel }, influencers, influencerCategories)}
 ${footer(c, { hasInfluencers })}
 ${scripts(nonce)}
 </body>

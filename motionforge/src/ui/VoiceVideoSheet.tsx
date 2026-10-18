@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { getBuffer, importAudioFile, extractAudioFromVideo } from '../engine/audio';
-import { buildVoiceProject, type VoiceVideoResult } from '../engine/voiceVideo';
+import { buildVoiceProject, VOICE_STYLES, type VoiceStyle, type VoiceVideoResult } from '../engine/voiceVideo';
 import { storage } from '../engine/storage';
 import { engine } from '../state/engine';
 import { getStore } from '../state/store';
@@ -27,6 +27,7 @@ export function VoiceVideoSheet({ onClose, onCreated }: { onClose: () => void; o
   const [ref, setRef] = useState<RefProfile | null>(null);
   const [useRef, setUseRef] = useState(true);
   const [accent2, setAccent2] = useState('#18b4ff');
+  const [style, setStyle] = useState<VoiceStyle>('app');
 
   const pickVoice = async (f: File) => {
     setBusy('Дууг уншиж байна…'); setResult(null);
@@ -53,7 +54,7 @@ export function VoiceVideoSheet({ onClose, onCreated }: { onClose: () => void; o
   };
   const plan = () => {
     if (!voice) return;
-    setResult(buildVoiceProject({ voice, script, brand: brand.trim() || 'YOUR BRAND', accent, accent2, pace: ref && useRef ? Math.min(7, Math.max(1.8, ref.avgShot)) : undefined, images, outro, aspect, subtitles: subs, music, name: brand.trim() ? `${brand.trim()} — voice video` : undefined }));
+    setResult(buildVoiceProject({ voice, script, brand: brand.trim() || 'YOUR BRAND', accent, accent2, pace: ref && useRef ? Math.min(7, Math.max(1.8, ref.avgShot)) : undefined, images, outro, aspect, subtitles: subs, music, style, name: brand.trim() ? `${brand.trim()} — voice video` : undefined }));
   };
   const create = async () => {
     if (!result) return;
@@ -90,6 +91,7 @@ export function VoiceVideoSheet({ onClose, onCreated }: { onClose: () => void; o
         <label className="vv-l">Скрипт — нэг мөрөнд нэг өгүүлбэр / санаа</label>
         <textarea className="vv-script" rows={7} value={script} placeholder={'Офист ажилладаг уу?\nЭнэ багц танд их хэрэг болно.\n…\n«1» гэж коммент бичээрэй.'} onChange={(e) => { setScript(e.target.value); setResult(null); }} />
         <div className="prop"><label>Брэнд</label><input value={brand} placeholder="HR OFFICE MASTER PACK" onChange={(e) => { setBrand(e.target.value); setResult(null); }} /></div>
+        <div className="prop"><label>Хэв маяг</label><div className="vv-styles">{VOICE_STYLES.map((x) => <button key={x.id} className={style === x.id ? 'on' : ''} onClick={() => { setStyle(x.id); setResult(null); }}>{x.label}</button>)}</div></div>
         <div className="prop"><label>Өнгө</label><input type="color" value={accent} onChange={(e) => { setAccent(e.target.value); setResult(null); }} /><input type="color" value={accent2} onChange={(e) => { setAccent2(e.target.value); setResult(null); }} /></div>
         <div className="prop"><label>Зураг ({images.length})</label><label className="file-btn">Бүтээгдэхүүн / баримтын зураг…<input type="file" accept="image/*" multiple hidden onChange={(e) => { if (e.target.files) pickImages(e.target.files); e.target.value = ''; }} /></label></div>
         <div className="prop"><label>Хэмжээ</label><select value={aspect} onChange={(e) => { setAspect(e.target.value as AspectId); setResult(null); }}><option value="9:16">9:16 Reels</option><option value="1:1">1:1</option><option value="4:5">4:5</option><option value="16:9">16:9</option></select></div>

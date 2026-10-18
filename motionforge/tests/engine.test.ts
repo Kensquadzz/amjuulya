@@ -267,4 +267,13 @@ describe('voice-over drives the video', () => {
       expect(r.project.audio[0].duration).toBe(dur); // the voice is never trimmed
     });
   }
+  it('the chosen look is applied to every shot; timing is identical across looks', async () => {
+    const { buildVoiceProject } = await import('../src/engine/voiceVideo');
+    const base = { voice: { assetId: 'asset:v', name: 'v', duration: 45, buffer: fakeVoice(45, 10) }, script: Array.from({ length: 10 }, (_, i) => `Хэсэг ${i + 1}`).join('\n'), brand: 'HR PACK', accent: '#2f5bff', images: [], outro: 0.6, aspect: '9:16' as const, subtitles: true, music: false };
+    const runs = (['app', 'glass', 'cinema'] as const).map((style) => buildVoiceProject({ ...base, style }));
+    runs.forEach((r, k) => { const shots = r.project.layers.filter((l) => l.type === 'scene3d') as any[]; expect(shots.every((l) => l.params.style === ['app', 'glass', 'cinema'][k])).toBe(true); });
+    const timing = (r: any) => r.plan.map((s: any) => `${s.shot}@${s.start.toFixed(2)}`).join(' ');
+    expect(timing(runs[1])).toBe(timing(runs[0]));
+    expect(timing(runs[2])).toBe(timing(runs[0]));
+  });
 });

@@ -55,6 +55,38 @@ for (const [dur, n] of [[16, 5], [45, 10], [90, 10]]) {
   if (late.length > 2) check(`${dur} s: picture develops after 16 s`, new Set(late.map((v) => Math.round(v / 5000))).size >= Math.min(4, late.length - 1), `${late.length} frames`);
   if (out && r.url) writeFileSync(`${out}/voice-${dur}s.png`, Buffer.from(r.url.split(',')[1], 'base64'));
 }
+// three visual systems from the same narration: each renders, and they look different
+{
+  const sigs = {};
+  for (const style of ['app', 'glass', 'cinema']) {
+    const r = await p.evaluate(async ({ style, script, sheet }) => {
+      const { buildVoiceProject } = await import('/src/engine/voiceVideo.ts');
+      const { Renderer } = await import('/src/engine/renderer.ts');
+      const sr = 22050, dur = 45, n = 10, buf = new AudioBuffer({ length: dur * sr, sampleRate: sr, numberOfChannels: 1 }), d = buf.getChannelData(0);
+      const slot = (dur - 1.2) / n;
+      for (let k = 0; k < n; k++) { const a = 0.6 + k * slot, e = a + slot * 0.82; for (let i = Math.round(a * sr); i < Math.round(e * sr); i++) d[i] = (Math.random() * 2 - 1) * 0.3; }
+      const res = buildVoiceProject({ voice: { assetId: 'asset:test', name: 'test', duration: buf.duration, buffer: buf }, script: script.join('\n'), brand: 'HR OFFICE MASTER PACK', accent: '#2f5bff', accent2: '#18b4ff', images: [], outro: 0.6, aspect: '9:16', subtitles: true, music: false, style });
+      const proj = { ...res.project, audio: [] };
+      const c = document.createElement('canvas'), rr = new Renderer(c, { preserveDrawingBuffer: true });
+      rr.setSize(270, 480); await rr.prepareTextures(proj);
+      const shots = proj.layers.filter((l) => l.type === 'scene3d');
+      const times = shots.map((l) => +((l.start + l.end) / 2).toFixed(2));
+      const strip = document.createElement('canvas'); strip.width = 270 * 5; strip.height = 480 * Math.ceil(times.length / 5);
+      const sx = strip.getContext('2d'), sig = [];
+      for (let i = 0; i < times.length; i++) {
+        rr.render(proj, times[i]); sx.drawImage(c, (i % 5) * 270, Math.floor(i / 5) * 480);
+        const px = sx.getImageData((i % 5) * 270 + 20, Math.floor(i / 5) * 480 + 60, 230, 260).data; let s = 0; for (let k = 0; k < px.length; k += 16) s += px[k] + px[k + 1] + px[k + 2]; sig.push(s / (px.length / 16) / 3);
+      }
+      return { styles: shots.map((l) => l.params.style), sig, url: sheet ? strip.toDataURL('image/png') : '' };
+    }, { style, script: SCRIPT, sheet: !!out });
+    check(`style ${style}: every shot carries the look`, r.styles.every((x) => x === style), r.styles.join(' '));
+    check(`style ${style}: no blank shots`, r.sig.every((v) => v > 3), r.sig.map((v) => v.toFixed(0)).join(' '));
+    sigs[style] = r.sig;
+    if (out && r.url) writeFileSync(`${out}/style-${style}.png`, Buffer.from(r.url.split(',')[1], 'base64'));
+  }
+  const diff = (a, b) => a.reduce((s, v, i) => s + Math.abs(v - b[i]), 0) / a.length;
+  check('styles look different (mean brightness diff per shot)', diff(sigs.app, sigs.glass) > 8 && diff(sigs.app, sigs.cinema) > 8 && diff(sigs.glass, sigs.cinema) > 4, `app/glass ${diff(sigs.app, sigs.glass).toFixed(1)} app/cinema ${diff(sigs.app, sigs.cinema).toFixed(1)} glass/cinema ${diff(sigs.glass, sigs.cinema).toFixed(1)}`);
+}
 // the real UI: Home -> Voice-over -> Video with a 45 s WAV, then export
 {
   const sr = 16000, dur = 45, n = 10, len = sr * dur, wav = Buffer.alloc(44 + len * 2);

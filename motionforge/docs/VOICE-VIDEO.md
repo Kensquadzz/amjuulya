@@ -29,6 +29,21 @@ What the app cannot do on the device: transcribe speech. Subtitles and the
 choice of shot come from the script the user types; without a script the
 sections follow the pauses only.
 
+## Looks (visual systems)
+
+The storyboard (timing, shot kinds, subtitles) is the same for every look; the
+look only changes how each shot is drawn (`story2d` param `style`).
+
+| Look | Background | Materials / type | Transition |
+|---|---|---|---|
+| `app` — App concept | light UI, meadow, keyboard | white panels, Montserrat + Inter | 0.3 s dissolve |
+| `glass` — Liquid Glass | moving aurora (brand colours + magenta/violet) | translucent panes with lit rim, white text | 0.3 s dissolve |
+| `cinema` — Cinematic Type | near-black, film grain, letterbox | own shots: Oswald uppercase word slams, mono labels, numbered lists, film strip, terminal typing, Ken Burns | hard cut + punch-in + short white flash |
+
+Limits: glass panes are drawn translucency, not a real backdrop blur; cinema
+with no pictures shows generated document pages in the Ken Burns / film strip
+shots.
+
 ## Next: enhancing the user's own Reel footage (not built yet)
 
 The same pieces carry over: a video layer (the footage) at the bottom, the

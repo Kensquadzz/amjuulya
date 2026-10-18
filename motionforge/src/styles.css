@@ -479,3 +479,6 @@ input[type='color'] { width: 44px; height: 34px; padding: 0; border: 1px solid v
 .vv-ref img { width: 100%; border-radius: 10px; display: block; }
 .vv-pal { display: flex; gap: 8px; }
 .vv-pal button { width: 36px; height: 36px; border-radius: 50%; border: 2px solid #fff3; padding: 0; }
+.vv-styles { display: flex; gap: 6px; flex-wrap: wrap; }
+.vv-styles button { padding: 8px 12px; border-radius: 999px; border: 1px solid #fff3; background: transparent; color: inherit; font-size: 14px; }
+.vv-styles button.on { background: var(--accent, #2f5bff); border-color: transparent; color: #fff; }

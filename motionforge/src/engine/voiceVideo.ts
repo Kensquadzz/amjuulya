@@ -25,7 +25,15 @@ export interface VoiceVideoOptions {
   subtitles: boolean;
   music: boolean;
   name?: string;
+  /** visual system: app concept (default), liquid glass, cinematic typography */
+  style?: VoiceStyle;
 }
+export type VoiceStyle = 'app' | 'glass' | 'cinema';
+export const VOICE_STYLES: { id: VoiceStyle; label: string }[] = [
+  { id: 'app', label: 'App concept' },
+  { id: 'glass', label: 'Liquid Glass' },
+  { id: 'cinema', label: 'Cinematic Type' },
+];
 export interface VoiceVideoResult { project: Project; plan: PlannedShot[]; speech: Span[]; issues: StoryIssue[]; duration: number }
 
 /** «1», "1", '1' -> the quoted text; used for the comment the CTA types. */
@@ -50,7 +58,7 @@ export function buildVoiceProject(o: VoiceVideoOptions): VoiceVideoResult {
     const start = i === 0 ? 0 : s.start;
     const end = i === plan.length - 1 ? D : Math.min(D, plan[i + 1].start + XF);
     const params: Record<string, string | number> = {
-      shot: s.shot, title: s.text || o.brand, sub: '', items: '', brand: o.brand, accent: o.accent, accent2: o.accent2 ?? '#18b4ff', seed: i,
+      shot: s.shot, title: s.text || o.brand, sub: '', items: '', brand: o.brand, accent: o.accent, accent2: o.accent2 ?? '#18b4ff', seed: i, style: o.style ?? 'app',
     };
     if (s.shot === 'cta') { params.sub = quoted(s.text) ?? (/\d/.test(s.text) ? s.text.match(/\d+/)![0] : o.brand); params.hint = 'Сэтгэгдэл бичих...'; }
     if (s.shot === 'search') params.hint = 'Хайх...';
@@ -61,9 +69,10 @@ export function buildVoiceProject(o: VoiceVideoOptions): VoiceVideoResult {
     const cues = plan.flatMap((s) => captionCues(s.text, s.start, s.end));
     if (cues.length) {
       const first = cues[0].start, last = cues[cues.length - 1].end;
-      layers.push(makeShape(D, { name: 'Subtitle box', shape: 'rect', w: 960, h: 230, radius: 46, fill: '#05070f', fillOn: true, strokeWidth: 0, x: 0.5, y: 0.735, opacity: 0.62, start: Math.max(0, first - 0.05), end: Math.min(D, last + 0.2) }));
+      const look = o.style ?? 'app';
+      layers.push(makeShape(D, { name: 'Subtitle box', shape: 'rect', w: 960, h: 230, radius: look === 'cinema' ? 0 : 46, fill: look === 'glass' ? '#14123a' : '#05070f', fillOn: true, strokeWidth: look === 'glass' ? 2 : 0, stroke: '#ffffff', x: 0.5, y: 0.735, opacity: look === 'glass' ? 0.6 : look === 'cinema' ? 0.4 : 0.62, start: Math.max(0, first - 0.05), end: Math.min(D, last + 0.2) }));
       cues.forEach((q, i) => layers.push(makeText(D, {
-        name: `Subtitle ${i + 1}`, text: q.text, fontFamily: 'Montserrat', fontWeight: 700, fontSize: 54, lineHeight: 1.2, letterSpacing: -0.005, color: '#ffffff', align: 'center',
+        name: `Subtitle ${i + 1}`, text: look === 'cinema' ? q.text.toUpperCase() : q.text, fontFamily: look === 'cinema' ? 'Oswald' : 'Montserrat', fontWeight: look === 'cinema' ? 500 : 700, fontSize: look === 'cinema' ? 58 : 54, lineHeight: 1.2, letterSpacing: -0.005, color: '#ffffff', align: 'center',
         x: 0.5, y: 0.735, start: q.start, end: i + 1 < cues.length ? cues[i + 1].start : Math.min(D, q.end + 0.2),
         anim: { preset: 'typePop', unit: 'word', delay: 0, duration: 0.28, stagger: 0.05, ease: 'easeOutCubic', direction: 'up', intensity: 0.6, order: 'forward', out: { enabled: i + 1 === cues.length, duration: 0.2, stagger: 0 } } as any,
       })));

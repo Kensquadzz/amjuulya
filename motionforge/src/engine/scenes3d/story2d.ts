@@ -124,13 +124,14 @@ export const story2d: SceneDef = {
     { key: 'accent2', kind: 'color', label: 'Highlight colour', def: '#18b4ff' },
     { key: 'headFont', kind: 'text', label: 'Headline font', def: 'Montserrat' },
     { key: 'uiFont', kind: 'text', label: 'Interface font', def: 'Inter' },
+    { key: 'style', kind: 'text', label: 'Look (app, glass, cinema)', def: 'app' },
     { key: 'seed', kind: 'float', label: 'Variation', min: 0, max: 20, def: 0 },
     ...Array.from({ length: IMGS }, (_, i) => ({ key: `img${i + 1}`, kind: 'image' as const, label: `Picture ${i + 1}`, def: '' as const })),
   ],
   create2d(kit) {
     let c: CanvasRenderingContext2D;
     let P: Record<string, number | string> = {};
-    let A = '#2f5bff', A2 = '#18b4ff', HF = 'Montserrat', UF = 'Inter', SEED = 0;
+    let A = '#2f5bff', A2 = '#18b4ff', HF = 'Montserrat', UF = 'Inter', SEED = 0, ST = 'app';
     const imgs: (HTMLImageElement | null)[] = [];
     const srcs: string[] = [];
 
@@ -222,20 +223,189 @@ export const story2d: SceneDef = {
       const x = W * 0.75 + Math.sin(t * 0.5) * 80, gl = c.createRadialGradient(x, 380, 0, x, 380, 900); gl.addColorStop(0, `rgba(${hexRgb(A)},0.16)`); gl.addColorStop(1, `rgba(${hexRgb(A)},0)`); c.fillStyle = gl; c.fillRect(0, 0, W, H);
     };
 
+    // ---------------------------------------------------------------- look: liquid glass (same shots, glass materials on a moving aurora)
+    const isGlass = () => ST === 'glass';
+    const aurora = (t: number) => {
+      c.fillStyle = '#07071a'; c.fillRect(0, 0, W, H);
+      const cols = [A, A2, '#ff3fa4', '#7c4dff'];
+      c.save(); c.globalCompositeOperation = 'lighter';
+      for (let i = 0; i < 4; i++) {
+        const x = W * (0.15 + 0.7 * hash(i * 5 + SEED)) + Math.sin(t * 0.35 + i * 1.7) * 220, y = H * (0.1 + 0.55 * hash(i * 11 + SEED)) + Math.cos(t * 0.28 + i * 2.3) * 200, r = 650 + 250 * hash(i * 3 + 1);
+        const g = c.createRadialGradient(x, y, 0, x, y, r); g.addColorStop(0, `rgba(${hexRgb(cols[i])},0.46)`); g.addColorStop(1, `rgba(${hexRgb(cols[i])},0)`); c.fillStyle = g; c.fillRect(0, 0, W, H);
+      }
+      c.restore();
+    };
+    /** a pane of glass: faint body, bright top edge, light-catching rim */
+    const glass = (x: number, y: number, w: number, h: number, r: number, body = 0.09) => {
+      c.save();
+      rr(x, y, w, h, r); c.fillStyle = `rgba(255,255,255,${body})`; c.fill();
+      const hl = c.createLinearGradient(0, y, 0, y + Math.min(h, 220)); hl.addColorStop(0, 'rgba(255,255,255,0.2)'); hl.addColorStop(1, 'rgba(255,255,255,0)'); c.fillStyle = hl; c.fill();
+      const sg = c.createLinearGradient(x, y, x + w * 0.5, y + h); sg.addColorStop(0, 'rgba(255,255,255,0.75)'); sg.addColorStop(0.45, 'rgba(255,255,255,0.1)'); sg.addColorStop(1, 'rgba(255,255,255,0.4)'); c.strokeStyle = sg; c.lineWidth = 2.5; c.stroke();
+      c.restore();
+    };
+    const bgL = (t: number) => (isGlass() ? aurora(t) : lightBg(t));
+    const bgD = (t: number) => (isGlass() ? aurora(t) : ST === 'cinema' ? cineBg(t) : darkBg(t));
+    const ink = (dark: string) => (isGlass() ? '#ffffff' : dark);
+
+    // ---------------------------------------------------------------- look: cinematic typography (own shots: black, grain, letterbox, hard cuts)
+    let GRAIN: HTMLCanvasElement | null = null;
+    const cineBg = (_t: number) => {
+      c.fillStyle = '#060606'; c.fillRect(0, 0, W, H);
+      const g = c.createRadialGradient(W / 2, 720, 60, W / 2, 720, 1150); g.addColorStop(0, 'rgba(46,46,52,0.85)'); g.addColorStop(1, 'rgba(0,0,0,0)'); c.fillStyle = g; c.fillRect(0, 0, W, H);
+    };
+    const cineOver = (t: number) => {
+      if (!GRAIN) { GRAIN = document.createElement('canvas'); GRAIN.width = GRAIN.height = 256; const gx = GRAIN.getContext('2d')!, d = gx.createImageData(256, 256); for (let i = 0; i < d.data.length; i += 4) { const v = hash(i * 0.37) * 255; d.data[i] = d.data[i + 1] = d.data[i + 2] = v; d.data[i + 3] = 255; } gx.putImageData(d, 0, 0); }
+      const f = Math.floor(t * 24);
+      c.save(); c.globalAlpha *= 0.07; c.globalCompositeOperation = 'overlay';
+      const ox = -hash(f) * 256, oy = -hash(f + 0.5) * 256;
+      for (let y = oy; y < H; y += 256) for (let x = ox; x < W; x += 256) c.drawImage(GRAIN, x, y);
+      c.restore();
+      c.fillStyle = '#000'; c.fillRect(0, 0, W, 118); c.fillRect(0, H - 118, W, 118);
+    };
+    const mono = (s: string, x: number, y: number, px: number, col: string, align: CanvasTextAlign = 'left', spacing = 6) => {
+      (c as any).letterSpacing = `${spacing}px`; text(s, x, y, 500, px, col, align, 'JetBrains Mono'); (c as any).letterSpacing = '0px';
+    };
+    /** uppercase condensed headline; each word slams in (scale 1.35 -> 1) on its own beat */
+    const slam = (s: string, x: number, yc: number, maxW: number, px: number, t: number, t0: number, maxLines = 4, beat = 0.09) => {
+      const up = s.toUpperCase().trim();
+      const { lines: ls, size } = wrap(up, maxW, 700, px, 'Oswald', maxLines);
+      const lh = size * 1.04, y0 = yc - ((ls.length - 1) * lh) / 2;
+      const hi = up.split(/\s+/).reduce((a, b) => (b.replace(/[^\p{L}\d]/gu, '').length > a.replace(/[^\p{L}\d]/gu, '').length ? b : a), '');
+      let wi = 0;
+      ls.forEach((line, li) => {
+        let xx = x;
+        for (const w of line.split(' ')) {
+          const k = seg(t, t0 + wi * beat, t0 + wi * beat + 0.16); wi++;
+          const wW = tw(w, 700, size, 'Oswald');
+          if (k > 0) { const sc = 1 + 0.35 * (1 - eo5(k)); c.save(); c.translate(xx + wW / 2, y0 + li * lh); c.scale(sc, sc); c.globalAlpha *= Math.min(1, k * 3); text(w, -wW / 2, 0, 700, size, w === hi ? A : '#f4f4f2', 'left', 'Oswald'); c.restore(); }
+          xx += wW + tw(' ', 700, size, 'Oswald');
+        }
+      });
+      return { top: y0 - size * 0.55, bottom: y0 + (ls.length - 1) * lh + size * 0.55, size, words: wi };
+    };
+    const rule = (x: number, y: number, w: number, k: number) => { c.fillStyle = A; c.fillRect(x, y, w * eo(k), 6); };
+    const tag = (s: string, t: number) => { const a = seg(t, 0.05, 0.25); c.save(); c.globalAlpha *= a; mono(s, 90, 230, 26, 'rgba(255,255,255,0.55)'); c.restore(); rule(90, 262, 120, seg(t, 0.1, 0.5)); };
+    const num2 = (i: number) => String(i + 1).padStart(2, '0');
+
+    const cineTitle = (t: number, D: number) => {
+      cineBg(t);
+      const z = 1 + 0.03 * (t / D); c.save(); c.translate(W / 2, 720); c.scale(z, z); c.translate(-W / 2, -720);
+      tag(`${num2(Math.round(SEED))} / ${fmt(P.brand).toUpperCase()}`, t);
+      const r = slam(fmt(P.title), 90, 700, W - 180, 150, t, 0.12, 5);
+      const sub = fmt(P.sub);
+      if (sub) { c.save(); c.globalAlpha *= seg(t, 0.4 + r.words * 0.09, 0.8 + r.words * 0.09); mono(sub.toUpperCase(), 90, r.bottom + 70, 28, 'rgba(255,255,255,0.7)', 'left', 3); c.restore(); }
+      c.restore();
+    };
+    const cineHook = (t: number, D: number) => {
+      cineBg(t);
+      // a giant outlined question mark (or the shot number) behind the line
+      const ask = /\?/.test(fmt(P.title)), qk = eo(seg(t, 0, 0.6)), qs = 1.15 - 0.15 * qk + 0.03 * (t / D);
+      c.save(); c.globalAlpha *= 0.9 * qk; c.translate(W * 0.72, 760); c.scale(qs, qs); font(700, ask ? 1100 : 760, 'Oswald'); c.textAlign = 'center'; c.textBaseline = 'middle'; c.lineWidth = 6; c.strokeStyle = `rgba(${hexRgb(A)},0.55)`; c.strokeText(ask ? '?' : num2(Math.round(SEED)), 0, 0); c.restore();
+      tag(ask ? 'QUESTION' : 'NOTE', t);
+      slam(fmt(P.title), 90, 760, W - 180, 140, t, 0.2, 5, 0.12);
+    };
+    const cineBrand = (t: number, D: number) => {
+      cineBg(t);
+      // a light streak sweeps the frame, the name opens from the centre
+      const sk = seg(t, 0, 0.7), sx = lerp(-300, W + 300, eio(sk));
+      const sg = c.createLinearGradient(sx - 500, 0, sx + 500, 0); sg.addColorStop(0, 'rgba(255,255,255,0)'); sg.addColorStop(0.5, `rgba(${hexRgb(A2)},0.9)`); sg.addColorStop(1, 'rgba(255,255,255,0)');
+      c.save(); c.globalAlpha *= 1 - seg(t, 0.55, 0.85); c.fillStyle = sg; c.fillRect(0, 758, W, 4); c.restore();
+      const flare = c.createRadialGradient(sx, 760, 0, sx, 760, 260); flare.addColorStop(0, `rgba(${hexRgb(A2)},${0.5 * (1 - sk)})`); flare.addColorStop(1, 'rgba(0,0,0,0)'); c.fillStyle = flare; c.fillRect(0, 400, W, 720);
+      const words = fmt(P.brand).toUpperCase().split(/\s+/).filter(Boolean), top = words.slice(0, Math.ceil(words.length / 2)).join(' '), bot = words.slice(Math.ceil(words.length / 2)).join(' ');
+      const open = eo5(seg(t, 0.35, 1.0)), sp = lerp(60, 14, eo(seg(t, 0.35, D)));
+      c.save(); c.beginPath(); c.rect(0, 760 - 260 * open, W, 520 * open); c.clip();
+      (c as any).letterSpacing = `${sp}px`;
+      text(top, W / 2 + sp / 2, 690, 700, fitPx(top, W - 160 - sp * top.length, 700, 170, 'Oswald'), '#ffffff', 'center', 'Oswald');
+      (c as any).letterSpacing = '0px';
+      if (bot) mono(bot, W / 2, 850, 40, A, 'center', 18);
+      c.restore();
+    };
+    const cineType = (t: number, D: number, comment = false) => {
+      cineBg(t);
+      tag(comment ? 'COMMENT' : 'SEARCH', t);
+      const q = comment ? fmt(P.title) : fmt(P.title), t0 = 0.3, t1 = Math.max(t0 + 0.3, D * 0.75);
+      const n = Math.round(q.length * seg(t, t0, t1)), shown = q.slice(0, n);
+      const { lines: ls, size } = wrap(shown || ' ', W - 260, 500, 58, 'JetBrains Mono', 6);
+      const lh = size * 1.45, y0 = 700 - ((ls.length - 1) * lh) / 2;
+      text('>', 90, y0, 700, size, A, 'left', 'JetBrains Mono');
+      ls.forEach((l, i) => text(l, 150, y0 + i * lh, 500, size, '#ededed', 'left', 'JetBrains Mono'));
+      const last = ls[ls.length - 1] ?? '', cx = 150 + tw(last, 500, size, 'JetBrains Mono') + 6;
+      if (Math.floor(t * 2.4) % 2 === 0 || n < q.length) { c.fillStyle = A; c.fillRect(cx, y0 + (ls.length - 1) * lh - size * 0.55, size * 0.58, size * 1.1); }
+      if (comment) {
+        // the comment itself, huge
+        const v = fmt(P.sub) || '1', k = back(seg(t, t1, t1 + 0.4));
+        if (k > 0) { c.save(); c.translate(W / 2, 1060); c.scale(k, k); font(700, 300, 'Oswald'); c.textAlign = 'center'; c.textBaseline = 'middle'; c.lineWidth = 8; c.strokeStyle = A; c.strokeText(`«${v}»`, 0, 0); c.restore(); }
+      }
+    };
+    const cineFrames = (t: number, D: number) => {
+      // Ken Burns over full-bleed pictures, one per beat
+      cineBg(t);
+      const n = Math.max(1, Math.min(3, nImg() || 1)), per = D / n, i = Math.min(n - 1, Math.floor(t / per)), lt = t - i * per;
+      const z = 1.12 - 0.1 * (lt / per), dx = (i % 2 ? -1 : 1) * 30 * (lt / per);
+      c.save(); c.translate(W / 2 + dx, 760); c.scale(z, z); c.translate(-W / 2, -760); page(Math.round(SEED) + i, 0, 118, W, H - 236, 0.15); c.restore();
+      const sh = c.createLinearGradient(0, 118, 0, H); sh.addColorStop(0, 'rgba(0,0,0,0.75)'); sh.addColorStop(0.35, 'rgba(0,0,0,0.15)'); sh.addColorStop(0.65, 'rgba(0,0,0,0.25)'); sh.addColorStop(1, 'rgba(0,0,0,0.9)'); c.fillStyle = sh; c.fillRect(0, 0, W, H);
+      if (!nImg()) { c.fillStyle = 'rgba(6,6,8,0.55)'; c.fillRect(0, 0, W, H); }
+      tag(`${num2(i)} / ${num2(n - 1)}`, t);
+      slam(fmt(P.title), 90, 420, W - 180, 96, t, 0.15, 3);
+    };
+    const cineStrip = (t: number, D: number) => {
+      cineBg(t);
+      tag('LIBRARY', t);
+      slam(fmt(P.title), 90, 400, W - 180, 88, t, 0.1, 3);
+      // a moving film strip of documents
+      const FW = 400, FH = 540, y = 780, off = (t * 140 + SEED * 37) % (FW + 40), k = eo(seg(t, 0.1, 0.6));
+      c.save(); c.globalAlpha *= k; c.fillStyle = '#111'; c.fillRect(0, y - FH / 2 - 60, W, FH + 120);
+      for (let x = -off - 40; x < W + 40; x += 60) { rr(x, y - FH / 2 - 44, 30, 24, 5); c.fillStyle = '#2a2a2a'; c.fill(); rr(x, y + FH / 2 + 20, 30, 24, 5); c.fill(); }
+      for (let j = -1; j < 4; j++) { const x = j * (FW + 40) - off + 60, idx = j + Math.floor((t * 140 + SEED * 37) / (FW + 40)); c.save(); rr(x, y - FH / 2, FW, FH, 6); c.clip(); page(idx, x, y - FH / 2, FW, FH, 0); c.restore(); }
+      c.restore();
+      const mid = W / 2 - FW / 2 - 6, hk = seg(t, D * 0.55, D * 0.65);
+      if (hk > 0) { c.strokeStyle = A; c.lineWidth = 8; c.strokeRect(mid, y - FH / 2 - 6, (FW + 12) * eo(hk), FH + 12); }
+    };
+    const cineList = (t: number, D: number) => {
+      cineBg(t);
+      const items = itemsOf().slice(0, 5), head = lines(P.items).length ? fmt(P.title) : fmt(P.sub);
+      tag(head ? head.toUpperCase().slice(0, 34) : 'WHAT YOU GET', t);
+      const n = Math.max(1, items.length), step = Math.min(190, 900 / n), y0 = 760 - ((n - 1) * step) / 2;
+      items.forEach((it, i) => {
+        const a = 0.2 + i * Math.min(0.45, (D * 0.6) / n), k = eo5(seg(t, a, a + 0.35));
+        if (k <= 0) return;
+        const y = y0 + i * step;
+        mono(num2(i), 90, y, 30, A, 'left', 2);
+        const px = fitPx(it.toUpperCase(), W - 300, 700, Math.min(84, step * 0.55), 'Oswald');
+        c.save(); c.beginPath(); c.rect(170, y - px, (W - 170) * k, px * 2); c.clip(); text(it.toUpperCase(), 170, y, 700, px, '#f4f4f2', 'left', 'Oswald'); c.restore();
+        c.fillStyle = 'rgba(255,255,255,0.12)'; c.fillRect(90, y + step / 2 - 2, (W - 180) * k, 2);
+      });
+    };
+    const cineRoll = (t: number, D: number) => {
+      cineBg(t);
+      const words = (itemsOf().length >= 2 ? itemsOf() : fmt(P.title).split(/\s+/).filter(Boolean)).map((w) => w.toUpperCase());
+      if (!words.length) return;
+      const pos = eio(seg(t, 0.2, D - 0.4)) * (words.length - 1), cy = 760, lh = 150;
+      for (let i = 0; i < words.length; i++) {
+        const d = i - pos; if (Math.abs(d) > 6) continue;
+        const near = Math.exp(-d * d * 3), w = words[i], px = fitPx(w, W - 260, 700, 132, 'Oswald');
+        c.save(); c.globalAlpha *= Math.max(0.12, near) * Math.exp(-d * d * 0.06);
+        if (near > 0.5) text(w, 150, cy + d * lh, 700, px, '#ffffff', 'left', 'Oswald');
+        else { font(700, px, 'Oswald'); c.textAlign = 'left'; c.textBaseline = 'middle'; c.lineWidth = 2; c.strokeStyle = 'rgba(255,255,255,0.6)'; c.strokeText(w, 150, cy + d * lh); }
+        c.restore();
+      }
+      c.fillStyle = A; c.fillRect(90, cy - 60, 14, 120);
+    };
+
     // ---------------------------------------------------------------- shots (t: seconds into the shot, D: its length)
     const DOCK = ['notes', 'word', 'brand', 'excel', 'chat'], STEP = 172, DY = 800;
     const dockX = (k: string) => W / 2 + (DOCK.indexOf(k) - 2) * STEP;
     const target = () => { const s = (fmt(P.title) + ' ' + fmt(P.sub)).toLowerCase(); return /excel/.test(s) ? 'excel' : /word/.test(s) ? 'word' : 'brand'; };
     const shotDock = (t: number, D: number) => {
-      c.fillStyle = '#ebebed'; c.fillRect(0, 0, W, H);
-      const vg = c.createRadialGradient(W / 2, H * 0.42, 100, W / 2, H * 0.42, 1300); vg.addColorStop(0, 'rgba(255,255,255,0.55)'); vg.addColorStop(1, 'rgba(0,0,0,0.06)'); c.fillStyle = vg; c.fillRect(0, 0, W, H);
+      if (isGlass()) aurora(t);
+      else { c.fillStyle = '#ebebed'; c.fillRect(0, 0, W, H); const vg = c.createRadialGradient(W / 2, H * 0.42, 100, W / 2, H * 0.42, 1300); vg.addColorStop(0, 'rgba(255,255,255,0.55)'); vg.addColorStop(1, 'rgba(0,0,0,0.06)'); c.fillStyle = vg; c.fillRect(0, 0, W, H); }
       const z = 1 + 0.08 * eio(t / D);
       c.save(); c.translate(W / 2, DY); c.scale(z, z); c.translate(-W / 2, -DY);
       const intro = eo(seg(t, 0, 0.45));
       c.save(); c.globalAlpha *= intro;
       const total = DOCK.length * STEP - 40;
-      rr(W / 2 - total / 2 - 26, DY - 92, total + 52, 184, 50); c.fillStyle = 'rgba(255,255,255,0.82)'; c.shadowColor = 'rgba(0,0,0,0.1)'; c.shadowBlur = 40; c.shadowOffsetY = 12; c.fill(); c.shadowColor = 'transparent';
-      c.strokeStyle = '#ffffff'; c.lineWidth = 2; c.stroke();
+      if (isGlass()) glass(W / 2 - total / 2 - 26, DY - 92, total + 52, 184, 50, 0.12);
+      else { rr(W / 2 - total / 2 - 26, DY - 92, total + 52, 184, 50); c.fillStyle = 'rgba(255,255,255,0.82)'; c.shadowColor = 'rgba(0,0,0,0.1)'; c.shadowBlur = 40; c.shadowOffsetY = 12; c.fill(); c.shadowColor = 'transparent'; c.strokeStyle = '#ffffff'; c.lineWidth = 2; c.stroke(); }
       const tg = target(), tx = dockX(tg), click = Math.max(0.9, D - 0.4);
       const tour = [dockX('chat'), dockX('notes'), dockX(tg === 'excel' ? 'word' : 'excel')];
       const [mx, my] = keys(t, [[0.15, 1000, 560], [click * 0.3, tour[0] + 6, DY + 6], [click * 0.55, tour[1] + 6, DY + 8], [click * 0.8, tour[2] + 6, DY + 6], [click - 0.08, tx + 6, DY + 4], [D, tx + 6, DY + 4]]);
@@ -252,8 +422,8 @@ export const story2d: SceneDef = {
     };
     const shotBrand = (t: number, D: number) => {
       const cx = W / 2, cy = DY, k = seg(t, 0, 0.5);
-      c.fillStyle = '#ebebed'; c.fillRect(0, 0, W, H);
-      c.fillStyle = A; c.beginPath(); c.arc(cx, cy, 2300 * eo5(k), 0, Math.PI * 2); c.fill();
+      if (isGlass()) aurora(t); else { c.fillStyle = '#ebebed'; c.fillRect(0, 0, W, H); }
+      c.fillStyle = isGlass() ? `rgba(${hexRgb(A)},0.5)` : A; c.beginPath(); c.arc(cx, cy, 2300 * eo5(k), 0, Math.PI * 2); c.fill();
       for (let i = 0; i < 70; i++) {
         const a = hash(i + SEED) * Math.PI * 2, life = seg(t, hash(i + 2) * 0.12, 0.8);
         if (life <= 0 || life >= 1) continue;
@@ -267,8 +437,11 @@ export const story2d: SceneDef = {
       c.save(); c.translate(cx, cy); c.scale(ls, ls);
       if (sw <= 0) {
         c.beginPath(); c.arc(0, 0, 178, 0, Math.PI * 2); c.strokeStyle = 'rgba(255,255,255,0.95)'; c.lineWidth = 10; c.stroke();
-        c.shadowColor = 'rgba(0,0,0,0.2)'; c.shadowBlur = 40; c.shadowOffsetY = 16; c.beginPath(); c.arc(0, 0, 160, 0, Math.PI * 2); c.fillStyle = '#fff'; c.fill(); c.shadowColor = 'transparent';
-        const lg = c.createLinearGradient(0, -150, 0, 150); lg.addColorStop(0, `rgba(${hexRgb(A)},0.82)`); lg.addColorStop(1, A); c.beginPath(); c.arc(0, 0, 146, 0, Math.PI * 2); c.fillStyle = lg; c.fill();
+        if (isGlass()) { glass(-160, -160, 320, 320, 160, 0.14); const lg = c.createLinearGradient(0, -140, 0, 140); lg.addColorStop(0, `rgba(${hexRgb(A2)},0.55)`); lg.addColorStop(1, `rgba(${hexRgb(A)},0.75)`); c.beginPath(); c.arc(0, 0, 138, 0, Math.PI * 2); c.fillStyle = lg; c.fill(); }
+        else {
+          c.shadowColor = 'rgba(0,0,0,0.2)'; c.shadowBlur = 40; c.shadowOffsetY = 16; c.beginPath(); c.arc(0, 0, 160, 0, Math.PI * 2); c.fillStyle = '#fff'; c.fill(); c.shadowColor = 'transparent';
+          const lg = c.createLinearGradient(0, -150, 0, 150); lg.addColorStop(0, `rgba(${hexRgb(A)},0.82)`); lg.addColorStop(1, A); c.beginPath(); c.arc(0, 0, 146, 0, Math.PI * 2); c.fillStyle = lg; c.fill();
+        }
         if (shred > 0) { c.strokeStyle = 'rgba(255,255,255,0.85)'; c.lineWidth = 3; for (const [a, r, len, s] of SHREDS) { if (s > shred * 1.3) continue; c.beginPath(); c.moveTo(Math.cos(a) * r * 0.5, Math.sin(a) * r * 0.5); c.lineTo(Math.cos(a) * (r * 0.5 + len * shred), Math.sin(a) * (r * 0.5 + len * shred)); c.stroke(); } }
         mark(0, 0, 2.7 * (1 - 0.1 * shred));
       } else {
@@ -284,7 +457,7 @@ export const story2d: SceneDef = {
       c.restore();
     };
     const shotSearch = (t: number, D: number, comment = false) => {
-      buildMeadow(); drawMeadow(t);
+      if (isGlass()) aurora(t); else { buildMeadow(); drawMeadow(t); }
       const q = comment ? (fmt(P.sub) || '1') : fmt(P.title);
       // phases scale with the shot: click, zoom in, type, zoom out, send
       const click = Math.min(0.7, D * 0.12), zin = Math.min(1.1, D * 0.2), go = D - Math.min(0.7, D * 0.12), zout = go - Math.min(1.0, D * 0.18);
@@ -300,16 +473,20 @@ export const story2d: SceneDef = {
       c.save(); c.translate(W / 2, fy); c.scale(ap * press, ap * press); c.translate(-W / 2, -fy);
       c.globalAlpha *= seg(t, 0, 0.3);
       const ty = by + 30, th = 190, s = 1 + 0.018 * t;
-      c.save(); rr(bx - 10, ty, bw + 20, th, 52); c.clip(); c.drawImage(MEADOW_BLUR!, W / 2 + (-160 - SEED * 13 - W / 2) * s, H / 2 + (-230 - H / 2) * s, 1400 * s, 2300 * s); c.fillStyle = 'rgba(255,255,255,0.22)'; c.fillRect(bx - 10, ty, bw + 20, th); c.restore();
-      rr(bx - 10, ty, bw + 20, th, 52); c.strokeStyle = 'rgba(255,255,255,0.65)'; c.lineWidth = 2; c.stroke();
+      if (isGlass()) glass(bx - 10, ty, bw + 20, th, 52, 0.08);
+      else {
+        c.save(); rr(bx - 10, ty, bw + 20, th, 52); c.clip(); c.drawImage(MEADOW_BLUR!, W / 2 + (-160 - SEED * 13 - W / 2) * s, H / 2 + (-230 - H / 2) * s, 1400 * s, 2300 * s); c.fillStyle = 'rgba(255,255,255,0.22)'; c.fillRect(bx - 10, ty, bw + 20, th); c.restore();
+        rr(bx - 10, ty, bw + 20, th, 52); c.strokeStyle = 'rgba(255,255,255,0.65)'; c.lineWidth = 2; c.stroke();
+      }
       NAV.forEach((nv, i) => navIcon(nv, bx + 120 + i * ((bw - 240) / 5), ty + th - 52, 'rgba(255,255,255,0.78)'));
-      c.shadowColor = 'rgba(0,30,60,0.18)'; c.shadowBlur = 30; c.shadowOffsetY = 10; rr(bx, by, bw, ih, 50); c.fillStyle = 'rgba(255,255,255,0.97)'; c.fill(); c.shadowColor = 'transparent';
+      if (isGlass()) glass(bx, by, bw, ih, 50, 0.16);
+      else { c.shadowColor = 'rgba(0,30,60,0.18)'; c.shadowBlur = 30; c.shadowOffsetY = 10; rr(bx, by, bw, ih, 50); c.fillStyle = 'rgba(255,255,255,0.97)'; c.fill(); c.shadowColor = 'transparent'; }
       c.beginPath(); c.arc(bx + 58, fy, 27, 0, Math.PI * 2); c.fillStyle = A; c.fill(); mark(bx + 58, fy, 0.56);
-      if (!typed) text(fmt(P.hint) || (comment ? 'Сэтгэгдэл бичих...' : 'Хайх...'), textX, fy, 400, 34, '#9aa1ad', 'left', UF);
+      if (!typed) text(fmt(P.hint) || (comment ? 'Сэтгэгдэл бичих...' : 'Хайх...'), textX, fy, 400, 34, isGlass() ? 'rgba(255,255,255,0.6)' : '#9aa1ad', 'left', UF);
       else {
         c.save(); c.beginPath(); c.rect(textX - 8, by, areaR - textX + 16, ih); c.clip();
         const tx0 = textX - scrollX, done = typed.slice(0, typed.length - active.length), dw = tw(done, 600, 36);
-        text(done, tx0, fy, 600, 36, '#111318', 'left', UF);
+        text(done, tx0, fy, 600, 36, ink('#111318'), 'left', UF);
         const hg = c.createLinearGradient(tx0 + dw, 0, tx0 + dw + Math.max(40, tw(active, 600, 36)), 0); hg.addColorStop(0, A2); hg.addColorStop(1, A);
         text(active, tx0 + dw, fy, 600, 36, hg, 'left', UF); c.restore();
       }
@@ -319,7 +496,7 @@ export const story2d: SceneDef = {
       const sp = 1 - 0.14 * Math.sin(Math.PI * seg(t, go, go + 0.2)), on = t > go;
       c.save(); c.translate(bx + bw - 66, fy); c.scale(sp, sp);
       c.beginPath(); c.arc(0, 0, 34, 0, Math.PI * 2); c.fillStyle = on ? A : 'rgba(0,0,0,0.04)'; c.fill();
-      c.strokeStyle = on ? '#fff' : '#111318'; c.lineWidth = 4.5; c.lineCap = 'round'; c.lineJoin = 'round';
+      c.strokeStyle = on ? '#fff' : ink('#111318'); c.lineWidth = 4.5; c.lineCap = 'round'; c.lineJoin = 'round';
       if (comment) { c.beginPath(); c.moveTo(-12, -11); c.lineTo(14, 0); c.lineTo(-12, 11); c.lineTo(-6, 0); c.closePath(); c.stroke(); }
       else { c.beginPath(); c.arc(-4, -4, 13, 0, Math.PI * 2); c.stroke(); c.beginPath(); c.moveTo(6, 6); c.lineTo(15, 15); c.stroke(); }
       c.restore(); c.restore();
@@ -333,21 +510,23 @@ export const story2d: SceneDef = {
     };
     const VAR = [['#d7e2ff', '#7ea2ff'], ['#ffe1c2', '#ff9a3d'], ['#efd9ff', '#a855f7'], ['#d9fbe8', '#22c55e'], ['#ffffff', '#ffffff']];
     const shotCards = (t: number, D: number) => {
-      lightBg(t);
+      bgL(t);
       const n = VAR.length, kk = seg(t, 0, D - 0.25) * n, i = Math.min(n - 1, Math.floor(kk)), local = Math.min(1, kk - i);
       const pop = 0.93 + 0.07 * back(clamp(local * 3)), w = 660 * pop, h = 856 * pop, tilt = (i % 2 ? -1 : 1) * 0.12 * (1 - eo(local * 2));
       c.save(); c.translate(W / 2, 780); c.transform(1, tilt * 0.35, 0, 1, 0, 0); c.scale(1 - Math.abs(tilt) * 0.5, 1);
       c.shadowColor = 'rgba(30,40,80,0.22)'; c.shadowBlur = 50; c.shadowOffsetY = 22; rr(-w / 2, -h / 2, w, h, 34);
-      const bg = c.createLinearGradient(-w / 2, -h / 2, w / 2, h / 2); bg.addColorStop(0, VAR[i][0]); bg.addColorStop(1, VAR[i][1]); c.fillStyle = bg; c.fill(); c.shadowColor = 'transparent';
+      const bg = c.createLinearGradient(-w / 2, -h / 2, w / 2, h / 2); bg.addColorStop(0, VAR[i][0]); bg.addColorStop(1, VAR[i][1]); c.fillStyle = bg; if (isGlass()) c.globalAlpha *= 0.35; c.fill(); if (isGlass()) c.globalAlpha /= 0.35; c.shadowColor = 'transparent';
       c.save(); rr(-w / 2, -h / 2, w, h, 34); c.clip();
       const last = i === n - 1, pw = last ? w : w * 0.8, ph = last ? h : h * 0.82;
       c.translate(0, last ? 0 : 18); c.shadowColor = 'rgba(0,0,0,0.18)'; c.shadowBlur = 20; c.fillStyle = '#fff'; c.fillRect(-pw / 2, -ph / 2, pw, ph); c.shadowColor = 'transparent';
       page(Math.round(SEED) + (nImg() > 1 ? i % 2 : 0), -pw / 2, -ph / 2, pw, ph, 0);
       if (!last) { c.globalCompositeOperation = 'multiply'; c.fillStyle = VAR[i][0]; c.fillRect(-pw / 2, -ph / 2, pw, ph); c.globalCompositeOperation = 'source-over'; }
-      c.restore(); c.restore();
+      c.restore();
+      if (isGlass()) glass(-w / 2, -h / 2, w, h, 34, 0.04);
+      c.restore();
     };
     const shotGrid = (t: number, D: number) => {
-      lightBg(t);
+      bgL(t);
       const saveAt = D * 0.42, pullFrom = D * 0.62, pullTo = D * 0.95;
       const z = lerp(1, 0.38, eio(seg(t, pullFrom, pullTo))), drift = t * 26, COLW = 310, GAP = 26, HC = 4, HR = 5, x0 = W / 2 - (COLW + GAP) * HC;
       c.save(); c.translate(W / 2, 780); c.scale(z, z); c.translate(-W / 2, -780);
@@ -387,7 +566,7 @@ export const story2d: SceneDef = {
     };
     const itemsOf = () => { const l = lines(P.items); if (l.length) return l; return splitList(fmt(P.title)).map((s) => s.replace(/[.!?]$/, '')); };
     const shotRoll = (t: number, D: number) => {
-      buildKeyboard(); c.drawImage(KEYBOARD!, -110, -90);
+      if (isGlass()) aurora(t); else { buildKeyboard(); c.drawImage(KEYBOARD!, -110, -90); }
       const words = itemsOf().length >= 2 ? itemsOf() : fmt(P.title).split(/\s+/).filter(Boolean);
       if (!words.length) return;
       const pos = eio(seg(t, 0.2, D - 0.4)) * (words.length - 1), cy = 780, lh = 118;
@@ -397,11 +576,12 @@ export const story2d: SceneDef = {
         c.save(); c.globalAlpha *= (0.22 + 0.78 * near) * Math.exp(-d * d * 0.05); text(w, W / 2, cy + d * lh, 700, px, near > 0.5 ? '#ffffff' : '#8b8f99', 'center', HF); c.restore();
       }
       const ci = Math.round(pos), w = words[ci], bw = tw(w, 700, fitPx(w, W - 200, 700, 96, HF), HF) + 56, bh = 128;
+      if (isGlass()) { glass(W / 2 - bw / 2 - 20, cy - bh / 2 - 6, bw + 40, bh + 12, 40, 0.1); return; }
       c.strokeStyle = '#2f7bff'; c.lineWidth = 4; c.strokeRect(W / 2 - bw / 2, cy - bh / 2, bw, bh);
       for (const [hx, hy] of [[-1, -1], [1, -1], [-1, 1], [1, 1], [0, -1], [0, 1]]) { c.fillStyle = '#fff'; c.fillRect(W / 2 + hx * bw / 2 - 8, cy + hy * bh / 2 - 8, 16, 16); c.strokeRect(W / 2 + hx * bw / 2 - 8, cy + hy * bh / 2 - 8, 16, 16); }
     };
     const shotTitle = (t: number, D: number) => {
-      darkBg(t);
+      bgD(t);
       // fine diagonal light lines drifting
       c.save(); c.globalAlpha *= 0.08; c.strokeStyle = '#ffffff'; c.lineWidth = 2;
       for (let i = -6; i < 14; i++) { const x = i * 140 + (t * 40) % 140; c.beginPath(); c.moveTo(x, 0); c.lineTo(x + 900, H); c.stroke(); }
@@ -429,23 +609,26 @@ export const story2d: SceneDef = {
       c.restore();
     };
     const shotFeatures = (t: number, D: number) => {
-      lightBg(t);
+      bgL(t);
       const items = itemsOf().slice(0, 5), head = lines(P.items).length ? fmt(P.title) : fmt(P.sub);
-      if (head) { const h = wrap(head, W - 180, 800, 62, HF, 2); h.lines.forEach((l, i) => { const a = eo(seg(t, 0.05, 0.5)); c.save(); c.globalAlpha *= a; text(l, W / 2, 330 + i * h.size * 1.15 + 20 * (1 - a), 800, h.size, '#0f1424', 'center', HF); c.restore(); }); }
+      if (head) { const h = wrap(head, W - 180, 800, 62, HF, 2); h.lines.forEach((l, i) => { const a = eo(seg(t, 0.05, 0.5)); c.save(); c.globalAlpha *= a; text(l, W / 2, 330 + i * h.size * 1.15 + 20 * (1 - a), 800, h.size, ink('#0f1424'), 'center', HF); c.restore(); }); }
       const n = Math.max(1, items.length), step = Math.min(160, 760 / n), y0 = 780 - ((n - 1) * step) / 2 + (head ? 30 : 0);
       items.forEach((it, i) => {
         const k = back(seg(t, 0.25 + i * Math.min(0.5, (D * 0.55) / n), 0.75 + i * Math.min(0.5, (D * 0.55) / n)));
         if (k <= 0) return;
         const y = y0 + i * step, w = 880, h = Math.min(128, step - 22);
         c.save(); c.translate(W / 2 + (1 - k) * 420, y); c.globalAlpha *= clamp(k * 1.4);
-        c.shadowColor = 'rgba(20,30,70,0.12)'; c.shadowBlur = 30; c.shadowOffsetY = 10; rr(-w / 2, -h / 2, w, h, 30); c.fillStyle = '#ffffff'; c.fill(); c.shadowColor = 'transparent';
+        if (isGlass()) glass(-w / 2, -h / 2, w, h, 30, 0.1);
+        else { c.shadowColor = 'rgba(20,30,70,0.12)'; c.shadowBlur = 30; c.shadowOffsetY = 10; rr(-w / 2, -h / 2, w, h, 30); c.fillStyle = '#ffffff'; c.fill(); c.shadowColor = 'transparent'; }
         c.beginPath(); c.arc(-w / 2 + 64, 0, 30, 0, Math.PI * 2); c.fillStyle = A; c.fill(); navIcon('check', -w / 2 + 64, 0, '#fff');
-        const px = fitPx(it, w - 160, 600, 40, UF); text(it, -w / 2 + 116, 0, 600, px, '#111827', 'left', UF);
+        const px = fitPx(it, w - 160, 600, 40, UF); text(it, -w / 2 + 116, 0, 600, px, ink('#111827'), 'left', UF);
         c.restore();
       });
     };
     const shotStat = (t: number, D: number) => {
-      darkBg(t);
+      bgD(t);
+      if (isGlass()) { const k = back(seg(t, 0, 0.5)); c.save(); c.translate(W / 2, 760); c.scale(k, k); glass(-450, -330, 900, 560, 64, 0.08); c.restore(); }
+      if (ST === 'cinema') { tag('PRICE', t); c.strokeStyle = 'rgba(255,255,255,0.18)'; c.lineWidth = 2; c.strokeRect(90, 400, W - 180, 700); }
       const src = fmt(P.title);
       const nums = [...src.matchAll(/(\d[\d.,\s]*\d|\d)\s*(₮|%|\+|төгрөг|мянга)?/g)].map((m) => ({ raw: m[0].trim(), n: Number(m[1].replace(/[\s,]/g, '')), unit: m[2] ?? '' }));
       // with two numbers (before -> after) the leftover words rarely read well: only an explicit sub
@@ -471,17 +654,18 @@ export const story2d: SceneDef = {
     const inst: Scene2DInstance = {
       async prepare(prm) {
         P = prm;
-        const fams = [fmt(prm.headFont) || 'Montserrat', fmt(prm.uiFont) || 'Inter', 'Oswald'];
+        const fams = [fmt(prm.headFont) || 'Montserrat', fmt(prm.uiFont) || 'Inter', 'Oswald', 'JetBrains Mono'];
         try { await Promise.all(fams.flatMap((f) => [400, 500, 600, 700, 800].map((w) => document.fonts.load(`${w} 40px "${f}"`, 'Аа Өө Үү 0123')))); } catch { /* fallback fonts */ }
         await Promise.all(Array.from({ length: IMGS }, async (_, i) => { srcs[i] = fmt(prm[`img${i + 1}`]); imgs[i] = await loadImg(srcs[i]); }));
         const s = fmt(prm.shot);
-        if (s === 'search' || s === 'cta') buildMeadow();
-        if (s === 'roll') buildKeyboard();
+        const look = fmt(prm.style) || 'app';
+        if (look === 'app' && (s === 'search' || s === 'cta')) buildMeadow();
+        if (look === 'app' && s === 'roll') buildKeyboard();
       },
       draw(ctx, f: FrameState) {
         c = ctx; P = f.params;
         A = fmt(P.accent) || '#2f5bff'; A2 = fmt(P.accent2) || '#18b4ff';
-        HF = fmt(P.headFont) || 'Montserrat'; UF = fmt(P.uiFont) || 'Inter'; SEED = Number(P.seed ?? 0);
+        HF = fmt(P.headFont) || 'Montserrat'; UF = fmt(P.uiFont) || 'Inter'; SEED = Number(P.seed ?? 0); ST = fmt(P.style) || 'app';
         for (let i = 0; i < IMGS; i++) {
           const s = fmt(P[`img${i + 1}`]);
           if (s !== srcs[i]) { srcs[i] = s; imgs[i] = null; loadImg(s).then((im) => { if (srcs[i] === s) { imgs[i] = im; kit.redraw(); } }); }
@@ -491,6 +675,28 @@ export const story2d: SceneDef = {
         c.save();
         c.translate((f.W - W * k) / 2, (f.H - H * k) / 2); c.scale(k, k);
         c.beginPath(); c.rect(0, 0, W, H); c.clip();
+        if (ST === 'cinema') {
+          // hard cut: a short punch-in and a white flash instead of a dissolve
+          const pk = 1 + 0.05 * (1 - eo(seg(t, 0, 0.3)));
+          c.save(); c.translate(W / 2, H / 2); c.scale(pk, pk); c.translate(-W / 2, -H / 2);
+          switch (fmt(P.shot)) {
+            case 'dock': cineHook(t, D); break;
+            case 'brand': cineBrand(t, D); break;
+            case 'search': cineType(t, D); break;
+            case 'cta': cineType(t, D, true); break;
+            case 'cards': cineFrames(t, D); break;
+            case 'grid': cineStrip(t, D); break;
+            case 'roll': cineRoll(t, D); break;
+            case 'features': cineList(t, D); break;
+            case 'stat': shotStat(t, D); break;
+            default: cineTitle(t, D);
+          }
+          c.restore();
+          cineOver(t);
+          if (t < 0.12) { c.fillStyle = `rgba(255,255,255,${0.55 * (1 - t / 0.12)})`; c.fillRect(0, 0, W, H); }
+          c.restore();
+          return;
+        }
         // every shot dissolves in over the previous one (layers overlap slightly)
         c.globalAlpha = seg(t, 0, 0.3);
         switch (fmt(P.shot)) {

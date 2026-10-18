@@ -1,9 +1,12 @@
 // Uploads (direct to storage via presigned URL, with progress), the Media Library
 // view and the reusable media picker used by the project/influencer editors.
 import { h, api, toast, modal, confirmDialog, fmtBytes, fmtDate, busy } from './lib.js';
+import { prepareFile, PICK_ACCEPT, IMAGE_EXT, CONVERT_IMAGE_EXT, VIDEO_EXT as PICK_VIDEO_EXT } from './prepare.js';
 
 export const session = { limits: { imageMB: 15, videoMB: 500 }, accept: [], storage: null };
-const ACCEPT = '.jpg,.jpeg,.png,.webp,.avif,.gif,.mp4,.m4v,.mov,.webm';
+const ACCEPT = PICK_ACCEPT; // anything a phone/camera produces; prepare.js converts before upload
+const IMAGE_ACCEPT = ['image/*', ...[...IMAGE_EXT, ...CONVERT_IMAGE_EXT].map((e) => '.' + e)].join(',');
+const VIDEO_ACCEPT = ['video/*', ...PICK_VIDEO_EXT.map((e) => '.' + e)].join(',');
 const VIDEO_EXT = ['mp4', 'm4v', 'mov', 'webm'];
 const extOf = (n) => (/\.([a-z0-9]+)$/i.exec(n) || [, ''])[1].toLowerCase();
 const MIME = { jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp', avif: 'image/avif', gif: 'image/gif', mp4: 'video/mp4', m4v: 'video/mp4', mov: 'video/quicktime', webm: 'video/webm' };
@@ -63,12 +66,12 @@ function put(url, body, contentType, onProgress) {
 }
 
 /** Validates locally, then uploads straight to storage. Returns { item, existing }. */
-export async function uploadFile(file, { replaceId, onProgress, onStage } = {}) {
+export async function uploadFile(file, { replaceId, onProgress, onStage, onConvert } = {}) {
+  onStage?.('Шалгаж байна…');
+  // convert to web-safe formats first (HEIC → JPEG, HEVC/MOV/WebM → H.264 MP4, huge photos scaled)
+  file = await prepareFile(file, { imageLimit: session.limits.imageMB * 1048576, videoLimit: session.limits.videoMB * 1048576, onStage, onProgress: onConvert });
   const ext = extOf(file.name);
   if (!MIME[ext]) throw new Error(`.${ext || '?'} төрлийн файл зөвшөөрөгдөхгүй.`);
-  const kind = VIDEO_EXT.includes(ext) ? 'video' : 'image';
-  const limit = (kind === 'video' ? session.limits.videoMB : session.limits.imageMB) * 1048576;
-  if (file.size > limit) throw new Error(`${file.name}: хэт том байна (дээд хэмжээ ${Math.round(limit / 1048576)} MB).`);
   onStage?.('Шалгаж байна…');
   const [meta, sha] = await Promise.all([probe(file), sha256(file)]);
   const init = await api('/media/uploads', { method: 'POST', body: { name: file.name, size: file.size, type: file.type, sha256: sha, width: meta.width, height: meta.height, duration: meta.duration, hasThumb: Boolean(meta.thumb), replaceId } });
@@ -89,7 +92,8 @@ function uploadQueue(files, listEl, { onDone, replaceId } = {}) {
     const row = h('li.upload', h('span.upload__name', file.name), h('span.upload__size', fmtBytes(file.size)), bar, msg);
     listEl.prepend(row);
     try {
-      const { item, existing } = await uploadFile(file, { replaceId, onProgress: (p) => { bar.value = p; msg.textContent = `${Math.round(p * 100)}%`; }, onStage: (s) => { msg.textContent = s; } });
+      let stage = '';
+      const { item, existing } = await uploadFile(file, { replaceId, onProgress: (p) => { bar.value = p; msg.textContent = `Байршуулж байна… ${Math.round(p * 100)}%`; }, onStage: (s) => { stage = s; msg.textContent = s; bar.removeAttribute('value'); }, onConvert: (p) => { bar.value = p; msg.textContent = `${stage.replace(/…$/, '')} ${Math.round(p * 100)}%`; } });
       bar.value = 1; row.classList.add('is-ok');
       msg.textContent = existing ? 'Сан-д аль хэдийн байна — дахин ашиглана' : 'Амжилттай';
       onDone?.(item);
@@ -117,7 +121,7 @@ function uploadZone({ onFiles, multiple = true, accept = ACCEPT }) {
   input.addEventListener('change', () => { if (input.files.length) onFiles(input.files); input.value = ''; });
   const zone = h('label.dropzone', { for: input.id },
     h('strong', 'Файл сонгох эсвэл энд чирж оруулах'),
-    h('span', `Зураг: JPG, PNG, WebP, AVIF, GIF ≤ ${session.limits.imageMB} MB · Видео: MP4, MOV, WebM ≤ ${session.limits.videoMB} MB`), input);
+    h('span', `Зураг: JPG, PNG, WebP, HEIC (iPhone) … — шаардлагатай бол JPEG болгож, ${session.limits.imageMB} MB хүртэл багасгана · Видео: MP4, MOV (iPhone), WebM … — Android, iPhone-д тоглогдох H.264 MP4 болгож хөрвүүлнэ (≤ ${session.limits.videoMB} MB)`), input);
   zone.addEventListener('dragover', (e) => { e.preventDefault(); zone.classList.add('is-over'); });
   zone.addEventListener('dragleave', () => zone.classList.remove('is-over'));
   zone.addEventListener('drop', (e) => { e.preventDefault(); zone.classList.remove('is-over'); if (e.dataTransfer.files.length) onFiles(e.dataTransfer.files); });
@@ -140,7 +144,7 @@ export function openMediaDetail(m, { onChange } = {}) {
   const preview = m.kind === 'video'
     ? h('video', { src: m.url, controls: true, playsinline: true, preload: 'metadata', poster: m.thumbUrl || null, class: 'detail__media' })
     : h('img.detail__media', { src: m.url, alt: m.alt });
-  const replaceInput = h('input', { type: 'file', accept: m.kind === 'video' ? '.mp4,.m4v,.mov,.webm' : '.jpg,.jpeg,.png,.webp,.avif,.gif', class: 'sr-only', id: `rep-${m.id}` });
+  const replaceInput = h('input', { type: 'file', accept: m.kind === 'video' ? VIDEO_ACCEPT : IMAGE_ACCEPT, class: 'sr-only', id: `rep-${m.id}` });
   const progress = h('ul.uploads');
   replaceInput.addEventListener('change', async () => {
     const f = replaceInput.files[0]; if (!f) return;
@@ -212,7 +216,7 @@ function mediaGrid({ kind = '', selectable = false, multiple = false, onPick } =
     h('option', { value: '' }, 'Бүгд'), h('option', { value: 'image' }, 'Зураг'), h('option', { value: 'video' }, 'Видео'));
   const uploads = h('ul.uploads');
   const zone = uploadZone({
-    accept: kind === 'video' ? '.mp4,.m4v,.mov,.webm' : kind === 'image' ? '.jpg,.jpeg,.png,.webp,.avif,.gif' : ACCEPT,
+    accept: kind === 'video' ? VIDEO_ACCEPT : kind === 'image' ? IMAGE_ACCEPT : ACCEPT,
     onFiles: async (files) => {
       const items = (await uploadQueue(files, uploads)).filter(Boolean);
       await load();

@@ -18,8 +18,6 @@ export const TYPES = {
   gif: { kind: 'image', mime: 'image/gif' },
   mp4: { kind: 'video', mime: 'video/mp4' },
   m4v: { kind: 'video', mime: 'video/mp4' },
-  mov: { kind: 'video', mime: 'video/quicktime' },
-  webm: { kind: 'video', mime: 'video/webm' },
 };
 
 export const ACCEPT_ATTR = Object.keys(TYPES).map((e) => '.' + e).join(',');

@@ -49,6 +49,30 @@ test('upload validation: extension, size, SVG', async () => {
   assert.equal((await up({ name: 'x.jpg', size: 100, type: 'video/mp4' })).status, 400, 'extension / MIME mismatch');
 });
 
+test('videos: only H.264 + AAC MP4 is accepted (plays on Android, iPhone, desktop)', async () => {
+  const cookie = await login();
+  const A = { ...H, Cookie: cookie };
+  const { readFileSync } = await import('node:fs');
+  const upload = async (file, name) => {
+    const buf = readFileSync(new URL(`./fixtures/${file}`, import.meta.url));
+    const init = await fetch(`${BASE}/api/admin/media/uploads`, { method: 'POST', headers: A, body: JSON.stringify({ name, size: buf.length, type: 'video/mp4' }) });
+    if (init.status !== 201) return { status: init.status };
+    const { id, uploadUrl } = await init.json();
+    const put = await fetch(new URL(uploadUrl, BASE), { method: 'PUT', headers: { 'Content-Type': 'video/mp4' }, body: buf });
+    assert.ok(put.ok, 'PUT to storage');
+    const done = await fetch(`${BASE}/api/admin/media/${id}/complete`, { method: 'POST', headers: A, body: '{}' });
+    return { status: done.status, body: await done.json() };
+  };
+  assert.equal((await fetch(`${BASE}/api/admin/media/uploads`, { method: 'POST', headers: A, body: JSON.stringify({ name: 'clip.mov', size: 1000, type: 'video/quicktime' }) })).status, 400, 'MOV must be converted first');
+  assert.equal((await fetch(`${BASE}/api/admin/media/uploads`, { method: 'POST', headers: A, body: JSON.stringify({ name: 'clip.webm', size: 1000, type: 'video/webm' }) })).status, 400, 'WebM must be converted first');
+  const hevc = await upload('hevc-aac.mp4', `hevc-${Date.now()}.mp4`);
+  assert.equal(hevc.status, 400, 'HEVC MP4 rejected');
+  assert.match(hevc.body.message || '', /HEVC/);
+  const ok = await upload('h264-aac.mp4', `h264-${Date.now()}.mp4`);
+  assert.equal(ok.status, 200, 'H.264 + AAC MP4 accepted');
+  await fetch(`${BASE}/api/admin/media/${ok.body.item.id}`, { method: 'DELETE', headers: A });
+});
+
 test('input validation on content & projects', async () => {
   const cookie = await login();
   const bad = await fetch(`${BASE}/api/admin/projects`, { method: 'POST', headers: { ...H, Cookie: cookie }, body: JSON.stringify({ title: '' }) });

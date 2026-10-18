@@ -5,7 +5,8 @@ import { query, one, tx } from './db.js';
 import { HttpError, json, readJson, clientIp, hashIp } from './http.js';
 import { createSession, destroySession, verifyPassword, hashPassword, validatePasswordStrength, getSessionUser, assertSameOrigin } from './auth.js';
 import { hit, count, clear } from './ratelimit.js';
-import { assertStorage, presignPut, headObject, readHead, deleteObject, storageDriver } from './storage.js';
+import { assertStorage, presignPut, headObject, readHead, readRange, deleteObject, storageDriver } from './storage.js';
+import { probeMp4, isUniversalMp4 } from './mp4-probe.js';
 import { checkDeclared, sniff, sniffMatches, LIMITS, TYPES } from './media-rules.js';
 import { sanitizeContent, getContentForAdmin, mediaView, influencerView, attachCategories, getProject, isUuid } from './content.js';
 import { CONTENT_KEYS, DEFAULT_CONTENT } from './defaults.js';
@@ -425,6 +426,14 @@ export async function completeUpload(req, res, id) {
   if (!obj) return fail('Файл storage-д олдсонгүй — байршуулалт амжилтгүй болсон байна.');
   if (obj.size > LIMITS[m.kind]) return fail(`Файл хэт том байна (дээд хэмжээ ${Math.round(LIMITS[m.kind] / 1048576)} MB).`);
   if (!sniffMatches(sniff(await readHead(m.storage_key)), { kind: m.kind, mime: m.mime })) return fail('Файлын агуулга өргөтгөлтэйгээ таарахгүй байна (зөвшөөрөгдөөгүй эсвэл гэмтсэн файл).');
+  if (m.kind === 'video') {
+    // every published video must play on Android, iPhone and desktop: H.264 + AAC in MP4
+    const p = await probeMp4((start, len) => readRange(m.storage_key, start, len), obj.size).catch(() => null);
+    if (!isUniversalMp4(p)) {
+      const codec = p?.video?.find((v) => v !== 'avc1' && v !== 'avc3');
+      return fail(`Энэ видео Android/зарим хөтөч дээр тоглогдохгүй формат${codec ? ` (${codec === 'hvc1' || codec === 'hev1' ? 'HEVC/H.265' : codec})` : ''} байна. Admin хуудсаар дахин оруулбал H.264 MP4 болгож автоматаар хөрвүүлнэ.`);
+    }
+  }
 
   let thumbKey = m.thumb_key;
   if (thumbKey) {

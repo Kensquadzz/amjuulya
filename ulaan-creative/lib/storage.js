@@ -97,11 +97,17 @@ export async function headObject(key) {
 
 /** First bytes of an object — used to check the real file type (magic numbers). */
 export async function readHead(key, bytes = 4096) {
+  return readRange(key, 0, bytes);
+}
+
+/** Reads `length` bytes starting at `start` (fewer at the end of the object). */
+export async function readRange(key, start, length) {
   if (storageDriver() === 'local') {
     const fh = await fs.promises.open(localPath(key), 'r');
-    try { const buf = Buffer.alloc(bytes); const { bytesRead } = await fh.read(buf, 0, bytes, 0); return buf.subarray(0, bytesRead); } finally { await fh.close(); }
+    try { const buf = Buffer.alloc(length); const { bytesRead } = await fh.read(buf, 0, length, start); return buf.subarray(0, bytesRead); } finally { await fh.close(); }
   }
-  const r = await s3().fetch(s3ObjectUrl(key), { headers: { Range: `bytes=0-${bytes - 1}` } });
+  const r = await s3().fetch(s3ObjectUrl(key), { headers: { Range: `bytes=${start}-${start + length - 1}` } });
+  if (r.status === 416) return Buffer.alloc(0);
   if (!r.ok) throw new HttpError(502, 'storage_error', `GET ${r.status}`);
   return Buffer.from(await r.arrayBuffer());
 }

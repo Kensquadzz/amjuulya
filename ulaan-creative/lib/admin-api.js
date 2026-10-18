@@ -125,10 +125,14 @@ export async function logout(req, res) {
   json(res, 200, { ok: true });
 }
 
+// Which settings this deployment can see — names and yes/no only, never values.
+const ENV_NAMES = ['BLOB_READ_WRITE_TOKEN', 'RESEND_API_KEY', 'CONTACT_TO_EMAIL'];
+const envPresence = () => Object.fromEntries(ENV_NAMES.map((k) => [k, Boolean(String(process.env[k] || '').trim())]));
+
 export async function me(req, res) {
   const user = await getSessionUser(req);
   if (!user) return json(res, 200, { user: null });
-  json(res, 200, { user: { email: user.email }, storage: storageDriver() || null, limits: { imageMB: LIMITS.image / 1048576, videoMB: LIMITS.video / 1048576 }, accept: Object.keys(TYPES), email: { ready: emailConfig().ready, to: emailConfig().to } });
+  json(res, 200, { user: { email: user.email }, storage: storageDriver() || null, limits: { imageMB: LIMITS.image / 1048576, videoMB: LIMITS.video / 1048576 }, accept: Object.keys(TYPES), email: { ready: emailConfig().ready, to: emailConfig().to }, env: envPresence() });
 }
 
 export async function changePassword(req, res, user) {

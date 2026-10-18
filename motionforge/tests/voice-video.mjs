@@ -16,7 +16,7 @@ const errors = [];
 p.on('pageerror', (e) => errors.push(e.message));
 await p.goto('http://localhost:5191/tests/harness.html');
 const results = [];
-const check = (n, ok, info = '') => results.push(`${ok ? 'PASS' : 'FAIL'}  ${n}${info ? '  — ' + info : ''}`);
+const check = (n, ok, info = '') => { const l = `${ok ? 'PASS' : 'FAIL'}  ${n}${info ? '  — ' + info : ''}`; results.push(l); console.error(l); };
 const SCRIPT = ['Та оффист ажилладаг уу, эсвэл хувиараа бизнес эрхэлдэг үү?', 'Энэ багц танд их хэрэг болно.', 'Өргөдөл, албан бичиг, гэрээ, тушаал, хүний нөөцийн маягт', 'Тэр болгоныг шинээр бичихийн оронд', 'бэлэн загвараа аваад шууд ашиглаарай.', 'Зуу гаруй баримт бичгийн загвар нэг дор', 'Word, Excel дээр шууд засварлах боломжтой', 'Харин одоо Master Pack-ийг танилцуулъя', '40,000 төгрөгийн оронд 30,000 төгрөгөөр', 'Дэлгэрэнгүй мэдээлэл авах бол «1» гэж коммент бичээрэй.'];
 for (const [dur, n] of [[16, 5], [45, 10], [90, 10]]) {
   const r = await p.evaluate(async ({ dur, n, script, sheet }) => {

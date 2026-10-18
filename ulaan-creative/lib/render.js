@@ -326,6 +326,13 @@ function work(w, projects) {
 }
 
 const SOCIALS = [['instagram', 'Instagram'], ['tiktok', 'TikTok'], ['youtube', 'YouTube'], ['facebook', 'Facebook']];
+// Simple monochrome platform glyphs (currentColor) for the creator detail links
+const SOCIAL_ICONS = {
+  instagram: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="5" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="4.2" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="17.4" cy="6.6" r="1.3" fill="currentColor"/></svg>',
+  tiktok: '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M16.6 2h-3.4v13.3a2.9 2.9 0 1 1-2.9-2.9c.3 0 .6 0 .9.1V9.1a6.4 6.4 0 1 0 5.4 6.3V8.7a7.9 7.9 0 0 0 4.4 1.3V6.6a4.5 4.5 0 0 1-4.4-4.6Z"/></svg>',
+  youtube: '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M22.5 7.2a2.8 2.8 0 0 0-2-2C18.8 4.7 12 4.7 12 4.7s-6.8 0-8.5.5a2.8 2.8 0 0 0-2 2C1 8.9 1 12 1 12s0 3.1.5 4.8a2.8 2.8 0 0 0 2 2c1.7.5 8.5.5 8.5.5s6.8 0 8.5-.5a2.8 2.8 0 0 0 2-2c.5-1.7.5-4.8.5-4.8s0-3.1-.5-4.8ZM9.8 15.1V8.9l5.7 3.1-5.7 3.1Z"/></svg>',
+  facebook: '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M13.5 22v-8.2h2.8l.4-3.2h-3.2V8.5c0-.9.3-1.6 1.6-1.6h1.7V4.1c-.3 0-1.3-.1-2.5-.1-2.5 0-4.2 1.5-4.2 4.3v2.4H7.3v3.2h2.8V22h3.4Z"/></svg>',
+};
 
 /** Influencer list: full-screen panel opened from the nav ("Influencers"), cards fanned in an arc
  *  and swiped sideways. Price is never part of the public data, so it can't appear here. */
@@ -376,14 +383,17 @@ function influencerDetail(p) {
   const links = SOCIALS.filter(([k]) => p[k]);
   const data = [p.followers != null && ['Дагагч', fmtFollowers(p.followers)], p.engagement && ['Engagement (баталгаажсан)', p.engagement]].filter(Boolean);
   return `<template data-inf-detail="${attr(p.id)}">
-    <div class="inf-detail__media">${p.photo ? mediaImg(p.photo, { alt: p.photo.alt || p.name, sizes: '(max-width: 760px) 100vw, 420px' }) : `<span class="display" aria-hidden="true">${esc(initials(p.name))}</span>`}</div>
+    ${p.photo ? mediaImg(p.photo, { alt: '', sizes: '(max-width: 760px) 100vw, 420px', cls: 'inf-detail__backdrop' }) : ''}
+    <div class="inf-detail__media${p.photo ? ' has-photo' : ''}">${p.photo ? mediaImg(p.photo, { alt: p.photo.alt || p.name, sizes: '(max-width: 760px) 100vw, 420px', cls: 'inf-detail__photo' }) : `<span class="display" aria-hidden="true">${esc(initials(p.name))}</span>`}</div>
     <div class="inf-detail__body">
       <p class="mono inf-detail__cat">${esc(catNames(p).join(' · ') || 'Influencer')}</p>
       <h3 class="display inf-detail__name" id="inf-detail-title">${esc(p.name)}</h3>
       ${p.bio ? `<p class="inf-detail__bio">${esc(p.bio)}</p>` : ''}
       ${data.length ? `<dl class="inf-detail__data mono">${data.map(([k, v]) => `<div><dt>${k}</dt><dd>${esc(v)}</dd></div>`).join('')}</dl>` : ''}
-      ${links.length ? `<p class="inf-detail__links">${links.map(([k, l]) => `<a class="mono" href="${attr(p[k])}" target="_blank" rel="noopener">${l} ↗</a>`).join('')}</p>` : ''}
-      ${pickBtn(p, ' inf-pick--lg')}
+      <div class="inf-detail__actions">
+        ${links.length ? `<p class="inf-detail__links">${links.map(([k, l]) => `<a class="mono" href="${attr(p[k])}" target="_blank" rel="noopener" aria-label="${attr(`${p.name} — ${l}`)}">${SOCIAL_ICONS[k]}<span>${l}</span></a>`).join('')}</p>` : ''}
+        ${pickBtn(p, ' inf-pick--lg')}
+      </div>
     </div>
   </template>`;
 }

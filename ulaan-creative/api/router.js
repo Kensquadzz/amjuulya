@@ -6,7 +6,7 @@ import { HttpError, json, html, send, siteUrl, isProd } from '../lib/http.js';
 import { dbConfigured } from '../lib/db.js';
 import { requireAdmin } from '../lib/auth.js';
 import { handleLocalStorage, storageDriver } from '../lib/storage.js';
-import { getPublishedContent, getDraftContent, getPublishedProjects, getPublishedInfluencers, getProject, getMediaView } from '../lib/content.js';
+import { getPublishedContent, getDraftContent, getPublishedProjects, getPublishedInfluencers, getProject, getMediaView, getContentMediaMap } from '../lib/content.js';
 import { DEFAULT_CONTENT } from '../lib/defaults.js';
 import { renderHome, renderProject, renderNotFound } from '../lib/render.js';
 import { handleContact } from '../lib/contact.js';
@@ -30,8 +30,8 @@ function mediaOrigins() {
 function securityHeaders(res, { nonce, admin = false }) {
   const media = mediaOrigins().join(' ');
   const csp = admin
-    ? `default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob: ${media}; media-src 'self' blob: ${media}; connect-src 'self' ${media}; frame-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'; object-src 'none'`
-    : `default-src 'self'; script-src 'self' 'nonce-${nonce}'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: ${media}; media-src 'self' ${media}; connect-src 'self'; frame-src https://www.youtube-nocookie.com https://player.vimeo.com; frame-ancestors 'self'; base-uri 'self'; form-action 'self'; object-src 'none'`;
+    ? `default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: blob: ${media}; media-src 'self' blob: ${media}; connect-src 'self' ${media}; frame-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'; object-src 'none'`
+    : `default-src 'self'; script-src 'self' 'nonce-${nonce}'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: ${media}; media-src 'self' ${media}; connect-src 'self'; frame-src https://www.youtube-nocookie.com https://player.vimeo.com; frame-ancestors 'self'; base-uri 'self'; form-action 'self'; object-src 'none'`;
   res.setHeader('Content-Security-Policy', csp);
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
@@ -46,11 +46,12 @@ async function loadPublic() {
   try {
     const [content, projects, influencers] = await Promise.all([getPublishedContent(), getPublishedProjects(), getPublishedInfluencers()]);
     const ogMedia = content.seo.ogImageMediaId ? await getMediaView(content.seo.ogImageMediaId) : null;
-    return { content, projects, influencers, ogMedia };
+    const mediaMap = await getContentMediaMap(content);
+    return { content, projects, influencers, ogMedia, mediaMap };
   } catch (e) {
     // Database unreachable: keep the site up with built-in content.
     console.error('[site] falling back to defaults:', e.message);
-    return { content: structuredClone(DEFAULT_CONTENT), projects: [], influencers: [], ogMedia: null };
+    return { content: structuredClone(DEFAULT_CONTENT), projects: [], influencers: [], ogMedia: null, mediaMap: {} };
   }
 }
 
@@ -107,7 +108,8 @@ async function adminPage(req, res, path) {
     const [projects, influencers] = await Promise.all([getPublishedProjects(), getPublishedInfluencers()]);
     if (sub === '/preview/site') {
       const ogMedia = content.seo.ogImageMediaId ? await getMediaView(content.seo.ogImageMediaId) : null;
-      return html(res, 200, renderHome({ content, projects, influencers, ogMedia, site: siteUrl(req), nonce, preview: 'PREVIEW — нийтлээгүй өөрчлөлтүүдийг харуулж байна' }));
+      const mediaMap = await getContentMediaMap(content);
+      return html(res, 200, renderHome({ content, projects, influencers, ogMedia, mediaMap, site: siteUrl(req), nonce, preview: 'PREVIEW — нийтлээгүй өөрчлөлтүүдийг харуулж байна' }));
     }
     const project = await getProject({ id: sub.split('/').pop(), includeDrafts: true }).catch(() => null);
     if (!project) throw new HttpError(404, 'not_found');
@@ -153,6 +155,7 @@ const routes = [
   ['PUT', /^\/content\/([a-z_]+)$/, (q, s, c) => A.saveContentDraft(q, s, c.id)],
   ['POST', /^\/content\/([a-z_]+)\/publish$/, (q, s, c) => A.publishContent(q, s, c.id)],
   ['POST', /^\/content\/([a-z_]+)\/discard$/, (q, s, c) => A.discardContentDraft(q, s, c.id)],
+  ['POST', /^\/content\/([a-z_]+)\/reset$/, (q, s, c) => A.resetContent(q, s, c.id)],
 
   ['GET', /^\/submissions$/, (q, s, c) => A.listSubmissions(q, s, c.q)],
   ['PUT', new RegExp(`^/submissions/${UUID}$`), (q, s, c) => A.updateSubmission(q, s, c.id)],

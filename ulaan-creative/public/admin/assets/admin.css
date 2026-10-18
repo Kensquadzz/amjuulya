@@ -1,7 +1,7 @@
 :root {
   --red: #E50920; --red-dark: #B5000F; --ink: #111; --muted: #666; --line: #e3e0da; --paper: #F5F3EF; --white: #fff;
   --ok: #0F7B3F; --warn-bg: #FFF4D6; --warn-line: #E9C46A;
-  --r: 10px; --f: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif; --mono: "JetBrains Mono", ui-monospace, monospace;
+  --r: 10px; --f: "UC Sans", system-ui, -apple-system, "Segoe UI", sans-serif; --mono: "UC Mono", ui-monospace, monospace;
 }
 * { box-sizing: border-box; }
 html { -webkit-text-size-adjust: 100%; }

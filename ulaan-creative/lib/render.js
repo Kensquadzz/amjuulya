@@ -78,9 +78,10 @@ ${noindex ? '<meta name="robots" content="noindex, nofollow">' : `<link rel="can
     setTimeout(function () { if (!window.__ucReady) h.classList.remove('motion-ok', 'is-loading'); }, 4000);
   })(document);
 </script>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Anton&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Oswald:wght@700&display=swap" rel="stylesheet">
+<link rel="preload" href="/assets/fonts/oswald-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="/assets/fonts/oswald-cyrillic-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="/assets/fonts/inter-cyrillic-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/assets/css/fonts.css">
 <link rel="stylesheet" href="/assets/css/styles.css">
 ${jsonLd ? `<script type="application/ld+json" nonce="${nonce}">${JSON.stringify(jsonLd).replace(/</g, '\\u003c')}</script>` : ''}
 </head>`;
@@ -129,19 +130,16 @@ function footer(c, { hasInfluencers, base = '' }) {
       <p class="footer__tag">${rich(c.footer.tagline)}</p>
     </div>
     <nav class="footer__col" aria-label="Footer цэс">
-      <p class="label mono">Navigate</p>
+      <p class="label mono">Цэс</p>
       ${links.map(([id, l]) => `<a class="link-line" href="${base}#${id}">${l}</a>`).join('\n      ')}
     </nav>
-    ${contactItems.length ? `<div class="footer__col"><p class="label mono">Contact</p>${contactItems.join('')}</div>` : ''}
-    ${socials.length ? `<div class="footer__col"><p class="label mono">Social</p>${socials.join('')}</div>` : ''}
-  </div>
-  <div class="footer__word display" aria-hidden="true" data-footer-word>
-    <span>U</span><span>L</span><span>A</span><span>A</span><span>N</span>
+    ${contactItems.length ? `<div class="footer__col"><p class="label mono">Холбоо барих</p>${contactItems.join('')}</div>` : ''}
+    ${socials.length ? `<div class="footer__col"><p class="label mono">Сошиал</p>${socials.join('')}</div>` : ''}
   </div>
   <div class="container footer__bottom mono">
     <span>© <span data-year>${new Date().getFullYear()}</span> Ulaan Creative. Бүх эрх хуулиар хамгаалагдсан.</span>
     <span class="footer__clock" data-clock aria-label="Улаанбаатарын цаг"></span>
-    <a href="${base || ''}#top" class="link-line">Back to top ↑</a>
+    <a href="${base || ''}#top" class="link-line">Дээш буцах ↑</a>
   </div>
 </footer>`;
 }
@@ -155,6 +153,26 @@ const scripts = (nonce) => `
 const previewBar = (label) => label ? `<div class="preview-bar mono" role="status">${esc(label)}</div>` : '';
 
 /* ------------------------------ sections ------------------------------ */
+
+/** Rising slanted bars (the logo's diagonal stroke) = Create → Grow → Go viral. */
+function heroGraphic(words) {
+  const labels = (words.length === 3 ? words : ['CREATE', 'GROW', 'GO VIRAL']).map((w) => plain(w).replace(/\.$/, ''));
+  const bars = [
+    { bx: 120, h: 260, cls: 'bar bar--outline' },
+    { bx: 300, h: 470, cls: 'bar bar--dark' },
+    { bx: 480, h: 690, cls: 'bar bar--light' },
+  ];
+  const poly = ({ bx, h }) => { const L = 0.35 * h, w = 120; return `${bx},760 ${bx + w},760 ${bx + w - L},${760 - h} ${bx - L},${760 - h}`; };
+  // labels sit inside each bar, just under its top edge (the bars lean 0.35 px per px of height)
+  const tlx = ({ bx, h }) => bx - 0.35 * h;
+  const tops = bars.map((bar) => [tlx(bar) + 60, 760 - bar.h]);
+  return `<svg class="hero__graphic" viewBox="0 0 600 780" preserveAspectRatio="xMidYMax meet" aria-hidden="true" focusable="false">
+      ${bars.map((bar, i) => `<polygon class="${bar.cls}" data-hero-bar points="${poly(bar)}"/>`).join('')}
+      <path class="trend" data-hero-trend d="M${tops[0][0] - 30} ${tops[0][1] - 40} L${tops[1][0] - 20} ${tops[1][1] - 40} L${tops[2][0] + 30} ${tops[2][1] - 30}"/>
+      <path class="trend-head" d="M${tops[2][0] + 30} ${tops[2][1] - 30} l-26 -2 m26 2 l-12 22"/>
+      ${bars.map((bar, i) => { const x = tlx(bar), y = 760 - bar.h; return `<text class="lbl lbl--${i + 1}" data-hero-lbl><tspan class="lbl__n" x="${x + 0.35 * 34 + 14}" y="${y + 34}">0${i + 1}</tspan><tspan x="${x + 0.35 * 58 + 14}" y="${y + 58}">${esc(labels[i] || '')}</tspan></text>`; }).join('')}
+    </svg>`;
+}
 
 function hero(h) {
   const words = lines(h.headline);
@@ -216,15 +234,51 @@ function intro(c) {
 </section>`;
 }
 
-const VISUALS = {
-  ai: `<div class="svc__visual vis-ai" aria-hidden="true"><div class="vis-ai__grid" data-ai-grid></div><div class="vis-ai__prompt mono"><span class="vis-ai__tag">PROMPT</span><p data-ai-type>/product hero shot, red studio light, cinematic</p><div class="vis-ai__progress"><span></span></div><span class="vis-ai__status" data-ai-status>GENERATING · 00%</span></div></div>`,
-  influencer: `<div class="svc__visual vis-inf" aria-hidden="true"><div class="vis-inf__ring r1"><i></i><i></i><i></i></div><div class="vis-inf__ring r2"><i></i><i></i><i></i><i></i></div><div class="vis-inf__ring r3"><i></i><i></i><i></i><i></i><i></i></div><div class="vis-inf__core display">BRAND</div><span class="vis-inf__chip mono c1">reels</span><span class="vis-inf__chip mono c2">tiktok</span><span class="vis-inf__chip mono c3">stories</span></div>`,
-  video: `<div class="svc__visual vis-vid" aria-hidden="true"><div class="vis-vid__frame"><span class="c tl"></span><span class="c tr"></span><span class="c bl"></span><span class="c br"></span><span class="vis-vid__rec mono"><i></i>REC</span><span class="vis-vid__tc mono" data-timecode>00:00:00:00</span><span class="vis-vid__meta mono">9:16 · 4K · 25FPS</span><span class="vis-vid__cross"></span><span class="vis-vid__word display">ACTION</span></div></div>`,
-  calendar: `<div class="svc__visual vis-cal" aria-hidden="true"><div class="vis-cal__head mono"><span>CONTENT CALENDAR</span><span>WK 01—04</span></div><div class="vis-cal__days mono"><span>Да</span><span>Мя</span><span>Лх</span><span>Пү</span><span>Ба</span><span>Бя</span><span>Ня</span></div><div class="vis-cal__grid" data-cal-grid></div><div class="vis-cal__legend mono"><span><i class="k1"></i>REEL</span><span><i class="k2"></i>POST</span><span><i class="k3"></i>STORY</span></div></div>`,
-};
-const SVC_THEME = { ai: ['svc--ai', 'dark'], influencer: ['svc--inf', 'light'], video: ['svc--vid', 'dark'], calendar: ['svc--brand', 'light'] };
+/** Real work gallery (images / playable videos) managed in the admin; clean empty state otherwise. */
+function showcaseVisual(item, mediaMap) {
+  const works = item.works.map((w) => ({ ...w, media: mediaMap[w.mediaId] })).filter((w) => w.media).slice(0, 4);
+  if (!works.length) {
+    return `<div class="svc__visual vis-show vis-show--empty">
+      <div class="vis-show__empty">
+        <span class="mono">Selected work</span>
+        <p class="vis-show__empty-title">Бүтээлүүд удахгүй нэмэгдэнэ</p>
+        <p>Бидний хийсэн зураг, видео бүтээлүүдийг энд үзэх боломжтой болно.</p>
+      </div>
+    </div>`;
+  }
+  return `<div class="svc__visual vis-show vis-show--${works.length}">
+    ${works.map((w) => `<figure class="vis-show__item">
+      <div class="vis-show__media">${w.media.kind === 'video'
+        ? `<video controls playsinline preload="metadata"${w.media.thumbUrl ? ` poster="${attr(w.media.thumbUrl)}"` : ''} aria-label="${attr(w.title || w.media.alt || 'Видео бүтээл')}"><source src="${attr(w.media.url)}" type="${attr(w.media.mime === 'video/quicktime' ? 'video/mp4' : w.media.mime)}"></video>`
+        : mediaImg(w.media, { alt: w.media.alt || w.title, sizes: '(max-width: 900px) 50vw, 25vw' })}</div>
+      ${w.title || w.caption ? `<figcaption>${w.title ? `<strong>${esc(w.title)}</strong>` : ''}${w.caption ? `<span>${esc(w.caption)}</span>` : ''}</figcaption>` : ''}
+    </figure>`).join('')}
+  </div>`;
+}
 
-function services(s) {
+/** Brand & digital: the service's own steps as a strategy staircase (brand → content → campaign). */
+function strategyVisual(item) {
+  const steps = item.bullets.slice(0, 4);
+  return `<div class="svc__visual vis-plan" aria-hidden="true">
+    <ol class="vis-plan__steps">${steps.map((b, i) => `<li style="--i:${i}"><span class="mono">0${i + 1}</span><strong>${esc(b)}</strong></li>`).join('')}</ol>
+    <p class="vis-plan__foot mono">Brand → Content → Campaign</p>
+  </div>`;
+}
+
+const STATIC_VISUALS = {
+  influencer: `<div class="svc__visual vis-inf" aria-hidden="true"><div class="vis-inf__ring r1"><i></i><i></i><i></i></div><div class="vis-inf__ring r2"><i></i><i></i><i></i><i></i></div><div class="vis-inf__ring r3"><i></i><i></i><i></i><i></i><i></i></div><div class="vis-inf__core display">BRAND</div><span class="vis-inf__chip mono c1">reels</span><span class="vis-inf__chip mono c2">tiktok</span><span class="vis-inf__chip mono c3">stories</span></div>`,
+  video: `<div class="svc__visual vis-vid" aria-hidden="true"><div class="vis-vid__frame"><span class="c tl"></span><span class="c tr"></span><span class="c bl"></span><span class="c br"></span><span class="vis-vid__rec mono"><i></i>REC</span><span class="vis-vid__tc mono" data-timecode>00:00:00:00</span><span class="vis-vid__meta mono">9:16 · 4K · 25FPS</span><span class="vis-vid__cross"></span><span class="vis-vid__word display">RECORDING</span></div></div>`,
+};
+// 'calendar' is the old name of the strategy visual (kept for content saved before the rename)
+const SVC_THEME = { ai: ['svc--ai', 'dark'], influencer: ['svc--inf', 'light'], video: ['svc--vid', 'dark'], strategy: ['svc--brand', 'light'], calendar: ['svc--brand', 'light'] };
+
+function serviceVisual(item, mediaMap) {
+  if (item.visual === 'ai') return showcaseVisual(item, mediaMap);
+  if (item.visual === 'strategy' || item.visual === 'calendar') return strategyVisual(item);
+  return STATIC_VISUALS[item.visual] || showcaseVisual(item, mediaMap);
+}
+
+function services(s, mediaMap) {
   return `<section class="services" id="services" aria-labelledby="services-title">
   <div class="container services__head">
     <p class="label mono" data-reveal>${esc(s.label)}</p>
@@ -242,7 +296,7 @@ function services(s) {
           <p class="svc__desc">${esc(it.description)}</p>
           ${it.bullets.length ? `<ul class="svc__list">${it.bullets.map((b) => `<li>${esc(b)}</li>`).join('')}</ul>` : ''}
         </div>
-        ${VISUALS[it.visual] || VISUALS.ai}
+        ${serviceVisual(it, mediaMap)}
       </div>
     </article>`;
     }).join('\n    ')}
@@ -274,10 +328,17 @@ function work(w, projects) {
       <h2 class="display work__title" id="work-title" data-split>${rich(w.title)}</h2>
       <p class="work__intro" data-reveal>${esc(w.intro)}</p>
     </div>
+    ${w.flow.length ? `<ol class="flow" role="list" aria-label="Санаанаас үр дүн хүртэл">
+      ${w.flow.map((f, i) => `<li class="flow__step" data-reveal>
+        <span class="flow__num mono">0${i + 1}</span>
+        <span class="flow__en display">${esc(f.en)}</span>
+        <span class="flow__mn">${esc(f.mn)}</span>
+        ${f.text ? `<p>${esc(f.text)}</p>` : ''}
+      </li>`).join('')}
+    </ol>` : ''}
     ${items.length ? `<div class="work__grid">${items.join('\n      ')}</div>` : `<div class="work__empty" data-reveal>
-      <div class="work__empty-art" aria-hidden="true"><img class="bomb" src="/assets/img/ulaan-bomb.webp" srcset="/assets/img/ulaan-bomb-sm.webp 480w, /assets/img/ulaan-bomb.webp 959w" width="959" height="1492" decoding="async" sizes="260px" loading="lazy" alt=""></div>
-      <div><h3 class="display">${esc(w.emptyTitle)}</h3><p>${esc(w.emptyText)}</p>
-      <a class="btn-fill btn-fill--dark" href="#contact" data-magnetic><span>Төслөө ярилцах</span><i class="dot" aria-hidden="true"></i></a></div>
+      <div><h3 class="display">${esc(w.emptyTitle)}</h3><p>${esc(w.emptyText)}</p></div>
+      <a class="btn-fill btn-fill--dark" href="#contact" data-magnetic><span>Төслөө ярилцах</span><i class="dot" aria-hidden="true"></i></a>
     </div>`}
   </div>
 </section>`;
@@ -358,8 +419,9 @@ function about(a) {
   </div>
   <div class="container about__grid">
     <figure class="about__figure" data-reveal-media>
-      <div class="about__mascot" data-parallax-img><img class="bomb" src="/assets/img/ulaan-bomb.webp" srcset="/assets/img/ulaan-bomb-sm.webp 480w, /assets/img/ulaan-bomb.webp 959w" width="959" height="1492" decoding="async" sizes="(max-width: 900px) 80vw, 40vw" loading="lazy" alt="Ulaan Creative-ийн бөмбөг дүр"></div>
-      <figcaption class="mono">Fig. 01 — Ulaan, the idea bomb</figcaption>
+      <div class="about__mark" data-parallax-img>${heroGraphic(['STRATEGY', 'CREATIVE', 'RESULT'])}</div>
+      <img class="about__logo" src="/assets/img/ulaan-logo-on-red.webp" width="640" height="252" alt="Ulaan Creative" loading="lazy">
+      <figcaption class="mono">Strategy · Creative · Production · Distribution</figcaption>
     </figure>
     <div class="about__copy">
       <h3 class="display" data-split>${rich(a.title)}</h3>
@@ -428,7 +490,8 @@ function ogImageUrl(content, site, ogMedia) {
   return ogMedia?.url ? (ogMedia.url.startsWith('http') ? ogMedia.url : site + ogMedia.url) : `${site}/assets/img/og.jpg`;
 }
 
-export function renderHome({ content, projects, influencers, site, nonce, ogMedia, preview }) {
+
+export function renderHome({ content, projects, influencers, site, nonce, ogMedia, preview, mediaMap = {} }) {
   const c = content;
   const hasInfluencers = influencers.length > 0;
   const jsonLd = { '@context': 'https://schema.org', '@type': 'Organization', name: 'Ulaan Creative', url: site + '/', logo: `${site}/assets/img/ulaan-logo-light.png` };
@@ -446,7 +509,7 @@ ${nav({ hasInfluencers })}
 ${hero(c.hero)}
 ${marquee(c.marquee)}
 ${intro(c.intro)}
-${services(c.services)}
+${services(c.services, mediaMap)}
 ${work(c.work, projects)}
 ${creators(c.influencers, influencers)}
 ${packages(c.packages)}

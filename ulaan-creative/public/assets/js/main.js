@@ -182,67 +182,9 @@
     return $$('.split-word', el);
   }
 
-  /* ---------------- Visual: AI pixel generator ---------------- */
-  const aiGrid = $('[data-ai-grid]');
-  const aiType = $('[data-ai-type]');
-  const aiStatus = $('[data-ai-status]');
-  const aiProgress = $('.vis-ai__progress');
-  const N = 16;
-  const aiCells = [];
-  if (aiGrid) {
-    for (let i = 0; i < N * N; i++) { const s = document.createElement('span'); aiGrid.appendChild(s); aiCells.push(s); }
-  }
-  // A simple "generated" shape: a sphere with a highlight, dithered.
-  const aiTarget = aiCells.map((_, i) => {
-    const x = i % N, y = Math.floor(i / N);
-    const dx = (x - 7.5) / 6.2, dy = (y - 7) / 6.2, d = Math.sqrt(dx * dx + dy * dy);
-    if (d > 1) return y > 13 ? 'on-d' : '';
-    const hl = Math.sqrt((dx + 0.35) ** 2 + (dy + 0.4) ** 2);
-    if (hl < 0.32) return 'on-w';
-    return d > 0.82 && (x + y) % 2 ? 'on-d' : 'on-r';
-  });
-  const aiFull = aiType ? aiType.textContent : '';
-  let aiTimer = null;
-  function aiShowFinal() {
-    aiCells.forEach((c, i) => { c.className = aiTarget[i]; });
-    if (aiStatus) aiStatus.textContent = 'DONE · 100%';
-    if (aiProgress) aiProgress.style.setProperty('--p', '100%');
-  }
-  function aiRun() {
-    if (!aiGrid || aiTimer) return;
-    let step = 0;
-    const order = aiCells.map((_, i) => i).sort(() => Math.random() - 0.5);
-    aiCells.forEach((c) => { c.className = ''; });
-    const total = 70;
-    aiTimer = setInterval(() => {
-      step++;
-      const typed = Math.min(aiFull.length, Math.round((step / 24) * aiFull.length));
-      aiType.textContent = aiFull.slice(0, typed);
-      if (step > 24) {
-        const k = Math.round(((step - 24) / (total - 24)) * order.length);
-        for (let j = 0; j < k; j++) aiCells[order[j]].className = aiTarget[order[j]];
-        // noise flicker on remaining cells
-        for (let j = k; j < order.length; j += 7) aiCells[order[j]].className = Math.random() > 0.85 ? 'on-d' : '';
-      }
-      const pct = Math.min(100, Math.round((step / total) * 100));
-      aiProgress.style.setProperty('--p', pct + '%');
-      aiStatus.textContent = (pct < 100 ? 'GENERATING · ' : 'DONE · ') + String(pct).padStart(2, '0') + '%';
-      if (step >= total) { clearInterval(aiTimer); aiTimer = null; setTimeout(() => { if (aiVisible) aiRun(); }, 3800); }
-    }, 70);
-  }
-  let aiVisible = false;
-
-  /* ---------------- Visual: calendar ---------------- */
-  const calGrid = $('[data-cal-grid]');
-  const calPlan = ['k1', '', 'k2', 'k3', 'k1', '', 'k2', 'k2', 'k1', '', 'k3', 'k2', 'k1', '', '', 'k2', 'k1', 'k3', '', 'k1', 'k2', 'k1', 'k3', '', 'k2', 'k1', '', 'k3'];
-  if (calGrid) {
-    calPlan.forEach((k, i) => {
-      const s = document.createElement('span');
-      s.textContent = String(i + 1).padStart(2, '0');
-      if (k) { const tag = document.createElement('i'); tag.className = k; s.appendChild(tag); }
-      calGrid.appendChild(s);
-    });
-  }
+  /* ---------------- Showcase: one video plays at a time ---------------- */
+  const showVideos = $$('.vis-show video');
+  showVideos.forEach((v) => v.addEventListener('play', () => showVideos.forEach((o) => { if (o !== v) o.pause(); })));
 
   /* ---------------- Visual: timecode ---------------- */
   const tc = $('[data-timecode]');
@@ -257,21 +199,13 @@
   };
   const tcStop = () => { clearInterval(tcTimer); tcTimer = null; };
 
-  // Run the service visuals only while they are on screen.
+  // Run the timecode only while the camera visual is on screen.
   if ('IntersectionObserver' in window) {
     const vio = new IntersectionObserver((entries) => {
-      entries.forEach((en) => {
-        const el = en.target;
-        if (el.classList.contains('vis-ai')) {
-          aiVisible = en.isIntersecting;
-          if (reduceMotion) { if (en.isIntersecting) aiShowFinal(); return; }
-          if (en.isIntersecting) aiRun();
-        }
-        if (el.classList.contains('vis-vid')) (en.isIntersecting ? tcStart() : tcStop());
-      });
+      entries.forEach((en) => (en.isIntersecting ? tcStart() : tcStop()));
     }, { threshold: 0.25 });
-    $$('.vis-ai, .vis-vid').forEach((el) => vio.observe(el));
-  } else { aiShowFinal(); }
+    $$('.vis-vid').forEach((el) => vio.observe(el));
+  }
 
   /* ---------------- Creators slider ---------------- */
   const track = $('[data-creators-track]');
@@ -427,10 +361,7 @@
   /* =========================================================
      MOTION (GSAP) — skipped entirely for reduced motion
      ========================================================= */
-  if (!motion) {
-    aiShowFinal();
-    return;
-  }
+  if (!motion) return;
 
   const mm = gsap.matchMedia();
 
@@ -609,14 +540,6 @@
     });
   });
 
-  // Calendar cells pop in
-  if (calGrid) {
-    gsap.from(calGrid.children, {
-      scale: 0.6, opacity: 0, duration: 0.6, ease: 'back.out(2)', stagger: { each: 0.025, from: 'start' },
-      scrollTrigger: { trigger: calGrid, start: 'top 80%', once: true },
-    });
-  }
-
   /* ---------------- Work: parallax inside media ---------------- */
   $$('.work__media').forEach((m) => {
     const inner = m.querySelector('img, .ph span');
@@ -660,15 +583,6 @@
     gsap.fromTo(aboutImg, { yPercent: -10 }, {
       yPercent: 0, ease: 'none',
       scrollTrigger: { trigger: aboutImg.parentElement, start: 'top bottom', end: 'bottom top', scrub: true },
-    });
-  }
-
-  /* ---------------- Footer wordmark ---------------- */
-  const footerLetters = $$('[data-footer-word] span');
-  if (footerLetters.length) {
-    gsap.from(footerLetters, {
-      yPercent: 100, ease: 'none', stagger: 0.08,
-      scrollTrigger: { trigger: '[data-footer-word]', start: 'top bottom', end: 'bottom bottom', scrub: 0.6 },
     });
   }
 

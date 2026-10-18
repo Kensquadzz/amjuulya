@@ -457,6 +457,13 @@ export async function publishContent(req, res, key) {
   json(res, 200, { ok: true });
 }
 
+/** Removes the stored section so the built-in default text is used again. */
+export async function resetContent(req, res, key) {
+  contentKey(key);
+  await query('delete from site_content where key = $1', [key]);
+  json(res, 200, { ok: true });
+}
+
 export async function discardContentDraft(req, res, key) {
   contentKey(key);
   await query('update site_content set draft = null, updated_at = now() where key = $1', [key]);

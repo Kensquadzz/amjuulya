@@ -10,6 +10,7 @@ export const isUuid = (v) => typeof v === 'string' && UUID_RE.test(v);
 // Templates for list items whose default list is empty.
 const ITEM_TEMPLATES = {
   'faq.items': { q: '', a: '' },
+  'services.items[].works': { mediaId: null, title: '', caption: '' },
 };
 
 /**
@@ -33,7 +34,7 @@ function coerce(shape, value, path) {
     for (const k of Object.keys(shape)) out[k] = coerce(shape[k], src[k], `${path}.${k}`);
     return out;
   }
-  if (shape === null || /MediaId$/.test(path)) return isUuid(value) ? value : null;
+  if (shape === null || /mediaId$/i.test(path)) return isUuid(value) ? value : null;
   if (typeof shape === 'boolean') return value === true || value === 'true';
   if (typeof shape === 'number') { const n = Number(value); return Number.isFinite(n) ? n : shape; }
   // strings
@@ -176,6 +177,13 @@ export async function getPublishedInfluencers() {
   const { rows } = await query(`select * from influencers where status = 'published' order by sort_order, created_at`);
   const media = await mediaByIds(rows.map((r) => r.profile_media_id));
   return rows.map((r) => influencerView(r, media));
+}
+
+/** Media referenced from website content (e.g. service showcase works), keyed by id. Ready media only. */
+export async function getContentMediaMap(content) {
+  if (!dbConfigured()) return {};
+  const ids = content.services.items.flatMap((it) => it.works.map((w) => w.mediaId));
+  return mediaByIds(ids);
 }
 
 export async function getMediaView(id) {

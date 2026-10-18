@@ -172,11 +172,15 @@ For print or large formats, ask the designer for the original vector (SVG/AI) fi
 
 | File | Use |
 | --- | --- |
-| `public/assets/img/ulaan-bomb.webp` (959×1492) + `ulaan-bomb-sm.webp` (480 px) | hero, about, empty-portfolio state, 404 |
+| `public/assets/img/ulaan-bomb.webp` (959×1492) + `ulaan-bomb-sm.webp` (480 px) | hero and 404 page only |
 | `public/assets/mascot/ulaan-bomb.png` | transparent PNG for social / presentations |
 | `public/assets/mascot/ulaan-bomb-icon-512.png`, `public/assets/img/favicon-32.png`, `icon-192.png`, `apple-touch-icon.png` | icons (bomb head on red) |
 
 In the hero, the bomb sways around the hand, follows the cursor slightly, and the "Start a project" line points to its left eye (`.hero__eye` in `styles.css`; adjust `left/top` if the image is replaced). For a sharper or animated version (e.g. a lit fuse), ask the creator for the original render or 3D file.
+
+**Fonts:** self-hosted in `public/assets/fonts` (`public/assets/css/fonts.css`, SIL OFL): Oswald (display), Inter (body), JetBrains Mono (labels). Each family covers Latin and full Cyrillic, so Mongolian Ө Ү ө ү render in the same typeface as the rest of the word. No Google Fonts request.
+
+**Service visuals:** *AI Creative Production* shows real work (images / playable videos) added in *Admin → Үйлчилгээнүүд → Бүтээлүүд*; until then it shows "Бүтээлүүд удахгүй нэмэгдэнэ". *Brand & Digital* shows its own steps as a staircase. If a section was published before this update, press **Анхдагч руу буцаах** in the admin to load the new default texts.
 
 ## 9. Tests
 

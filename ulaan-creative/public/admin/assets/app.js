@@ -300,6 +300,7 @@ const SCHEMAS = {
       fields: [{ name: 'value', label: 'Тоо', type: 'text' }, { name: 'suffix', label: 'Дагавар (+, %)', type: 'text' }, { name: 'label', label: 'Тайлбар (MN)', type: 'text' }, { name: 'sublabel', label: 'Тайлбар (EN)', type: 'text' }, { name: 'visible', label: 'Сайт дээр харуулах', type: 'toggle' }] } ] },
   work: { title: 'Портфолио хэсгийн текст', fields: [
     { name: 'label', label: 'Шошго', type: 'text' }, { name: 'title', label: 'Гарчиг', type: 'textarea', rows: 2 }, { name: 'intro', label: 'Текст', type: 'textarea' },
+    { name: 'flow', label: 'Санаанаас үр дүн хүртэлх урсгал', type: 'list', itemLabel: 'Алхам', titleOf: (s) => s.en, addLabel: 'Алхам нэмэх', help: 'Жишээ: Idea → Action → Result. 3 алхам хамгийн цэвэрхэн харагдана.', template: { en: '', mn: '', text: '' }, fields: [{ name: 'en', label: 'EN', type: 'text' }, { name: 'mn', label: 'MN', type: 'text' }, { name: 'text', label: 'Тайлбар', type: 'text' }] },
     { name: 'emptyTitle', label: 'Төсөл байхгүй үеийн гарчиг', type: 'text' }, { name: 'emptyText', label: 'Төсөл байхгүй үеийн текст', type: 'textarea' } ] },
   influencers: { title: 'Influencer хэсгийн текст', fields: [
     { name: 'label', label: 'Шошго', type: 'text' }, { name: 'title', label: 'Гарчиг', type: 'textarea', rows: 2 }, { name: 'intro', label: 'Текст', type: 'textarea' } ] },
@@ -319,8 +320,14 @@ const SCHEMAS = {
   services: { title: 'Үйлчилгээнүүд', fields: [
     { name: 'label', label: 'Шошго', type: 'text' }, { name: 'title', label: 'Гарчиг', type: 'textarea', rows: 2 }, { name: 'intro', label: 'Текст', type: 'textarea' },
     { name: 'items', label: 'Үйлчилгээ', type: 'list', itemLabel: 'Үйлчилгээ', titleOf: (s) => s.title.replace(/\n/g, ' '), addLabel: 'Үйлчилгээ нэмэх',
-      template: { visual: 'ai', tag: '', title: '', description: '', bullets: [] },
-      fields: [{ name: 'title', label: 'Нэр', type: 'textarea', rows: 2 }, { name: 'tag', label: 'Жижиг шошго', type: 'text' }, { name: 'visual', label: 'Визуал / өнгө', type: 'select', options: [['ai', 'AI (хар)'], ['influencer', 'Influencer (улаан)'], ['video', 'Video (цагаан)'], ['calendar', 'Calendar (хар)']] }, { name: 'description', label: 'Тайлбар', type: 'textarea' }, { name: 'bullets', label: 'Жагсаалт (мөр бүрт нэг)', type: 'lines' }] } ] },
+      template: { visual: 'ai', tag: '', title: '', description: '', bullets: [], works: [] },
+      fields: [{ name: 'title', label: 'Нэр', type: 'textarea', rows: 2 }, { name: 'tag', label: 'Жижиг шошго', type: 'text' },
+        { name: 'visual', label: 'Визуал / өнгө', type: 'select', options: [['ai', 'Бүтээлийн галерей (хар)'], ['influencer', 'Influencer тойрог (улаан)'], ['video', 'Видео камер — FILMING (цагаан)'], ['strategy', 'Стратегийн шат (хар)']] },
+        { name: 'description', label: 'Тайлбар', type: 'textarea' }, { name: 'bullets', label: 'Жагсаалт (мөр бүрт нэг)', type: 'lines', help: '"Стратегийн шат" визуал эхний 4 мөрийг шат болгон харуулна.' },
+        { name: 'works', label: 'Бүтээлүүд (зураг / видео)', type: 'list', itemLabel: 'Бүтээл', titleOf: (w) => w.title, addLabel: 'Бүтээл нэмэх',
+          help: '"Бүтээлийн галерей" визуалтай үйлчилгээнд эхний 4 бүтээл харагдана. Видео сайтаас шууд тоглогдоно. Хоосон бол "Бүтээлүүд удахгүй нэмэгдэнэ" гэж харагдана.',
+          template: { mediaId: null, title: '', caption: '' },
+          fields: [{ name: 'mediaId', label: 'Зураг эсвэл видео', type: 'media', kind: 'any' }, { name: 'title', label: 'Гарчиг', type: 'text' }, { name: 'caption', label: 'Тайлбар', type: 'text' }] }] } ] },
   packages: { title: 'Багцууд & үнэ', fields: [
     { name: 'label', label: 'Шошго', type: 'text' }, { name: 'title', label: 'Гарчиг', type: 'textarea', rows: 2 }, { name: 'intro', label: 'Текст', type: 'textarea' },
     { name: 'note', label: 'Анхааруулга (тусад нь тооцогдох зардал)', type: 'textarea', help: 'Рекламны төсөв, influencer-ийн төлбөр, нэмэлт үйлдвэрлэлийн зардлын нөхцөл.' },
@@ -345,8 +352,8 @@ async function contentSections(keys, { title, intro, notice } = {}) {
   const byKey = Object.fromEntries(items.map((i) => [i.key, i]));
   const mediaCache = {};
   // Resolve picked media (e.g. OG image) for previews
-  if (keys.includes('seo') && byKey.seo.value.ogImageMediaId) {
-    try { const { items: m } = await api('/media?type=image&limit=200'); m.forEach((x) => { mediaCache[x.id] = x; }); } catch { /* ignore */ }
+  if (keys.some((k) => JSON.stringify(byKey[k].value).match(/"(ogImageMediaId|mediaId)":"[0-9a-f-]{36}"/))) {
+    try { const { items: m } = await api('/media?limit=200'); m.forEach((x) => { mediaCache[x.id] = x; }); } catch { /* ignore */ }
   }
   const tabs = h('div.tabs', { role: 'tablist' });
   const panel = h('div.tab-panel', { role: 'tabpanel' });
@@ -367,10 +374,14 @@ async function contentSections(keys, { title, intro, notice } = {}) {
       if (!(await confirmDialog('Нийтлээгүй өөрчлөлтүүдийг цуцлах уу?'))) return;
       try { await api(`/content/${key}/discard`, { method: 'POST' }); toast('Цуцлагдлаа'); render(); } catch (e) { toast(e.message, 'error'); }
     } }, 'Өөрчлөлт цуцлах') : null;
+    const reset = !item.isDefault || item.hasUnpublishedChanges ? h('button.btn.btn--ghost', { type: 'button', onclick: async () => {
+      if (!(await confirmDialog('Энэ хэсгийн бүх засварыг устгаж, анхдагч текст рүү буцаах уу? Сайт дээр шууд хэрэгжинэ.', { okLabel: 'Анхдагч руу буцаах', danger: true }))) return;
+      try { await api(`/content/${key}/reset`, { method: 'POST' }); toast('Анхдагч текст рүү буцлаа'); render(); } catch (e) { toast(e.message, 'error'); }
+    } }, 'Анхдагч руу буцаах') : null;
     panel.replaceChildren(
       h('div.card', h('div.card__head', h('h2', SCHEMAS[key].title), statusEl),
         buildForm(SCHEMAS[key].fields, value, { mediaCache }),
-        h('div.savebar', pubBtn, saveBtn, h('a.btn.btn--ghost', { href: `${BASE}/preview/site`, target: '_blank', title: 'Ноорог хадгалсны дараа харагдана' }, 'Preview ↗'), discard)));
+        h('div.savebar', pubBtn, saveBtn, h('a.btn.btn--ghost', { href: `${BASE}/preview/site`, target: '_blank', title: 'Ноорог хадгалсны дараа харагдана' }, 'Preview ↗'), discard, reset)));
     tabs.querySelectorAll('button').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.key === key)));
   };
   keys.forEach((k) => tabs.append(h('button.tab', { type: 'button', role: 'tab', dataset: { key: k }, onclick: () => { if (!confirmLeave()) return; setDirty(false); show(k); } }, SCHEMAS[k].title, byKey[k].hasUnpublishedChanges ? h('i.dot', { 'aria-label': 'нийтлээгүй' }) : null)));

@@ -45,8 +45,8 @@ function field(f, obj, mediaCache) {
     }
     case 'media': {
       return mediaField({
-        label: f.label, kind: f.kind || 'image', help: f.help,
-        value: obj[f.name] ? mediaCache[obj[f.name]] || { id: obj[f.name], name: 'Сонгосон медиа', kind: f.kind || 'image', thumbUrl: '' } : null,
+        label: f.label, kind: f.kind === 'any' ? '' : f.kind || 'image', help: f.help,
+        value: obj[f.name] ? mediaCache[obj[f.name]] || { id: obj[f.name], name: 'Сонгосон медиа', kind: f.kind === 'video' ? 'video' : 'image', thumbUrl: '' } : null,
         onChange: (m) => { if (m) mediaCache[m.id] = m; set(m ? m.id : null); },
       });
     }

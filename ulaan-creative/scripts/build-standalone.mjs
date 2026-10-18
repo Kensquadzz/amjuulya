@@ -31,6 +31,10 @@ html = html.replace(/<script src="\/assets\/vendor\/[^"]+" defer><\/script>\n?/g
 const vendor = ['gsap.min.js', 'ScrollTrigger.min.js', 'lenis.min.js'].map((f) => read(`assets/vendor/${f}`)).join('\n');
 swap('<script src="/assets/js/main.js" defer></script>', `<script>\n${vendor}\n</script>\n<script>\n${read('assets/js/main.js')}\n</script>`);
 const dataUri = (p, mime) => `data:${mime};base64,${readFileSync(path.join(root, 'public', p)).toString('base64')}`;
+// fonts: inline the woff2 files referenced by fonts.css
+const fontsCss = read('assets/css/fonts.css').replace(/url\(\/assets\/fonts\/([^)]+)\)/g, (_, f) => `url(${dataUri(`assets/fonts/${f}`, 'font/woff2')})`);
+swap('<link rel="stylesheet" href="/assets/css/fonts.css">', `<style>\n${fontsCss}\n</style>`);
+html = html.replace(/<link rel="preload" href="\/assets\/fonts\/[^"]+" as="font"[^>]*>\n?/g, '');
 swap('href="/assets/img/favicon-32.png"', `href="${dataUri('assets/img/favicon-32.png', 'image/png')}"`);
 html = html.split('/assets/img/ulaan-bomb-sm.webp').join(dataUri('assets/img/ulaan-bomb-sm.webp', 'image/webp'));
 html = html.split('/assets/img/ulaan-bomb.webp').join(dataUri('assets/img/ulaan-bomb.webp', 'image/webp'));

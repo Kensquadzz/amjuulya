@@ -712,7 +712,7 @@ export const film: SceneDef = {
         if (s.copy.caption) blurIn(eio(seg(t, 0.5, 1.0)), () => NT(s.copy.caption!, X0 + 4, 650, 500, 44, '#d9d9e0', 'l'));
         c.restore();
         const its = listOf(s.copy.items), rowH = 150, gap = 18, start = 1.0, top = 640;
-        const scroll = eio(seg(t, start, D)) * Math.max(0, its.length * (rowH + gap) - 760);
+        const scroll = eio(seg(t, start, D)) * Math.max(0, its.length * (rowH + gap) - 760) + Math.max(0, t - start) * 26; /* rows keep drifting */
         c.save(); c.beginPath(); c.rect(0, top - 20, W, 920); c.clip();
         its.forEach((it, i) => {
           const rk = eio(seg(t, start + i * 0.08, start + 0.6 + i * 0.08)); if (rk <= 0) return;
@@ -765,7 +765,7 @@ export const film: SceneDef = {
         c.save(); c.globalAlpha *= out;
         // the mark stays as a small signature (continuity from the lockup)
         blurIn(eio(seg(t, 0, 0.5)), () => nmark(W / 2, 520, 34, 1));
-        const step = eio(seg(t, s1 - 0.15, s1 + 0.4));
+        const step = eio(seg(t, s1 - 0.6, s1 - 0.05));
         const oy = lerp(880, 760, step), opx = lerp(150, 84, step);
         const n = Math.floor(clamp((t - 0.1) / 0.06, 0, old.length));
         c.save(); c.globalAlpha *= lerp(1, 0.55, step);
@@ -810,7 +810,8 @@ export const film: SceneDef = {
     const drawScene = (s: FilmScene, T0: number) => {
       SCENE = s.id; camScale = 1;
       const t = T0 - s.start, D = s.end - s.start, b = (s.beats ?? []).map((x) => x - s.start);
-      (SC[s.kind] ?? NIGHT[s.kind] ?? SC.question)({ s, t, D, b });
+      if (NIGHT[s.kind]) { c.save(); push(t, D, W / 2, 900, 0.035); NIGHT[s.kind]({ s, t, D, b }); c.restore(); return; }
+      (SC[s.kind] ?? SC.question)({ s, t, D, b });
     };
     const into = (buf: HTMLCanvasElement, f: FrameState, s: FilmScene, T0: number) => {
       if (buf.width !== f.W || buf.height !== f.H) { buf.width = f.W; buf.height = f.H; }

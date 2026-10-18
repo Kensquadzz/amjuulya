@@ -90,6 +90,7 @@ function setupView({ tokenConfigured }) {
     tokenConfigured
       ? h('p.muted', 'Админ хараахан үүсээгүй байна. Vercel дээр тавьсан Setup кодоо оруулж, өөрийн имэйл, нууц үгээр эрх үүсгэнэ. Нэг л удаа хийгдэнэ.')
       : h('div.notice.notice--warn', 'Vercel → Settings → Environment Variables дээр ADMIN_SETUP_TOKEN (16+ тэмдэгт) нэмээд Redeploy хийсний дараа энд эрх үүсгэнэ.'),
+    h('p.muted', 'Код таарахгүй бол: Vercel → Settings → Environment Variables → ADMIN_SETUP_TOKEN → ⋯ → Edit хэсгээс утгыг харж яг тэрийг бичнэ. Утгыг өөрчилсөн бол Redeploy хийнэ.'),
     form)));
 }
 

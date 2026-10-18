@@ -103,7 +103,7 @@ export async function setupFirstAdmin(req, res) {
   const body = await readJson(req, 8 * 1024);
   const expected = setupToken();
   if (expected.length < 16) throw new HttpError(403, 'setup_disabled', 'Vercel дээр ADMIN_SETUP_TOKEN (16+ тэмдэгт) тохируулаагүй байна.');
-  const given = Buffer.from(String(body.token || ''));
+  const given = Buffer.from(String(body.token || '').trim()); // tolerate spaces picked up when copy-pasting on a phone
   const want = Buffer.from(expected);
   if (given.length !== want.length || !crypto.timingSafeEqual(given, want)) throw new HttpError(403, 'bad_token', 'Setup код буруу байна.');
   const email = str(body.email, 200, 'Имэйл', { required: true }).toLowerCase();

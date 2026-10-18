@@ -388,6 +388,38 @@ function influencerDetail(p) {
   </template>`;
 }
 
+/** Home preview: up to 8 published creators (featured first) from the same data as the full
+ *  browser; "БҮГДИЙГ ХАРАХ" opens that browser (the nav's Influencers panel). */
+function influencersPreview(s, list) {
+  const picks = [...list.filter((p) => p.featured), ...list.filter((p) => !p.featured)].slice(0, 8);
+  return `<section class="inf-home" id="influencers-preview" aria-labelledby="inf-home-title" data-inf-home data-cursor-theme="light">
+  <div class="container inf-home__head">
+    <div>
+      <p class="label mono" data-reveal>${esc(s.label)}</p>
+      <h2 class="display inf-home__title" id="inf-home-title" data-split>INFLUENCERS</h2>
+      <p class="inf-home__sub" data-reveal>${esc(s.homeSubtitle || 'Брэндтэй тань тохирох контент бүтээгчдийг олоорой.')}</p>
+    </div>
+    <div class="inf-home__actions" data-reveal>
+      <a class="inf-home__picked mono" href="#influencers" data-home-inquire hidden><span data-home-picked>0</span> сонгосон · Хүсэлт илгээх</a>
+      <a class="inf-home__all mono" href="#influencers">БҮГДИЙГ ХАРАХ <span aria-hidden="true">→</span></a>
+    </div>
+  </div>
+  ${picks.length ? `<div class="inf-row inf-home__row">
+    <div class="inf-row__head inf-home__rowhead"><span class="mono">${picks.length} / ${list.length} бүтээгч</span><div class="inf-row__pages" aria-hidden="true" data-inf-pages></div></div>
+    <div class="inf-row__viewport">
+      <button type="button" class="inf-row__edge inf-row__edge--prev" data-inf-row-prev aria-label="Өмнөх бүтээгчид"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M10 3 5 8l5 5" fill="none" stroke="currentColor" stroke-width="1.8"/></svg></button>
+      <ul class="inf-row__track" role="list" aria-label="Онцлох influencer-ууд" data-inf-track>
+      ${picks.map(influencerCard).join('\n      ')}
+      </ul>
+      <button type="button" class="inf-row__edge inf-row__edge--next" data-inf-row-next aria-label="Дараагийн бүтээгчид"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m6 3 5 5-5 5" fill="none" stroke="currentColor" stroke-width="1.8"/></svg></button>
+    </div>
+  </div>` : `<div class="container"><div class="inf-home__empty" data-reveal>
+    <p class="display">${esc(s.emptyTitle)}</p>
+    <p>${esc(s.emptyText)}</p>
+  </div></div>`}
+</section>`;
+}
+
 /** Netflix-inspired creator browser, opened from the nav ("Influencers"): optional featured
  *  creator, horizontal category rows, search + filter, multi-select → one campaign inquiry. */
 function influencersPanel(s, list, categories = []) {
@@ -611,6 +643,7 @@ ${marquee(c.marquee)}
 ${intro(c.intro)}
 ${services(c.services, mediaMap)}
 ${work(c.work, projects)}
+${influencersPreview(c.influencers, influencers)}
 ${packages(c.packages)}
 ${about(c.about)}
 ${faq(c.faq)}

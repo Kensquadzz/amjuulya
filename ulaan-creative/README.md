@@ -188,6 +188,8 @@ In the hero, the bomb sways around the hand, follows the cursor slightly, and th
 * **multi-select** (+ Сонгох on each card / featured / details) with a selection bar (review + remove) and a **campaign inquiry** form (name, company, phone/e-mail, objective, optional dates, notes). Inquiries are stored in `contact_submissions` (kind `influencer`, selected creators as `[{id,name}]`; only *published* creators are accepted) and appear in *Admin → Ирсэн хүсэлтүүд*;
 * engagement is shown only when the admin ticks «Engagement баталгаажсан».
 
+**Home preview:** the home page shows an *INFLUENCERS* row with up to 8 published creators (featured first, then the admin order) — the same data and cards as the full browser, so admin edits show in both. Arrows / drag on desktop, swipe on phones; selecting a creator there is shared with the full browser. «БҮГДИЙГ ХАРАХ →» opens the full browser (`#influencers`). The subtitle is editable in *Website content → Influencer хэсгийн текст*.
+
 **Private price:** the influencer **price** is stored for the admin only. It is never in the public HTML, JS, `/api/public/*` or the contact flow (covered by `test/api.test.mjs`).
 
 **Categories:** Admin → Influencer-ууд → «Ангиллууд»: add, rename, reorder, delete. Deleting a category removes only its links, never the profiles. Default categories are seeded by `migrations/003_influencer_categories.sql`; run `npm run db:migrate` after updating.

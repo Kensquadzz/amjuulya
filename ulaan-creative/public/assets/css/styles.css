@@ -1016,3 +1016,31 @@ html:not(.js) .inf-pick, html:not(.js) .inf__tools { display: none; }
 /* preview / demo label stays visible above the influencer panel without covering the selection bar */
 html.inf-open .preview-bar { bottom: auto; top: max(70px, calc(env(safe-area-inset-top) + 64px)); background: var(--red); max-width: calc(100vw - 32px); text-align: center; }
 @media (hover: none) { .inf-row__edge { display: none; } .inf-row__track { scroll-snap-type: x mandatory; } }
+
+/* Home: INFLUENCERS preview (same cards / row scrolling as the full browser) */
+.inf-home { background: #0d0d0d; color: var(--white); padding: clamp(80px, 9vw, 140px) 0 clamp(64px, 7vw, 110px); overflow: hidden; }
+.inf-home__head { display: flex; justify-content: space-between; align-items: flex-end; gap: 24px; flex-wrap: wrap; margin-bottom: clamp(16px, 2vw, 28px); }
+.inf-home__title { font-size: clamp(56px, 9vw, 160px); line-height: .9; }
+.inf-home__sub { margin-top: 14px; font-size: clamp(15px, 1.2vw, 18px); opacity: .8; max-width: 44ch; }
+.inf-home__actions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.inf-home__all, .inf-home__picked {
+  display: inline-flex; align-items: center; gap: 10px; min-height: 48px; padding: 0 22px; border-radius: 999px;
+  font-size: 12px; letter-spacing: .14em; text-transform: uppercase; transition: background-color .3s, color .3s, border-color .3s;
+}
+.inf-home__all { border: 1px solid rgba(255,255,255,.6); }
+.inf-home__all span { transition: transform .3s var(--ease); }
+.inf-home__all:hover, .inf-home__all:focus-visible { background: var(--white); color: var(--black); }
+.inf-home__all:hover span { transform: translateX(4px); }
+.inf-home__picked { background: var(--red); border: 1px solid var(--red); }
+.inf-home__picked[hidden] { display: none; }
+.inf-home__rowhead { justify-content: flex-end; }
+.inf-home__rowhead .mono { margin-right: auto; font-size: 11px; opacity: .55; }
+.inf-home__empty { border: 1px dashed rgba(255,255,255,.3); border-radius: 18px; padding: clamp(28px, 4vw, 56px); }
+.inf-home__empty .display { font-size: clamp(26px, 3vw, 44px); margin-bottom: 10px; }
+.inf-home__empty p:not(.display) { opacity: .75; max-width: 56ch; }
+@media (max-width: 760px) {
+  .inf-home__head { align-items: flex-start; }
+  .inf-home__actions { width: 100%; }
+  .inf-home__all { flex: 1; justify-content: center; }
+  .inf-home .inf-card { flex-basis: 64vw; } /* next card peeks in */
+}

@@ -1153,6 +1153,34 @@ html:not(.js) .inf-pick, html:not(.js) .inf__tools { display: none; }
 html.inf-open .preview-bar { bottom: auto; top: max(70px, calc(env(safe-area-inset-top) + 64px)); background: var(--red); max-width: calc(100vw - 32px); text-align: center; }
 @media (hover: none) { .inf-row__edge { display: none; } .inf-row__track { scroll-snap-type: x mandatory; } }
 
+/* Home: INFLUENCERS preview (same cards / row scrolling as the full browser) */
+.inf-home { background: #0d0d0d; color: var(--white); padding: clamp(80px, 9vw, 140px) 0 clamp(64px, 7vw, 110px); overflow: hidden; }
+.inf-home__head { display: flex; justify-content: space-between; align-items: flex-end; gap: 24px; flex-wrap: wrap; margin-bottom: clamp(16px, 2vw, 28px); }
+.inf-home__title { font-size: clamp(56px, 9vw, 160px); line-height: .9; }
+.inf-home__sub { margin-top: 14px; font-size: clamp(15px, 1.2vw, 18px); opacity: .8; max-width: 44ch; }
+.inf-home__actions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.inf-home__all, .inf-home__picked {
+  display: inline-flex; align-items: center; gap: 10px; min-height: 48px; padding: 0 22px; border-radius: 999px;
+  font-size: 12px; letter-spacing: .14em; text-transform: uppercase; transition: background-color .3s, color .3s, border-color .3s;
+}
+.inf-home__all { border: 1px solid rgba(255,255,255,.6); }
+.inf-home__all span { transition: transform .3s var(--ease); }
+.inf-home__all:hover, .inf-home__all:focus-visible { background: var(--white); color: var(--black); }
+.inf-home__all:hover span { transform: translateX(4px); }
+.inf-home__picked { background: var(--red); border: 1px solid var(--red); }
+.inf-home__picked[hidden] { display: none; }
+.inf-home__rowhead { justify-content: flex-end; }
+.inf-home__rowhead .mono { margin-right: auto; font-size: 11px; opacity: .55; }
+.inf-home__empty { border: 1px dashed rgba(255,255,255,.3); border-radius: 18px; padding: clamp(28px, 4vw, 56px); }
+.inf-home__empty .display { font-size: clamp(26px, 3vw, 44px); margin-bottom: 10px; }
+.inf-home__empty p:not(.display) { opacity: .75; max-width: 56ch; }
+@media (max-width: 760px) {
+  .inf-home__head { align-items: flex-start; }
+  .inf-home__actions { width: 100%; }
+  .inf-home__all { flex: 1; justify-content: center; }
+  .inf-home .inf-card { flex-basis: 64vw; } /* next card peeks in */
+}
+
 </style>
 <script type="application/ld+json" nonce="standalone">{"@context":"https://schema.org","@type":"Organization","name":"Ulaan Creative","url":"https://ulaancreative.mn/","logo":"https://ulaancreative.mn/assets/img/ulaan-logo-light.png"}</script>
 </head>
@@ -1342,6 +1370,23 @@ html.inf-open .preview-bar { bottom: auto; top: max(70px, calc(env(safe-area-ins
       <a class="btn-fill btn-fill--dark" href="#contact" data-magnetic><span>Төслөө ярилцах</span><i class="dot" aria-hidden="true"></i></a>
     </div>
   </div>
+</section>
+<section class="inf-home" id="influencers-preview" aria-labelledby="inf-home-title" data-inf-home data-cursor-theme="light">
+  <div class="container inf-home__head">
+    <div>
+      <p class="label mono" data-reveal>( 005 ) — Influencer сүлжээ</p>
+      <h2 class="display inf-home__title" id="inf-home-title" data-split>INFLUENCERS</h2>
+      <p class="inf-home__sub" data-reveal>Брэндтэй тань тохирох контент бүтээгчдийг олоорой.</p>
+    </div>
+    <div class="inf-home__actions" data-reveal>
+      <a class="inf-home__picked mono" href="#influencers" data-home-inquire hidden><span data-home-picked>0</span> сонгосон · Хүсэлт илгээх</a>
+      <a class="inf-home__all mono" href="#influencers">БҮГДИЙГ ХАРАХ <span aria-hidden="true">→</span></a>
+    </div>
+  </div>
+  <div class="container"><div class="inf-home__empty" data-reveal>
+    <p class="display">Хамтран ажилладаг influencer-үүд удахгүй нэмэгдэнэ</p>
+    <p>Брэндийнхээ кампанит ажилд тохирох контент бүтээгч хайж байна уу? Зорилго, төсөвт тань нийцүүлэн сонгож, хамтын ажиллагааг эхнээс нь дуустал зохион байгуулна.</p>
+  </div></div>
 </section>
 <section class="packages" id="packages" aria-labelledby="packages-title" data-cursor-theme="dark">
   <div class="container">
@@ -1762,8 +1807,10 @@ html.inf-open .preview-bar { bottom: auto; top: max(70px, calc(env(safe-area-ins
     const chip = (id) => { const li = document.createElement('li'); li.textContent = nameOf(id); const x = document.createElement('button'); x.type = 'button'; x.dataset.infUnpick = id; x.setAttribute('aria-label', `${nameOf(id)} — хасах`); x.textContent = '✕'; li.appendChild(x); return li; };
     function syncPicked() {
       try { sessionStorage.setItem(KEY, JSON.stringify([...picked])); } catch (e) { /* private mode */ }
-      $$('[data-inf-pick]', inf).forEach((b) => b.setAttribute('aria-pressed', String(picked.has(b.dataset.infPick))));
-      $$('[data-inf-item]', inf).forEach((c) => c.classList.toggle('is-picked', picked.has(c.dataset.infItem)));
+      $$('[data-inf-pick]').forEach((b) => b.setAttribute('aria-pressed', String(picked.has(b.dataset.infPick))));
+      $$('[data-inf-item]').forEach((c) => c.classList.toggle('is-picked', picked.has(c.dataset.infItem)));
+      const homePicked = $('[data-home-inquire]');
+      if (homePicked) { homePicked.hidden = !picked.size; $('[data-home-picked]', homePicked).textContent = String(picked.size); }
       if (bar) {
         bar.hidden = picked.size === 0;
         $('[data-inf-count]', bar).textContent = String(picked.size);
@@ -1916,7 +1963,7 @@ html.inf-open .preview-bar { bottom: auto; top: max(70px, calc(env(safe-area-ins
       const on = n ? Math.round((track.scrollLeft / max) * (n - 1)) : -1;
       [...box.children].forEach((el, i) => el.classList.toggle('is-on', i === on));
     }
-    $$('[data-inf-track]', inf).forEach((track) => {
+    $$('[data-inf-track]').forEach((track) => {
       const row = track.closest('.inf-row');
       $('[data-inf-row-prev]', row).addEventListener('click', () => page(track, -1));
       $('[data-inf-row-next]', row).addEventListener('click', () => page(track, 1));
@@ -1963,7 +2010,19 @@ html.inf-open .preview-bar { bottom: auto; top: max(70px, calc(env(safe-area-ins
         if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') { e.preventDefault(); page(track, e.key === 'ArrowRight' ? 1 : -1); }
       });
     });
-    window.addEventListener('resize', () => $$('[data-inf-track]', inf).forEach((t) => { updateRowNav(t); updatePages(t); }));
+    window.addEventListener('resize', () => $$('[data-inf-track]').forEach((t) => { updateRowNav(t); updatePages(t); }));
+    requestAnimationFrame(() => $$('[data-inf-track]').forEach((t) => { updateRowNav(t); updatePages(t); }));
+
+    /* --- Home preview: same cards; details / inquiry open inside the full browser --- */
+    const home = $('[data-inf-home]');
+    if (home) home.addEventListener('click', (e) => {
+      const pick = e.target.closest('[data-inf-pick]');
+      if (pick) { const id = pick.dataset.infPick; if (picked.has(id)) picked.delete(id); else picked.add(id); syncPicked(); return; }
+      const open = e.target.closest('[data-inf-open]');
+      if (open) { openInf(); openDetail(open.dataset.infOpen, open); return; }
+      const inquire = e.target.closest('[data-home-inquire]');
+      if (inquire) { e.preventDefault(); e.stopPropagation(); openInf(); syncPicked(); openSheet('inquiry', inquire); }
+    });
     inf._pages = updatePages;
 
     /* --- one click handler for the panel --- */

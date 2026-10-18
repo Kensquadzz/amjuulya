@@ -249,8 +249,10 @@
     const chip = (id) => { const li = document.createElement('li'); li.textContent = nameOf(id); const x = document.createElement('button'); x.type = 'button'; x.dataset.infUnpick = id; x.setAttribute('aria-label', `${nameOf(id)} — хасах`); x.textContent = '✕'; li.appendChild(x); return li; };
     function syncPicked() {
       try { sessionStorage.setItem(KEY, JSON.stringify([...picked])); } catch (e) { /* private mode */ }
-      $$('[data-inf-pick]', inf).forEach((b) => b.setAttribute('aria-pressed', String(picked.has(b.dataset.infPick))));
-      $$('[data-inf-item]', inf).forEach((c) => c.classList.toggle('is-picked', picked.has(c.dataset.infItem)));
+      $$('[data-inf-pick]').forEach((b) => b.setAttribute('aria-pressed', String(picked.has(b.dataset.infPick))));
+      $$('[data-inf-item]').forEach((c) => c.classList.toggle('is-picked', picked.has(c.dataset.infItem)));
+      const homePicked = $('[data-home-inquire]');
+      if (homePicked) { homePicked.hidden = !picked.size; $('[data-home-picked]', homePicked).textContent = String(picked.size); }
       if (bar) {
         bar.hidden = picked.size === 0;
         $('[data-inf-count]', bar).textContent = String(picked.size);
@@ -403,7 +405,7 @@
       const on = n ? Math.round((track.scrollLeft / max) * (n - 1)) : -1;
       [...box.children].forEach((el, i) => el.classList.toggle('is-on', i === on));
     }
-    $$('[data-inf-track]', inf).forEach((track) => {
+    $$('[data-inf-track]').forEach((track) => {
       const row = track.closest('.inf-row');
       $('[data-inf-row-prev]', row).addEventListener('click', () => page(track, -1));
       $('[data-inf-row-next]', row).addEventListener('click', () => page(track, 1));
@@ -450,7 +452,19 @@
         if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') { e.preventDefault(); page(track, e.key === 'ArrowRight' ? 1 : -1); }
       });
     });
-    window.addEventListener('resize', () => $$('[data-inf-track]', inf).forEach((t) => { updateRowNav(t); updatePages(t); }));
+    window.addEventListener('resize', () => $$('[data-inf-track]').forEach((t) => { updateRowNav(t); updatePages(t); }));
+    requestAnimationFrame(() => $$('[data-inf-track]').forEach((t) => { updateRowNav(t); updatePages(t); }));
+
+    /* --- Home preview: same cards; details / inquiry open inside the full browser --- */
+    const home = $('[data-inf-home]');
+    if (home) home.addEventListener('click', (e) => {
+      const pick = e.target.closest('[data-inf-pick]');
+      if (pick) { const id = pick.dataset.infPick; if (picked.has(id)) picked.delete(id); else picked.add(id); syncPicked(); return; }
+      const open = e.target.closest('[data-inf-open]');
+      if (open) { openInf(); openDetail(open.dataset.infOpen, open); return; }
+      const inquire = e.target.closest('[data-home-inquire]');
+      if (inquire) { e.preventDefault(); e.stopPropagation(); openInf(); syncPicked(); openSheet('inquiry', inquire); }
+    });
     inf._pages = updatePages;
 
     /* --- one click handler for the panel --- */

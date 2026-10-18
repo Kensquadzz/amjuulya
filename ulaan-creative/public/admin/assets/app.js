@@ -343,7 +343,7 @@ const SCHEMAS = {
     { name: 'emptyTitle', label: 'Төсөл байхгүй үеийн гарчиг', type: 'text' }, { name: 'emptyText', label: 'Төсөл байхгүй үеийн текст', type: 'textarea' } ] },
   influencers: { title: 'Influencer хэсгийн текст', fields: [
     { name: 'label', label: 'Шошго', type: 'text' }, { name: 'title', label: 'Гарчиг', type: 'textarea', rows: 2 }, { name: 'intro', label: 'Текст', type: 'textarea' },
-    { name: 'emptyTitle', label: 'Influencer нэмэгдээгүй үеийн гарчиг', type: 'text' }, { name: 'emptyText', label: 'Influencer нэмэгдээгүй үеийн текст', type: 'textarea' } ] },
+    { name: 'homeSubtitle', label: 'Нүүр хуудасны INFLUENCERS хэсгийн дэд гарчиг', type: 'text' }, { name: 'emptyTitle', label: 'Influencer нэмэгдээгүй үеийн гарчиг', type: 'text' }, { name: 'emptyText', label: 'Influencer нэмэгдээгүй үеийн текст', type: 'textarea' } ] },
   about: { title: 'Бидний тухай', fields: [
     { name: 'label', label: 'Шошго', type: 'text' },
     { name: 'manifesto', label: 'Манифест (том текст)', type: 'textarea', help: '*одоор* хүрээлсэн үг улаанаар тодорно.' },

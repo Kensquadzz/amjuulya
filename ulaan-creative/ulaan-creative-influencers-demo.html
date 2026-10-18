@@ -1153,6 +1153,34 @@ html:not(.js) .inf-pick, html:not(.js) .inf__tools { display: none; }
 html.inf-open .preview-bar { bottom: auto; top: max(70px, calc(env(safe-area-inset-top) + 64px)); background: var(--red); max-width: calc(100vw - 32px); text-align: center; }
 @media (hover: none) { .inf-row__edge { display: none; } .inf-row__track { scroll-snap-type: x mandatory; } }
 
+/* Home: INFLUENCERS preview (same cards / row scrolling as the full browser) */
+.inf-home { background: #0d0d0d; color: var(--white); padding: clamp(80px, 9vw, 140px) 0 clamp(64px, 7vw, 110px); overflow: hidden; }
+.inf-home__head { display: flex; justify-content: space-between; align-items: flex-end; gap: 24px; flex-wrap: wrap; margin-bottom: clamp(16px, 2vw, 28px); }
+.inf-home__title { font-size: clamp(56px, 9vw, 160px); line-height: .9; }
+.inf-home__sub { margin-top: 14px; font-size: clamp(15px, 1.2vw, 18px); opacity: .8; max-width: 44ch; }
+.inf-home__actions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.inf-home__all, .inf-home__picked {
+  display: inline-flex; align-items: center; gap: 10px; min-height: 48px; padding: 0 22px; border-radius: 999px;
+  font-size: 12px; letter-spacing: .14em; text-transform: uppercase; transition: background-color .3s, color .3s, border-color .3s;
+}
+.inf-home__all { border: 1px solid rgba(255,255,255,.6); }
+.inf-home__all span { transition: transform .3s var(--ease); }
+.inf-home__all:hover, .inf-home__all:focus-visible { background: var(--white); color: var(--black); }
+.inf-home__all:hover span { transform: translateX(4px); }
+.inf-home__picked { background: var(--red); border: 1px solid var(--red); }
+.inf-home__picked[hidden] { display: none; }
+.inf-home__rowhead { justify-content: flex-end; }
+.inf-home__rowhead .mono { margin-right: auto; font-size: 11px; opacity: .55; }
+.inf-home__empty { border: 1px dashed rgba(255,255,255,.3); border-radius: 18px; padding: clamp(28px, 4vw, 56px); }
+.inf-home__empty .display { font-size: clamp(26px, 3vw, 44px); margin-bottom: 10px; }
+.inf-home__empty p:not(.display) { opacity: .75; max-width: 56ch; }
+@media (max-width: 760px) {
+  .inf-home__head { align-items: flex-start; }
+  .inf-home__actions { width: 100%; }
+  .inf-home__all { flex: 1; justify-content: center; }
+  .inf-home .inf-card { flex-basis: 64vw; } /* next card peeks in */
+}
+
 </style>
 <script type="application/ld+json" nonce="standalone">{"@context":"https://schema.org","@type":"Organization","name":"Ulaan Creative","url":"https://ulaancreative.mn/","logo":"https://ulaancreative.mn/assets/img/ulaan-logo-light.png"}</script>
 </head>
@@ -1340,6 +1368,100 @@ html.inf-open .preview-bar { bottom: auto; top: max(70px, calc(env(safe-area-ins
     <div class="work__empty" data-reveal>
       <div><h3 class="display">Бүтээлүүд удахгүй нэмэгдэнэ</h3><p>Сүүлийн үеийн ажлуудаа энд байршуулж байна. Өөрийн төслөө ярилцахыг хүсвэл бидэнтэй холбогдоорой.</p></div>
       <a class="btn-fill btn-fill--dark" href="#contact" data-magnetic><span>Төслөө ярилцах</span><i class="dot" aria-hidden="true"></i></a>
+    </div>
+  </div>
+</section>
+<section class="inf-home" id="influencers-preview" aria-labelledby="inf-home-title" data-inf-home data-cursor-theme="light">
+  <div class="container inf-home__head">
+    <div>
+      <p class="label mono" data-reveal>( 005 ) — Influencer сүлжээ</p>
+      <h2 class="display inf-home__title" id="inf-home-title" data-split>INFLUENCERS</h2>
+      <p class="inf-home__sub" data-reveal>Брэндтэй тань тохирох контент бүтээгчдийг олоорой.</p>
+    </div>
+    <div class="inf-home__actions" data-reveal>
+      <a class="inf-home__picked mono" href="#influencers" data-home-inquire hidden><span data-home-picked>0</span> сонгосон · Хүсэлт илгээх</a>
+      <a class="inf-home__all mono" href="#influencers">БҮГДИЙГ ХАРАХ <span aria-hidden="true">→</span></a>
+    </div>
+  </div>
+  <div class="inf-row inf-home__row">
+    <div class="inf-row__head inf-home__rowhead"><span class="mono">8 / 10 бүтээгч</span><div class="inf-row__pages" aria-hidden="true" data-inf-pages></div></div>
+    <div class="inf-row__viewport">
+      <button type="button" class="inf-row__edge inf-row__edge--prev" data-inf-row-prev aria-label="Өмнөх бүтээгчид"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M10 3 5 8l5 5" fill="none" stroke="currentColor" stroke-width="1.8"/></svg></button>
+      <ul class="inf-row__track" role="list" aria-label="Онцлох influencer-ууд" data-inf-track>
+      <li class="inf-card" data-inf-item="demo-5">
+        <div class="inf-card__media"><span class="display" aria-hidden="true">DC</span></div>
+        <button type="button" class="inf-card__open" data-inf-open="demo-5" aria-label="DEMO Creator 05 — дэлгэрэнгүй">
+          <span class="inf-card__cat mono">Food &amp; Travel · Lifestyle &amp; Fashion</span>
+          <strong class="inf-card__name">DEMO Creator 05</strong>
+          <span class="inf-card__meta mono">Instagram<i aria-hidden="true">/</i>150K дагагч</span>
+        </button>
+        <button type="button" class="inf-pick inf-pick--card" data-inf-pick="demo-5" aria-pressed="false" aria-label="DEMO Creator 05 — кампанит ажилд сонгох"><span class="inf-pick__off">+ Сонгох</span><span class="inf-pick__on">✓ Сонгосон</span></button>
+      </li>
+      <li class="inf-card" data-inf-item="demo-1">
+        <div class="inf-card__media"><span class="display" aria-hidden="true">DC</span></div>
+        <button type="button" class="inf-card__open" data-inf-open="demo-1" aria-label="DEMO Creator 01 — дэлгэрэнгүй">
+          <span class="inf-card__cat mono">Lifestyle &amp; Fashion</span>
+          <strong class="inf-card__name">DEMO Creator 01</strong>
+          <span class="inf-card__meta mono">Instagram<i aria-hidden="true">/</i>8.5K дагагч</span>
+        </button>
+        <button type="button" class="inf-pick inf-pick--card" data-inf-pick="demo-1" aria-pressed="false" aria-label="DEMO Creator 01 — кампанит ажилд сонгох"><span class="inf-pick__off">+ Сонгох</span><span class="inf-pick__on">✓ Сонгосон</span></button>
+      </li>
+      <li class="inf-card" data-inf-item="demo-2">
+        <div class="inf-card__media"><span class="display" aria-hidden="true">DC</span></div>
+        <button type="button" class="inf-card__open" data-inf-open="demo-2" aria-label="DEMO Creator 02 — дэлгэрэнгүй">
+          <span class="inf-card__cat mono">Lifestyle &amp; Fashion · Fitness &amp; Dance</span>
+          <strong class="inf-card__name">DEMO Creator 02</strong>
+          <span class="inf-card__meta mono">Instagram · TikTok<i aria-hidden="true">/</i>23K дагагч</span>
+        </button>
+        <button type="button" class="inf-pick inf-pick--card" data-inf-pick="demo-2" aria-pressed="false" aria-label="DEMO Creator 02 — кампанит ажилд сонгох"><span class="inf-pick__off">+ Сонгох</span><span class="inf-pick__on">✓ Сонгосон</span></button>
+      </li>
+      <li class="inf-card" data-inf-item="demo-3">
+        <div class="inf-card__media"><span class="display" aria-hidden="true">DC</span></div>
+        <button type="button" class="inf-card__open" data-inf-open="demo-3" aria-label="DEMO Creator 03 — дэлгэрэнгүй">
+          <span class="inf-card__cat mono">Fitness &amp; Dance</span>
+          <strong class="inf-card__name">DEMO Creator 03</strong>
+          <span class="inf-card__meta mono">Instagram<i aria-hidden="true">/</i>47K дагагч</span>
+        </button>
+        <button type="button" class="inf-pick inf-pick--card" data-inf-pick="demo-3" aria-pressed="false" aria-label="DEMO Creator 03 — кампанит ажилд сонгох"><span class="inf-pick__off">+ Сонгох</span><span class="inf-pick__on">✓ Сонгосон</span></button>
+      </li>
+      <li class="inf-card" data-inf-item="demo-4">
+        <div class="inf-card__media"><span class="display" aria-hidden="true">DC</span></div>
+        <button type="button" class="inf-card__open" data-inf-open="demo-4" aria-label="DEMO Creator 04 — дэлгэрэнгүй">
+          <span class="inf-card__cat mono">Food &amp; Travel</span>
+          <strong class="inf-card__name">DEMO Creator 04</strong>
+          <span class="inf-card__meta mono">Instagram · TikTok<i aria-hidden="true">/</i>72K дагагч</span>
+        </button>
+        <button type="button" class="inf-pick inf-pick--card" data-inf-pick="demo-4" aria-pressed="false" aria-label="DEMO Creator 04 — кампанит ажилд сонгох"><span class="inf-pick__off">+ Сонгох</span><span class="inf-pick__on">✓ Сонгосон</span></button>
+      </li>
+      <li class="inf-card" data-inf-item="demo-6">
+        <div class="inf-card__media"><span class="display" aria-hidden="true">DC</span></div>
+        <button type="button" class="inf-card__open" data-inf-open="demo-6" aria-label="DEMO Creator 06 — дэлгэрэнгүй">
+          <span class="inf-card__cat mono">Tech &amp; Education</span>
+          <strong class="inf-card__name">DEMO Creator 06</strong>
+          <span class="inf-card__meta mono">Instagram · TikTok<i aria-hidden="true">/</i>610K дагагч</span>
+        </button>
+        <button type="button" class="inf-pick inf-pick--card" data-inf-pick="demo-6" aria-pressed="false" aria-label="DEMO Creator 06 — кампанит ажилд сонгох"><span class="inf-pick__off">+ Сонгох</span><span class="inf-pick__on">✓ Сонгосон</span></button>
+      </li>
+      <li class="inf-card" data-inf-item="demo-7">
+        <div class="inf-card__media"><span class="display" aria-hidden="true">DC</span></div>
+        <button type="button" class="inf-card__open" data-inf-open="demo-7" aria-label="DEMO Creator 07 — дэлгэрэнгүй">
+          <span class="inf-card__cat mono">Entertainment</span>
+          <strong class="inf-card__name">DEMO Creator 07</strong>
+          <span class="inf-card__meta mono">Instagram<i aria-hidden="true">/</i>12K дагагч</span>
+        </button>
+        <button type="button" class="inf-pick inf-pick--card" data-inf-pick="demo-7" aria-pressed="false" aria-label="DEMO Creator 07 — кампанит ажилд сонгох"><span class="inf-pick__off">+ Сонгох</span><span class="inf-pick__on">✓ Сонгосон</span></button>
+      </li>
+      <li class="inf-card" data-inf-item="demo-8">
+        <div class="inf-card__media"><span class="display" aria-hidden="true">DC</span></div>
+        <button type="button" class="inf-card__open" data-inf-open="demo-8" aria-label="DEMO Creator 08 — дэлгэрэнгүй">
+          <span class="inf-card__cat mono">Entertainment · Fitness &amp; Dance</span>
+          <strong class="inf-card__name">DEMO Creator 08</strong>
+          <span class="inf-card__meta mono">Instagram · TikTok<i aria-hidden="true">/</i>330K дагагч</span>
+        </button>
+        <button type="button" class="inf-pick inf-pick--card" data-inf-pick="demo-8" aria-pressed="false" aria-label="DEMO Creator 08 — кампанит ажилд сонгох"><span class="inf-pick__off">+ Сонгох</span><span class="inf-pick__on">✓ Сонгосон</span></button>
+      </li>
+      </ul>
+      <button type="button" class="inf-row__edge inf-row__edge--next" data-inf-row-next aria-label="Дараагийн бүтээгчид"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m6 3 5 5-5 5" fill="none" stroke="currentColor" stroke-width="1.8"/></svg></button>
     </div>
   </div>
 </section>
@@ -2136,8 +2258,10 @@ html.inf-open .preview-bar { bottom: auto; top: max(70px, calc(env(safe-area-ins
     const chip = (id) => { const li = document.createElement('li'); li.textContent = nameOf(id); const x = document.createElement('button'); x.type = 'button'; x.dataset.infUnpick = id; x.setAttribute('aria-label', `${nameOf(id)} — хасах`); x.textContent = '✕'; li.appendChild(x); return li; };
     function syncPicked() {
       try { sessionStorage.setItem(KEY, JSON.stringify([...picked])); } catch (e) { /* private mode */ }
-      $$('[data-inf-pick]', inf).forEach((b) => b.setAttribute('aria-pressed', String(picked.has(b.dataset.infPick))));
-      $$('[data-inf-item]', inf).forEach((c) => c.classList.toggle('is-picked', picked.has(c.dataset.infItem)));
+      $$('[data-inf-pick]').forEach((b) => b.setAttribute('aria-pressed', String(picked.has(b.dataset.infPick))));
+      $$('[data-inf-item]').forEach((c) => c.classList.toggle('is-picked', picked.has(c.dataset.infItem)));
+      const homePicked = $('[data-home-inquire]');
+      if (homePicked) { homePicked.hidden = !picked.size; $('[data-home-picked]', homePicked).textContent = String(picked.size); }
       if (bar) {
         bar.hidden = picked.size === 0;
         $('[data-inf-count]', bar).textContent = String(picked.size);
@@ -2290,7 +2414,7 @@ html.inf-open .preview-bar { bottom: auto; top: max(70px, calc(env(safe-area-ins
       const on = n ? Math.round((track.scrollLeft / max) * (n - 1)) : -1;
       [...box.children].forEach((el, i) => el.classList.toggle('is-on', i === on));
     }
-    $$('[data-inf-track]', inf).forEach((track) => {
+    $$('[data-inf-track]').forEach((track) => {
       const row = track.closest('.inf-row');
       $('[data-inf-row-prev]', row).addEventListener('click', () => page(track, -1));
       $('[data-inf-row-next]', row).addEventListener('click', () => page(track, 1));
@@ -2337,7 +2461,19 @@ html.inf-open .preview-bar { bottom: auto; top: max(70px, calc(env(safe-area-ins
         if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') { e.preventDefault(); page(track, e.key === 'ArrowRight' ? 1 : -1); }
       });
     });
-    window.addEventListener('resize', () => $$('[data-inf-track]', inf).forEach((t) => { updateRowNav(t); updatePages(t); }));
+    window.addEventListener('resize', () => $$('[data-inf-track]').forEach((t) => { updateRowNav(t); updatePages(t); }));
+    requestAnimationFrame(() => $$('[data-inf-track]').forEach((t) => { updateRowNav(t); updatePages(t); }));
+
+    /* --- Home preview: same cards; details / inquiry open inside the full browser --- */
+    const home = $('[data-inf-home]');
+    if (home) home.addEventListener('click', (e) => {
+      const pick = e.target.closest('[data-inf-pick]');
+      if (pick) { const id = pick.dataset.infPick; if (picked.has(id)) picked.delete(id); else picked.add(id); syncPicked(); return; }
+      const open = e.target.closest('[data-inf-open]');
+      if (open) { openInf(); openDetail(open.dataset.infOpen, open); return; }
+      const inquire = e.target.closest('[data-home-inquire]');
+      if (inquire) { e.preventDefault(); e.stopPropagation(); openInf(); syncPicked(); openSheet('inquiry', inquire); }
+    });
     inf._pages = updatePages;
 
     /* --- one click handler for the panel --- */

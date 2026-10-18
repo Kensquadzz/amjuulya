@@ -161,6 +161,15 @@ test('first-admin web setup is closed once an admin exists (or without ADMIN_SET
   assert.ok([403, 410].includes(r.status), `got ${r.status}`);
 });
 
+test('lib/migrations.js is in sync with migrations/*.sql', async () => {
+  const { readdirSync, readFileSync } = await import('node:fs');
+  const { MIGRATIONS } = await import('../lib/migrations.js');
+  const dir = new URL('../migrations/', import.meta.url);
+  const files = readdirSync(dir).filter((f) => f.endsWith('.sql')).sort();
+  assert.deepEqual(MIGRATIONS.map((m) => m.name), files, 'run npm run db:sync-migrations');
+  for (const m of MIGRATIONS) assert.equal(m.sql, readFileSync(new URL(m.name, dir), 'utf8'), `${m.name} changed — run npm run db:sync-migrations`);
+});
+
 test('security headers on public and admin pages', async () => {
   const home = await fetch(`${BASE}/`);
   assert.match(home.headers.get('content-security-policy'), /script-src 'self' 'nonce-/);

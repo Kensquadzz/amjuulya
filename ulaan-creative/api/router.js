@@ -171,6 +171,7 @@ const routes = [
 
 async function adminApi(req, res, sub, searchParams) {
   if (!dbConfigured()) throw new HttpError(503, 'db_not_configured', 'DATABASE_URL тохируулаагүй байна.');
+  try { await ensureMigrated(); } catch (e) { throw new HttpError(503, 'migration_failed', `Мэдээллийн сангийн хүснэгт үүсгэж чадсангүй: ${String(e.message).slice(0, 300)}`); }
   if (sub === '/setup' && req.method === 'GET') return A.setupStatus(req, res);
   if (sub === '/setup' && req.method === 'POST') return A.setupFirstAdmin(req, res);
   if (sub === '/auth/login' && req.method === 'POST') return A.login(req, res);
@@ -222,6 +223,8 @@ export default async function handler(req, res) {
     const body = { ok: false, error: e instanceof HttpError ? e.code : status === 503 ? 'db_not_configured' : 'server_error' };
     if (e instanceof HttpError && e.message && e.message !== e.code) body.message = e.message; // human-readable, no internals
     if (e instanceof HttpError && e.extra) Object.assign(body, e.extra);
+    // admin API: show the technical cause (e.g. a database error code) so problems can be diagnosed from the screen
+    if (status === 500 && path.startsWith('/api/admin/')) body.detail = `${e.code ? `${e.code}: ` : ''}${String(e.message || e).slice(0, 300)}`;
     if (!isApi && status === 401) { res.statusCode = 302; res.setHeader('Location', path.startsWith('/admin') ? '/admin/login' : '/'); return res.end(); }
     return json(res, status, body);
   }

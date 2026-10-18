@@ -1,47 +1,52 @@
-// Applies migrations/*.sql once each (tracked in schema_migrations). Used by `npm run db:migrate`
-// and automatically on the first database request of each server instance, so a fresh
-// database (e.g. Neon created from the Vercel dashboard) needs no terminal step.
-import { readdirSync, readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
+// Applies pending migrations (lib/migrations.js, generated from migrations/*.sql) once each,
+// tracked in schema_migrations. Used by `npm run db:migrate` and automatically on the first
+// database request of each server instance, so a fresh database (e.g. Neon created from the
+// Vercel dashboard) needs no terminal step.
+// Works through connection poolers (Neon/PgBouncer transaction mode): the lock is a
+// transaction-scoped advisory lock and all pending migrations run in one transaction.
 import { getPool, dbConfigured } from './db.js';
+import { MIGRATIONS } from './migrations.js';
 
-const dir = fileURLToPath(new URL('../migrations/', import.meta.url));
-const LOCK = 742001; // pg advisory lock id: only one instance migrates at a time
+const LOCK = 742002;
 
 export async function runMigrations(log = () => {}) {
-  const client = await getPool().connect();
+  const pool = getPool();
+  await pool.query('create table if not exists schema_migrations (name text primary key, applied_at timestamptz not null default now())');
+  const pending = async (q) => {
+    const done = new Set((await q.query('select name from schema_migrations')).rows.map((r) => r.name));
+    MIGRATIONS.forEach((m) => { if (done.has(m.name)) log(`✓ ${m.name} (already applied)`); });
+    return MIGRATIONS.filter((m) => !done.has(m.name));
+  };
+  if (!(await pending(pool)).length) return []; // common case: nothing to do, no lock needed
+  const client = await pool.connect();
+  const applied = [];
   try {
-    await client.query('select pg_advisory_lock($1)', [LOCK]);
-    await client.query('create table if not exists schema_migrations (name text primary key, applied_at timestamptz not null default now())');
-    const done = new Set((await client.query('select name from schema_migrations')).rows.map((r) => r.name));
-    const applied = [];
-    for (const f of readdirSync(dir).filter((x) => x.endsWith('.sql')).sort()) {
-      if (done.has(f)) { log(`✓ ${f} (already applied)`); continue; }
-      try {
-        await client.query('begin');
-        await client.query(readFileSync(dir + f, 'utf8'));
-        await client.query('insert into schema_migrations (name) values ($1)', [f]);
-        await client.query('commit');
-        applied.push(f); log(`+ ${f} applied`);
-      } catch (e) {
-        await client.query('rollback').catch(() => {});
-        throw new Error(`${f}: ${e.message}`);
-      }
+    await client.query('begin');
+    await client.query('select pg_advisory_xact_lock($1)', [LOCK]); // another instance may be migrating
+    for (const m of await pending(client)) {
+      try { await client.query(m.sql); } catch (e) { throw new Error(`${m.name}: ${e.message}`); }
+      await client.query('insert into schema_migrations (name) values ($1)', [m.name]);
+      applied.push(m.name); log(`+ ${m.name} applied`);
     }
+    await client.query('commit');
     return applied;
+  } catch (e) {
+    await client.query('rollback').catch(() => {});
+    throw e;
   } finally {
-    await client.query('select pg_advisory_unlock($1)', [LOCK]).catch(() => {});
     client.release();
   }
 }
 
 let ready = null;
+let lastError = null;
 /** Runs pending migrations once per instance; retried on the next request if it failed. */
 export function ensureMigrated() {
   if (!dbConfigured()) return Promise.resolve();
   if (!ready) {
-    ready = runMigrations().then((a) => { if (a.length) console.log('[db] migrations applied:', a.join(', ')); })
-      .catch((e) => { ready = null; console.error('[db] migration failed:', e.message); throw e; });
+    ready = runMigrations().then((a) => { lastError = null; if (a.length) console.log('[db] migrations applied:', a.join(', ')); })
+      .catch((e) => { ready = null; lastError = e; console.error('[db] migration failed:', e.message); throw e; });
   }
   return ready;
 }
+export const migrationError = () => lastError;

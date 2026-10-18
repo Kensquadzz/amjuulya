@@ -95,8 +95,9 @@ function setupView({ tokenConfigured }) {
 
 async function loginView() {
   try { const r = await api('/auth/me'); if (r.user) { me = r.user; return navigate('/dashboard', { replace: true }); } } catch { /* not logged in */ }
-  try { const st = await api('/setup'); if (st.needed) return setupView(st); } catch { /* no database yet: normal login form shows the error */ }
-  const err = h('p.error', { role: 'alert' });
+  let setupError = '';
+  try { const st = await api('/setup'); if (st.needed) return setupView(st); } catch (ex) { setupError = ex.message; /* shown above the login form */ }
+  const err = h('p.error', { role: 'alert' }, setupError);
   const email = h('input#l-email', { type: 'email', autocomplete: 'username', required: true });
   const pw = h('input#l-pw', { type: 'password', autocomplete: 'current-password', required: true });
   const btn = h('button.btn.btn--block', { type: 'submit' }, 'Нэвтрэх');

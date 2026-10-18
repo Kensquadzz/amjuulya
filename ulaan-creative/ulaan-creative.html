@@ -664,56 +664,6 @@ html:not(.motion-ok) .marquee__track { animation: none; }
 }
 
 /* =========================================================
-   CREATORS
-   ========================================================= */
-.creators { background: var(--red); color: var(--white); padding: clamp(96px, 11vw, 170px) 0 clamp(64px, 7vw, 110px); overflow: hidden; }
-.creators__head { display: flex; justify-content: space-between; align-items: flex-end; gap: 32px; margin-bottom: clamp(40px, 5vw, 72px); }
-.creators__title { font-size: clamp(56px, 9vw, 168px); }
-.creators__side { max-width: 380px; display: flex; flex-direction: column; gap: 26px; }
-.creators__controls { display: flex; align-items: center; gap: 12px; }
-.creators__progress { flex: 1; height: 2px; background: rgba(255,255,255,.3); margin-left: 12px; position: relative; overflow: hidden; }
-.creators__progress span { position: absolute; inset: 0; background: var(--white); transform-origin: left; transform: scaleX(.2); }
-.creators__track {
-  display: flex; gap: clamp(14px, 1.6vw, 24px); overflow-x: auto; overscroll-behavior-x: contain;
-  scroll-snap-type: x mandatory; scroll-padding-inline: var(--pad); padding: 4px var(--pad) 24px;
-  scrollbar-width: none; cursor: grab;
-}
-.creators__track::-webkit-scrollbar { display: none; }
-.creators__track.is-dragging { cursor: grabbing; scroll-snap-type: none; user-select: none; }
-.creators__track:focus-visible { outline: 2px solid var(--white); outline-offset: -2px; }
-.creator { flex: 0 0 clamp(250px, 23vw, 340px); scroll-snap-align: start; }
-.creator__portrait {
-  position: relative; aspect-ratio: 4 / 5; overflow: hidden; background: var(--black);
-  background-image: radial-gradient(80% 60% at 50% 20%, rgba(229,9,32,.6), transparent 70%);
-  display: grid; place-items: center;
-}
-.creator__portrait img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; transition: transform 1s var(--ease); }
-.creator__portrait .display { font-size: clamp(90px, 9vw, 150px); color: transparent; -webkit-text-stroke: 1.5px rgba(255,255,255,.65); transition: transform 1s var(--ease); }
-.creator:hover .creator__portrait .display, .creator:hover .creator__portrait img { transform: scale(1.08); }
-.creator__portrait .tag-ph { position: absolute; top: 12px; left: 12px; color: var(--white); }
-.creator__body { padding-top: 16px; }
-.creator__cat { font-size: 11px; opacity: .85; }
-.creator__name { font-size: 22px; font-weight: 600; margin: 2px 0 12px; }
-.creator__data { display: grid; grid-template-columns: 1fr 1fr; border-top: 1px solid rgba(255,255,255,.4); }
-.creator__data div { padding: 10px 0; }
-.creator__data dt { font-size: 10px; opacity: .7; }
-.creator__data dd { font-size: 13px; }
-.creator__link { display: inline-block; margin-top: 8px; font-size: 11px; border-bottom: 1px solid currentColor; padding-bottom: 2px; }
-.creator__link.is-disabled { opacity: .6; border-bottom-style: dashed; }
-.creators__empty { display: grid; grid-template-columns: 1fr 1fr; gap: clamp(28px, 5vw, 80px); align-items: end; padding-top: clamp(28px, 3vw, 40px); border-top: 1.5px solid rgba(255,255,255,.5); }
-.creators__steps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
-.creators__steps li { display: flex; align-items: baseline; gap: 18px; padding: 16px 0; border-bottom: 1px solid rgba(255,255,255,.3); font-family: var(--f-display); font-weight: 700; text-transform: uppercase; font-size: clamp(22px, 2.4vw, 38px); line-height: 1.05; }
-.creators__steps .mono { font-size: 12px; opacity: .8; font-weight: 400; }
-.creators__empty-copy h3 { font-size: clamp(28px, 3vw, 48px); line-height: 1; margin-bottom: 14px; }
-.creators__empty-copy p { max-width: 46ch; margin-bottom: 26px; opacity: .9; }
-@media (max-width: 900px) { .creators__empty { grid-template-columns: 1fr; } }
-.creators__note { margin-top: 18px; font-size: 11px; opacity: .8; text-transform: none; }
-@media (max-width: 760px) {
-  .creators__head { flex-direction: column; align-items: flex-start; }
-  .creator { flex-basis: 74vw; }
-}
-
-/* =========================================================
    PACKAGES
    ========================================================= */
 .packages { background: var(--paper); padding: clamp(96px, 12vw, 180px) 0; }
@@ -907,9 +857,6 @@ html:not(.motion-ok) .marquee__track { animation: none; }
 }
 
 /* Influencer cards */
-.creator__portrait img { z-index: 0; }
-.creator__bio { font-size: 14px; opacity: .9; margin: -4px 0 12px; }
-.creator__links { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 10px; }
 
 /* Packages: any count */
 .packages__grid--1 { grid-template-columns: minmax(0, 520px); }
@@ -981,6 +928,85 @@ html:not(.motion-ok) .marquee__track { animation: none; }
 .footer__logo { width: min(220px, 60vw); height: auto; margin-bottom: 18px; }
 .loader__logo { width: min(260px, 50vw); height: auto; }
 @media (max-width: 760px) { .logo__img { height: 28px; } }
+
+
+/* =========================================================
+   INFLUENCERS PANEL (opened from the nav)
+   ========================================================= */
+.inf {
+  position: fixed; inset: 0; z-index: 120; display: none; flex-direction: column;
+  background: #0d0d0d; color: var(--white); overflow: hidden;
+  padding: max(16px, env(safe-area-inset-top)) var(--pad) max(16px, env(safe-area-inset-bottom));
+}
+.inf:target, .inf.is-open { display: flex; }
+html.inf-open, html.inf-open body { overflow: hidden; }
+.inf__bg { position: absolute; inset: 0; z-index: 0; background: radial-gradient(120% 80% at 50% 0%, #5a0710 0%, #1a0306 45%, #0d0d0d 75%); }
+.inf__bg-img { position: absolute; inset: 0; opacity: 0; transition: opacity .9s var(--ease); }
+.inf__bg-img.is-on { opacity: 1; }
+.inf__bg-img img { width: 100%; height: 100%; object-fit: cover; object-position: 50% 20%; filter: saturate(.9); transform: scale(1.06); }
+.inf__bg::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(13,13,13,.55) 0%, rgba(13,13,13,.25) 35%, rgba(13,13,13,.85) 70%, #0d0d0d 100%); }
+.inf > *:not(.inf__bg) { position: relative; z-index: 1; }
+.inf__top { display: flex; justify-content: space-between; align-items: center; min-height: 48px; }
+.inf__close {
+  width: 48px; height: 48px; border-radius: 50%; display: grid; place-items: center; flex: none;
+  border: 1px solid rgba(255,255,255,.5); background: rgba(13,13,13,.4); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  font-size: 16px; transition: background-color .3s, color .3s;
+}
+.inf__close:hover, .inf__close:focus-visible { background: var(--white); color: var(--black); }
+.inf__head { text-align: center; margin: clamp(4px, 2vh, 24px) auto 0; max-width: 760px; }
+.inf__title { font-size: clamp(40px, 6.4vw, 104px); line-height: .95; }
+.inf__head p { margin: 12px auto 0; max-width: 52ch; font-size: 14.5px; opacity: .8; }
+.inf__stage { flex: 1; min-height: 0; position: relative; touch-action: pan-y; cursor: grab; user-select: none; -webkit-user-select: none; }
+.inf__stage.is-dragging { cursor: grabbing; }
+.inf__cards { list-style: none; margin: 0; padding: 0; position: absolute; inset: 0; }
+.inf-card {
+  --w: clamp(150px, 17vw, 250px);
+  position: absolute; left: 50%; top: 47%; width: min(var(--w), calc(var(--stage-h, 9999px) / 1.8)); aspect-ratio: 3 / 4.2; translate: -50% -50%;
+  transition: transform .7s var(--ease), opacity .5s, filter .5s; will-change: transform;
+}
+.inf__stage.is-dragging .inf-card { transition: none; }
+.inf-card__btn { position: relative; display: block; width: 100%; height: 100%; padding: 0; border: 0; border-radius: 18px; overflow: hidden; background: #1d1d1d; color: inherit; text-align: left; cursor: inherit; box-shadow: 0 24px 60px rgba(0,0,0,.5); }
+.inf-card__photo { position: absolute; inset: 0; display: grid; place-items: center; background: linear-gradient(160deg, #2a2a2a, #121212); }
+.inf-card:nth-child(5n+1) .inf-card__photo { background: linear-gradient(160deg, #E50920, #6d0410); }
+.inf-card:nth-child(5n+3) .inf-card__photo { background: linear-gradient(160deg, #3a3a3a, #0f0f0f); }
+.inf-card:nth-child(5n+4) .inf-card__photo { background: linear-gradient(160deg, #b5000f, #2a0206); }
+.inf-card__photo img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; pointer-events: none; -webkit-user-drag: none; }
+.inf-card__photo .display { font-size: clamp(56px, 6vw, 96px); color: transparent; -webkit-text-stroke: 1.5px rgba(255,255,255,.6); }
+.inf-card__cap { position: absolute; left: 0; right: 0; bottom: 0; padding: 40px 14px 14px; display: flex; flex-direction: column; gap: 2px; background: linear-gradient(transparent, rgba(0,0,0,.85)); }
+.inf-card__cap strong { font-size: 15px; font-weight: 600; line-height: 1.2; }
+.inf-card__cap .mono { font-size: 10px; opacity: .75; }
+.inf-card.is-active .inf-card__btn { outline: 2px solid var(--white); outline-offset: 3px; }
+.inf-card--empty .inf-card__btn { border: 1px dashed rgba(255,255,255,.35); box-shadow: none; }
+.inf-card--empty .inf-card__photo { background: rgba(255,255,255,.04) !important; }
+.inf-card--empty .inf-card__cap strong { opacity: .6; }
+.inf__foot { display: grid; grid-template-columns: 1fr auto; align-items: end; gap: 20px; min-height: 120px; }
+.inf-info__cat { font-size: 11px; color: var(--red); }
+.inf-info__name { font-size: clamp(30px, 3.6vw, 56px); line-height: 1; margin: 4px 0 8px; }
+.inf-info__bio { max-width: 60ch; font-size: 14.5px; opacity: .85; margin-bottom: 10px; }
+.inf-info__data { display: flex; gap: 28px; font-size: 11px; margin-bottom: 10px; }
+.inf-info__data dt { opacity: .6; }
+.inf-info__data dd { margin: 2px 0 0; font-size: 18px; }
+.inf-info__links { display: flex; flex-wrap: wrap; gap: 8px; }
+.inf-info__links a { border: 1px solid rgba(255,255,255,.45); border-radius: 999px; padding: 7px 14px; font-size: 11px; transition: background-color .3s, color .3s; }
+.inf-info__links a:hover, .inf-info__links a:focus-visible { background: var(--white); color: var(--black); }
+.inf__ctrl { display: flex; align-items: center; gap: 12px; }
+.inf__ctrl .mono { min-width: 56px; text-align: center; font-size: 12px; }
+@media (max-width: 760px) {
+  .inf-card { --w: clamp(140px, 44vw, 200px); }
+  .inf-info__name { font-size: clamp(24px, 7vw, 34px); }
+  .inf__title { font-size: clamp(36px, 11vw, 56px); }
+  .inf__head p { display: none; }
+  .inf-card__cap { padding: 28px 10px 10px; }
+  .inf-card__cap strong { font-size: 13px; }
+  .inf__foot { grid-template-columns: 1fr; min-height: 0; }
+  .inf__ctrl { justify-content: center; }
+  .inf-info__bio { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+}
+@media (max-height: 620px) { .inf__head p { display: none; } }
+/* No JS: cards sit in a simple sideways-scrolling row */
+html:not(.js) .inf__stage { overflow-x: auto; }
+html:not(.js) .inf__cards { position: static; display: flex; gap: 14px; padding: 20px 0; }
+html:not(.js) .inf-card { position: static; flex: 0 0 var(--w); width: var(--w); translate: none; }
 
 </style>
 <script type="application/ld+json" nonce="standalone">{"@context":"https://schema.org","@type":"Organization","name":"Ulaan Creative","url":"https://ulaancreative.mn/","logo":"https://ulaancreative.mn/assets/img/ulaan-logo-light.png"}</script>
@@ -1172,30 +1198,6 @@ html:not(.motion-ok) .marquee__track { animation: none; }
     </div>
   </div>
 </section>
-<section class="creators" id="influencers" aria-labelledby="creators-title" data-cursor-theme="light">
-  <div class="container creators__head">
-    <div>
-      <p class="label mono" data-reveal>( 005 ) — Influencer сүлжээ</p>
-      <h2 class="display creators__title" id="creators-title" data-split>Creators that<br>connect.</h2>
-    </div>
-    <div class="creators__side">
-      <p data-reveal>Брэндийн зорилго, үзэгчдэд тохирсон контент бүтээгчидтэй хамтын ажиллагааг бид зохион байгуулна.</p>
-      
-    </div>
-  </div>
-  <div class="container"><div class="creators__empty" data-reveal>
-    <ol class="creators__steps" role="list">
-      <li><span class="mono">01</span>Influencer сонголт</li>
-      <li><span class="mono">02</span>Кампанит ажлын төлөвлөлт</li>
-      <li><span class="mono">03</span>Контент, хамтын ажиллагааны зохицуулалт</li>
-    </ol>
-    <div class="creators__empty-copy">
-      <h3 class="display">Хамтран ажилладаг influencer-үүд удахгүй нэмэгдэнэ</h3>
-      <p>Брэндийнхээ кампанит ажилд тохирох контент бүтээгч хайж байна уу? Зорилго, төсөвт тань нийцүүлэн сонгож, хамтын ажиллагааг эхнээс нь дуустал зохион байгуулна.</p>
-      <a class="btn-fill btn-fill--dark" href="#contact" data-magnetic><span>Хамтран ажиллах</span><i class="dot" aria-hidden="true"></i></a>
-    </div>
-  </div></div>
-</section>
 <section class="packages" id="packages" aria-labelledby="packages-title" data-cursor-theme="dark">
   <div class="container">
     <div class="packages__head">
@@ -1287,6 +1289,61 @@ html:not(.motion-ok) .marquee__track { animation: none; }
   </div>
 </section>
 </main>
+<div class="inf" id="influencers" role="dialog" aria-modal="true" aria-labelledby="inf-title" data-inf data-lenis-prevent data-start="2">
+  <div class="inf__bg" aria-hidden="true"></div>
+  <div class="inf__top">
+    <p class="label mono">( 005 ) — Influencer сүлжээ</p>
+    <a class="inf__close" href="#top" data-inf-close aria-label="Хаах"><span aria-hidden="true">✕</span></a>
+  </div>
+  <div class="inf__head">
+    <h2 class="display inf__title" id="inf-title">Creators that<br>connect.</h2>
+    <p>Брэндийн зорилго, үзэгчдэд тохирсон контент бүтээгчидтэй хамтын ажиллагааг бид зохион байгуулна.</p>
+  </div>
+  <div class="inf__stage" data-inf-stage>
+    <ul class="inf__cards" role="list" aria-label="Influencer-уудын жагсаалт">
+    <li class="inf-card inf-card--empty" data-inf-card="0">
+      <button type="button" class="inf-card__btn" aria-label="Удахгүй нэмэгдэнэ" tabindex="-1">
+        <span class="inf-card__photo"><span class="display" aria-hidden="true">UC</span></span>
+        <span class="inf-card__cap"><strong>Удахгүй</strong></span>
+      </button>
+    </li>
+    <li class="inf-card inf-card--empty" data-inf-card="1">
+      <button type="button" class="inf-card__btn" aria-label="Удахгүй нэмэгдэнэ" tabindex="-1">
+        <span class="inf-card__photo"><span class="display" aria-hidden="true">UC</span></span>
+        <span class="inf-card__cap"><strong>Удахгүй</strong></span>
+      </button>
+    </li>
+    <li class="inf-card inf-card--empty" data-inf-card="2">
+      <button type="button" class="inf-card__btn" aria-label="Удахгүй нэмэгдэнэ" tabindex="-1">
+        <span class="inf-card__photo"><span class="display" aria-hidden="true">UC</span></span>
+        <span class="inf-card__cap"><strong>Удахгүй</strong></span>
+      </button>
+    </li>
+    <li class="inf-card inf-card--empty" data-inf-card="3">
+      <button type="button" class="inf-card__btn" aria-label="Удахгүй нэмэгдэнэ" tabindex="-1">
+        <span class="inf-card__photo"><span class="display" aria-hidden="true">UC</span></span>
+        <span class="inf-card__cap"><strong>Удахгүй</strong></span>
+      </button>
+    </li>
+    <li class="inf-card inf-card--empty" data-inf-card="4">
+      <button type="button" class="inf-card__btn" aria-label="Удахгүй нэмэгдэнэ" tabindex="-1">
+        <span class="inf-card__photo"><span class="display" aria-hidden="true">UC</span></span>
+        <span class="inf-card__cap"><strong>Удахгүй</strong></span>
+      </button>
+    </li>
+    </ul>
+  </div>
+  <div class="inf__foot">
+    <div class="inf__detail" aria-live="polite">
+      <div class="inf-info">
+        <h3 class="display inf-info__name">Хамтран ажилладаг influencer-үүд удахгүй нэмэгдэнэ</h3>
+        <p class="inf-info__bio">Брэндийнхээ кампанит ажилд тохирох контент бүтээгч хайж байна уу? Зорилго, төсөвт тань нийцүүлэн сонгож, хамтын ажиллагааг эхнээс нь дуустал зохион байгуулна.</p>
+        <p><a class="btn-fill btn-fill--light" href="#contact" data-inf-close><span>Хамтран ажиллах</span><i class="dot" aria-hidden="true"></i></a></p>
+      </div>
+    </div>
+    
+  </div>
+</div>
 <footer class="footer" data-cursor-theme="light">
   <div class="container footer__top">
     <div class="footer__col">
@@ -1388,6 +1445,7 @@ html:not(.motion-ok) .marquee__track { animation: none; }
     if (!a) return;
     const id = a.getAttribute('href');
     if (id.length < 2) return;
+    if (id === '#influencers' && inf) { e.preventDefault(); closeMenu(); openInf(); return; }
     const target = document.getElementById(id.slice(1));
     if (!target) return;
     e.preventDefault();
@@ -1489,8 +1547,8 @@ html:not(.motion-ok) .marquee__track { animation: none; }
       el.addEventListener('pointerleave', () => cursor.classList.remove('is-active'));
     };
     $$('[data-cursor]').forEach((el) => bind(el, el.dataset.cursor));
-    const track = $('[data-creators-track]');
-    if (track) bind(track, 'Drag', true);
+    const infStage = $('[data-inf-stage]');
+    if (infStage) bind(infStage, 'Drag', true);
   }
 
   /* ---------------- Text splitting ---------------- */
@@ -1551,48 +1609,113 @@ html:not(.motion-ok) .marquee__track { animation: none; }
     $$('.vis-vid').forEach((el) => vio.observe(el));
   }
 
-  /* ---------------- Creators slider ---------------- */
-  const track = $('[data-creators-track]');
-  if (track) {
-    const prev = $('[data-creators-prev]');
-    const next = $('[data-creators-next]');
-    const bar = $('[data-creators-progress]');
-    const step = () => { const card = track.querySelector('.creator'); return card ? card.getBoundingClientRect().width + 20 : 300; };
-    const update = () => {
-      const max = track.scrollWidth - track.clientWidth;
-      const p = max > 0 ? track.scrollLeft / max : 1;
-      const vis = Math.min(1, track.clientWidth / track.scrollWidth);
-      if (bar) bar.style.transform = `scaleX(${vis + (1 - vis) * p})`;
-      prev.disabled = track.scrollLeft <= 2;
-      next.disabled = track.scrollLeft >= max - 2;
-    };
-    prev.addEventListener('click', () => track.scrollBy({ left: -step(), behavior: reduceMotion ? 'auto' : 'smooth' }));
-    next.addEventListener('click', () => track.scrollBy({ left: step(), behavior: reduceMotion ? 'auto' : 'smooth' }));
-    track.addEventListener('scroll', update, { passive: true });
-    window.addEventListener('resize', update);
-    update();
-
-    // Mouse drag-to-scroll (touch already scrolls natively)
-    let down = false, startX = 0, startLeft = 0, moved = false;
-    track.addEventListener('pointerdown', (e) => {
-      if (e.pointerType !== 'mouse' || e.button !== 0) return;
-      down = true; moved = false; startX = e.clientX; startLeft = track.scrollLeft;
+  /* ---------------- Influencers panel (fanned cards, swipe sideways) ---------------- */
+  const inf = $('[data-inf]');
+  let infIndex = 0, infLastFocus = null;
+  function infLayout() {
+    if (!inf) return;
+    const stage = $('[data-inf-stage]', inf);
+    stage.style.setProperty('--stage-h', `${stage.clientHeight}px`);
+    const cards = $$('[data-inf-card]', inf);
+    const w = cards[0] ? cards[0].offsetWidth : 200;
+    const step = w * (window.innerWidth < 760 ? 0.72 : 0.86);
+    cards.forEach((c, i) => {
+      const d = i - infIndex + infDrag / step, a = Math.abs(d);
+      c.style.transform = `translateX(${d * step}px) translateY(${a * a * w * 0.06}px) rotate(${d * 7}deg) scale(${1 - Math.min(a, 3) * 0.07})`;
+      c.style.zIndex = String(100 - Math.round(a * 10));
+      c.style.opacity = a > 3.2 ? '0' : '1';
+      c.style.filter = a > 0.5 ? `brightness(${Math.max(0.45, 1 - a * 0.22)})` : '';
+      c.classList.toggle('is-active', i === infIndex);
+      const btn = c.querySelector('button');
+      if (btn && !c.classList.contains('inf-card--empty')) btn.tabIndex = i === infIndex ? 0 : -1;
     });
-    window.addEventListener('pointermove', (e) => {
-      if (!down) return;
-      const dx = e.clientX - startX;
-      if (Math.abs(dx) > 4) { moved = true; track.classList.add('is-dragging'); }
-      track.scrollLeft = startLeft - dx;
-    });
-    window.addEventListener('pointerup', () => {
-      if (!down) return; down = false;
-      if (moved) {
-        // settle on nearest card
-        track.classList.remove('is-dragging');
-        const s = step(); track.scrollTo({ left: Math.round(track.scrollLeft / s) * s, behavior: 'smooth' });
+  }
+  function infGo(i) {
+    const n = $$('[data-inf-card]', inf).length;
+    infIndex = Math.max(0, Math.min(n - 1, i));
+    $$('[data-inf-info]', inf).forEach((el) => { el.hidden = el.dataset.infInfo !== String(infIndex); });
+    $$('[data-inf-bg]', inf).forEach((el) => el.classList.toggle('is-on', el.dataset.infBg === String(infIndex)));
+    const count = $('[data-inf-count]', inf); if (count) count.textContent = `${infIndex + 1} / ${n}`;
+    const prev = $('[data-inf-prev]', inf), next = $('[data-inf-next]', inf);
+    if (prev) prev.disabled = infIndex === 0;
+    if (next) next.disabled = infIndex === n - 1;
+    infLayout();
+  }
+  let infDrag = 0;
+  function openInf() {
+    if (!inf) return;
+    infLastFocus = document.activeElement;
+    inf.classList.add('is-open');
+    document.documentElement.classList.add('inf-open');
+    if (lenis) lenis.stop();
+    infGo(infIndex);
+    if (history.replaceState) history.replaceState(null, '', '#influencers');
+    setTimeout(() => { const c = $('.inf__close', inf); if (c) c.focus(); }, 30);
+  }
+  function closeInf(toHash) {
+    if (!inf || !inf.classList.contains('is-open')) return;
+    inf.classList.remove('is-open');
+    document.documentElement.classList.remove('inf-open');
+    if (lenis) lenis.start();
+    if (history.replaceState) history.replaceState(null, '', toHash || location.pathname);
+    if (infLastFocus && infLastFocus.focus) infLastFocus.focus({ preventScroll: true });
+  }
+  if (inf) {
+    infIndex = Number(inf.dataset.start) || 0;
+    $$('[data-inf-close]', inf).forEach((a) => a.addEventListener('click', (e) => {
+      const href = a.getAttribute('href');
+      e.preventDefault(); e.stopPropagation();
+      closeInf();
+      if (href && href !== '#top') { const t = document.getElementById(href.slice(1)); if (t) scrollToTarget(t); }
+    }));
+    const prev = $('[data-inf-prev]', inf), next = $('[data-inf-next]', inf);
+    if (prev) prev.addEventListener('click', () => infGo(infIndex - 1));
+    if (next) next.addEventListener('click', () => infGo(infIndex + 1));
+    $$('[data-inf-card]', inf).forEach((c, i) => c.addEventListener('click', () => { if (!infMoved) infGo(i); }));
+    document.addEventListener('keydown', (e) => {
+      if (!inf.classList.contains('is-open')) return;
+      if (e.key === 'Escape') closeInf();
+      else if (e.key === 'ArrowLeft') infGo(infIndex - 1);
+      else if (e.key === 'ArrowRight') infGo(infIndex + 1);
+      else if (e.key === 'Tab') { // keep focus inside the panel
+        const f = $$('a[href], button:not([disabled])', inf).filter((el) => el.tabIndex >= 0 && el.offsetParent !== null);
+        if (!f.length) return;
+        if (e.shiftKey && document.activeElement === f[0]) { e.preventDefault(); f[f.length - 1].focus(); }
+        else if (!e.shiftKey && document.activeElement === f[f.length - 1]) { e.preventDefault(); f[0].focus(); }
       }
     });
-    track.addEventListener('click', (e) => { if (moved) { e.preventDefault(); e.stopPropagation(); } }, true);
+    // drag / swipe sideways
+    const stage = $('[data-inf-stage]', inf);
+    let infDown = false, infX = 0, infMoved = false;
+    stage.addEventListener('dragstart', (e) => e.preventDefault());
+    stage.addEventListener('pointerdown', (e) => { if (e.button !== 0) return; infDown = true; infMoved = false; infX = e.clientX; });
+    window.addEventListener('pointermove', (e) => {
+      if (!infDown) return;
+      infDrag = e.clientX - infX;
+      if (Math.abs(infDrag) > 6 && !infMoved) { infMoved = true; stage.classList.add('is-dragging'); }
+      if (infMoved) infLayout();
+    });
+    const end = () => {
+      if (!infDown) return;
+      infDown = false; stage.classList.remove('is-dragging');
+      const cards = $$('[data-inf-card]', inf);
+      const step = (cards[0] ? cards[0].offsetWidth : 200) * (window.innerWidth < 760 ? 0.72 : 0.86);
+      const shift = Math.round(-infDrag / step) || (Math.abs(infDrag) > 40 ? -Math.sign(infDrag) : 0);
+      infDrag = 0;
+      infGo(infIndex + shift);
+      setTimeout(() => { infMoved = false; }, 0);
+    };
+    window.addEventListener('pointerup', end);
+    window.addEventListener('pointercancel', end);
+    // trackpad / horizontal wheel
+    let wheelLock = 0;
+    stage.addEventListener('wheel', (e) => {
+      const dx = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : 0;
+      if (!dx || Date.now() < wheelLock || Math.abs(dx) < 12) return;
+      e.preventDefault(); wheelLock = Date.now() + 380; infGo(infIndex + Math.sign(dx));
+    }, { passive: false });
+    window.addEventListener('resize', infLayout);
+    if (location.hash === '#influencers') openInf();
   }
 
   /* ---------------- Package / CTA → contact form prefill ---------------- */
@@ -1892,12 +2015,6 @@ html:not(.motion-ok) .marquee__track { animation: none; }
       yPercent: 8, ease: 'none',
       scrollTrigger: { trigger: m, start: 'top bottom', end: 'bottom top', scrub: true },
     });
-  });
-
-  /* ---------------- Creators: cards slide in ---------------- */
-  if ($('.creator')) gsap.from('.creator', {
-    x: 120, opacity: 0, duration: 1.3, ease: 'expo.out', stagger: 0.07,
-    scrollTrigger: { trigger: '.creators__track', start: 'top 85%', once: true },
   });
 
   /* ---------------- About: manifesto scrub ---------------- */

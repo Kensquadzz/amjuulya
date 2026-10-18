@@ -325,51 +325,61 @@ function work(w, projects) {
 </section>`;
 }
 
-function creators(s, list) {
-  const card = (p) => {
-    const links = [['instagram', 'Instagram'], ['tiktok', 'TikTok'], ['youtube', 'YouTube']].filter(([k]) => p[k]);
-    const data = [p.followers != null && ['Followers', fmtFollowers(p.followers)], p.engagement && ['Engagement', p.engagement]].filter(Boolean);
-    return `<li class="creator">
-      <div class="creator__portrait">${p.photo ? mediaImg(p.photo, { alt: p.photo.alt || p.name, sizes: '340px' }) : `<span class="display" aria-hidden="true">${esc(initials(p.name))}</span>`}</div>
-      <div class="creator__body">
-        ${p.category ? `<p class="creator__cat mono">${esc(p.category)}</p>` : ''}
-        <h3 class="creator__name">${esc(p.name)}</h3>
-        ${p.bio ? `<p class="creator__bio">${esc(p.bio)}</p>` : ''}
-        ${data.length ? `<dl class="creator__data mono">${data.map(([k, v]) => `<div><dt>${k}</dt><dd>${esc(v)}</dd></div>`).join('')}</dl>` : ''}
-        ${links.length ? `<p class="creator__links">${links.map(([k, l]) => `<a class="creator__link mono" href="${attr(p[k])}" target="_blank" rel="noopener">${l} ↗</a>`).join('')}</p>` : ''}
-      </div>
+const SOCIALS = [['instagram', 'Instagram'], ['tiktok', 'TikTok'], ['youtube', 'YouTube'], ['facebook', 'Facebook']];
+
+/** Influencer list: full-screen panel opened from the nav ("Influencers"), cards fanned in an arc
+ *  and swiped sideways. Price is never part of the public data, so it can't appear here. */
+function influencersPanel(s, list) {
+  const empty = !list.length;
+  const people = empty ? Array.from({ length: 5 }, () => null) : list;
+  const start = Math.floor((people.length - 1) / 2);
+  const card = (p, i) => `<li class="inf-card${p ? '' : ' inf-card--empty'}" data-inf-card="${i}">
+      <button type="button" class="inf-card__btn" aria-label="${p ? attr(p.name) : 'Удахгүй нэмэгдэнэ'}"${empty ? ' tabindex="-1"' : ''}>
+        <span class="inf-card__photo">${p && p.photo ? mediaImg(p.photo, { alt: '', sizes: '260px' }) : `<span class="display" aria-hidden="true">${p ? esc(initials(p.name)) : 'UC'}</span>`}</span>
+        <span class="inf-card__cap"><strong>${p ? esc(p.name) : 'Удахгүй'}</strong>${p && p.category ? `<span class="mono">${esc(p.category)}</span>` : ''}</span>
+      </button>
     </li>`;
+  const info = (p, i) => {
+    const links = SOCIALS.filter(([k]) => p[k]);
+    const data = [p.followers != null && ['Дагагч', fmtFollowers(p.followers)], p.engagement && ['Engagement', p.engagement]].filter(Boolean);
+    return `<div class="inf-info" data-inf-info="${i}"${i === start ? '' : ' hidden'}>
+      <p class="mono inf-info__cat">${esc(p.category || 'Influencer')}</p>
+      <h3 class="display inf-info__name">${esc(p.name)}</h3>
+      ${p.bio ? `<p class="inf-info__bio">${esc(p.bio)}</p>` : ''}
+      ${data.length ? `<dl class="inf-info__data mono">${data.map(([k, v]) => `<div><dt>${k}</dt><dd>${esc(v)}</dd></div>`).join('')}</dl>` : ''}
+      ${links.length ? `<p class="inf-info__links">${links.map(([k, l]) => `<a class="mono" href="${attr(p[k])}" target="_blank" rel="noopener">${l} ↗</a>`).join('')}</p>` : ''}
+    </div>`;
   };
-  return `<section class="creators" id="influencers" aria-labelledby="creators-title" data-cursor-theme="light">
-  <div class="container creators__head">
-    <div>
-      <p class="label mono" data-reveal>${esc(s.label)}</p>
-      <h2 class="display creators__title" id="creators-title" data-split>${rich(s.title)}</h2>
-    </div>
-    <div class="creators__side">
-      <p data-reveal>${esc(s.intro)}</p>
-      ${list.length ? `<div class="creators__controls" data-reveal>
-        <button type="button" class="round-btn" data-creators-prev aria-label="Өмнөх" aria-controls="creator-track"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M10 3 5 8l5 5" fill="none" stroke="currentColor" stroke-width="1.6"/></svg></button>
-        <button type="button" class="round-btn" data-creators-next aria-label="Дараагийн" aria-controls="creator-track"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m6 3 5 5-5 5" fill="none" stroke="currentColor" stroke-width="1.6"/></svg></button>
-        <div class="creators__progress" aria-hidden="true"><span data-creators-progress></span></div>
-      </div>` : ''}
-    </div>
+  return `<div class="inf" id="influencers" role="dialog" aria-modal="true" aria-labelledby="inf-title" data-inf data-lenis-prevent data-start="${start}">
+  <div class="inf__bg" aria-hidden="true">${empty ? '' : list.map((p, i) => p.photo ? `<div class="inf__bg-img${i === start ? ' is-on' : ''}" data-inf-bg="${i}">${mediaImg(p.photo, { alt: '', sizes: '100vw' })}</div>` : '').join('')}</div>
+  <div class="inf__top">
+    <p class="label mono">${esc(s.label)}</p>
+    <a class="inf__close" href="#top" data-inf-close aria-label="Хаах"><span aria-hidden="true">✕</span></a>
   </div>
-  ${list.length ? `<ul class="creators__track" id="creator-track" role="list" tabindex="0" aria-label="Creator-уудын жагсаалт (хэвтээ гүйлгэх)" data-creators-track data-lenis-prevent>
-    ${list.map(card).join('\n    ')}
-  </ul>` : `<div class="container"><div class="creators__empty" data-reveal>
-    <ol class="creators__steps" role="list">
-      <li><span class="mono">01</span>Influencer сонголт</li>
-      <li><span class="mono">02</span>Кампанит ажлын төлөвлөлт</li>
-      <li><span class="mono">03</span>Контент, хамтын ажиллагааны зохицуулалт</li>
-    </ol>
-    <div class="creators__empty-copy">
-      <h3 class="display">${esc(s.emptyTitle)}</h3>
-      <p>${esc(s.emptyText)}</p>
-      <a class="btn-fill btn-fill--dark" href="#contact" data-magnetic><span>Хамтран ажиллах</span><i class="dot" aria-hidden="true"></i></a>
+  <div class="inf__head">
+    <h2 class="display inf__title" id="inf-title">${rich(s.title)}</h2>
+    <p>${esc(s.intro)}</p>
+  </div>
+  <div class="inf__stage" data-inf-stage>
+    <ul class="inf__cards" role="list" aria-label="Influencer-уудын жагсаалт">
+    ${people.map(card).join('\n    ')}
+    </ul>
+  </div>
+  <div class="inf__foot">
+    <div class="inf__detail" aria-live="polite">
+      ${empty ? `<div class="inf-info">
+        <h3 class="display inf-info__name">${esc(s.emptyTitle)}</h3>
+        <p class="inf-info__bio">${esc(s.emptyText)}</p>
+        <p><a class="btn-fill btn-fill--light" href="#contact" data-inf-close><span>Хамтран ажиллах</span><i class="dot" aria-hidden="true"></i></a></p>
+      </div>` : list.map(info).join('')}
     </div>
-  </div></div>`}
-</section>`;
+    ${empty ? '' : `<div class="inf__ctrl">
+      <button type="button" class="round-btn" data-inf-prev aria-label="Өмнөх"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M10 3 5 8l5 5" fill="none" stroke="currentColor" stroke-width="1.6"/></svg></button>
+      <span class="mono" data-inf-count>${start + 1} / ${list.length}</span>
+      <button type="button" class="round-btn" data-inf-next aria-label="Дараагийн"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m6 3 5 5-5 5" fill="none" stroke="currentColor" stroke-width="1.6"/></svg></button>
+    </div>`}
+  </div>
+</div>`;
 }
 
 function packages(p) {
@@ -497,12 +507,12 @@ ${marquee(c.marquee)}
 ${intro(c.intro)}
 ${services(c.services, mediaMap)}
 ${work(c.work, projects)}
-${creators(c.influencers, influencers)}
 ${packages(c.packages)}
 ${about(c.about)}
 ${faq(c.faq)}
 ${contact(c.contact, c)}
 </main>
+${influencersPanel(c.influencers, influencers)}
 ${footer(c, { hasInfluencers })}
 ${scripts(nonce)}
 </body>

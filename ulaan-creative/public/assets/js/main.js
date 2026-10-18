@@ -44,6 +44,7 @@
     if (!a) return;
     const id = a.getAttribute('href');
     if (id.length < 2) return;
+    if (id === '#influencers' && inf) { e.preventDefault(); closeMenu(); openInf(); return; }
     const target = document.getElementById(id.slice(1));
     if (!target) return;
     e.preventDefault();
@@ -145,8 +146,8 @@
       el.addEventListener('pointerleave', () => cursor.classList.remove('is-active'));
     };
     $$('[data-cursor]').forEach((el) => bind(el, el.dataset.cursor));
-    const track = $('[data-creators-track]');
-    if (track) bind(track, 'Drag', true);
+    const infStage = $('[data-inf-stage]');
+    if (infStage) bind(infStage, 'Drag', true);
   }
 
   /* ---------------- Text splitting ---------------- */
@@ -207,48 +208,113 @@
     $$('.vis-vid').forEach((el) => vio.observe(el));
   }
 
-  /* ---------------- Creators slider ---------------- */
-  const track = $('[data-creators-track]');
-  if (track) {
-    const prev = $('[data-creators-prev]');
-    const next = $('[data-creators-next]');
-    const bar = $('[data-creators-progress]');
-    const step = () => { const card = track.querySelector('.creator'); return card ? card.getBoundingClientRect().width + 20 : 300; };
-    const update = () => {
-      const max = track.scrollWidth - track.clientWidth;
-      const p = max > 0 ? track.scrollLeft / max : 1;
-      const vis = Math.min(1, track.clientWidth / track.scrollWidth);
-      if (bar) bar.style.transform = `scaleX(${vis + (1 - vis) * p})`;
-      prev.disabled = track.scrollLeft <= 2;
-      next.disabled = track.scrollLeft >= max - 2;
-    };
-    prev.addEventListener('click', () => track.scrollBy({ left: -step(), behavior: reduceMotion ? 'auto' : 'smooth' }));
-    next.addEventListener('click', () => track.scrollBy({ left: step(), behavior: reduceMotion ? 'auto' : 'smooth' }));
-    track.addEventListener('scroll', update, { passive: true });
-    window.addEventListener('resize', update);
-    update();
-
-    // Mouse drag-to-scroll (touch already scrolls natively)
-    let down = false, startX = 0, startLeft = 0, moved = false;
-    track.addEventListener('pointerdown', (e) => {
-      if (e.pointerType !== 'mouse' || e.button !== 0) return;
-      down = true; moved = false; startX = e.clientX; startLeft = track.scrollLeft;
+  /* ---------------- Influencers panel (fanned cards, swipe sideways) ---------------- */
+  const inf = $('[data-inf]');
+  let infIndex = 0, infLastFocus = null;
+  function infLayout() {
+    if (!inf) return;
+    const stage = $('[data-inf-stage]', inf);
+    stage.style.setProperty('--stage-h', `${stage.clientHeight}px`);
+    const cards = $$('[data-inf-card]', inf);
+    const w = cards[0] ? cards[0].offsetWidth : 200;
+    const step = w * (window.innerWidth < 760 ? 0.72 : 0.86);
+    cards.forEach((c, i) => {
+      const d = i - infIndex + infDrag / step, a = Math.abs(d);
+      c.style.transform = `translateX(${d * step}px) translateY(${a * a * w * 0.06}px) rotate(${d * 7}deg) scale(${1 - Math.min(a, 3) * 0.07})`;
+      c.style.zIndex = String(100 - Math.round(a * 10));
+      c.style.opacity = a > 3.2 ? '0' : '1';
+      c.style.filter = a > 0.5 ? `brightness(${Math.max(0.45, 1 - a * 0.22)})` : '';
+      c.classList.toggle('is-active', i === infIndex);
+      const btn = c.querySelector('button');
+      if (btn && !c.classList.contains('inf-card--empty')) btn.tabIndex = i === infIndex ? 0 : -1;
     });
-    window.addEventListener('pointermove', (e) => {
-      if (!down) return;
-      const dx = e.clientX - startX;
-      if (Math.abs(dx) > 4) { moved = true; track.classList.add('is-dragging'); }
-      track.scrollLeft = startLeft - dx;
-    });
-    window.addEventListener('pointerup', () => {
-      if (!down) return; down = false;
-      if (moved) {
-        // settle on nearest card
-        track.classList.remove('is-dragging');
-        const s = step(); track.scrollTo({ left: Math.round(track.scrollLeft / s) * s, behavior: 'smooth' });
+  }
+  function infGo(i) {
+    const n = $$('[data-inf-card]', inf).length;
+    infIndex = Math.max(0, Math.min(n - 1, i));
+    $$('[data-inf-info]', inf).forEach((el) => { el.hidden = el.dataset.infInfo !== String(infIndex); });
+    $$('[data-inf-bg]', inf).forEach((el) => el.classList.toggle('is-on', el.dataset.infBg === String(infIndex)));
+    const count = $('[data-inf-count]', inf); if (count) count.textContent = `${infIndex + 1} / ${n}`;
+    const prev = $('[data-inf-prev]', inf), next = $('[data-inf-next]', inf);
+    if (prev) prev.disabled = infIndex === 0;
+    if (next) next.disabled = infIndex === n - 1;
+    infLayout();
+  }
+  let infDrag = 0;
+  function openInf() {
+    if (!inf) return;
+    infLastFocus = document.activeElement;
+    inf.classList.add('is-open');
+    document.documentElement.classList.add('inf-open');
+    if (lenis) lenis.stop();
+    infGo(infIndex);
+    if (history.replaceState) history.replaceState(null, '', '#influencers');
+    setTimeout(() => { const c = $('.inf__close', inf); if (c) c.focus(); }, 30);
+  }
+  function closeInf(toHash) {
+    if (!inf || !inf.classList.contains('is-open')) return;
+    inf.classList.remove('is-open');
+    document.documentElement.classList.remove('inf-open');
+    if (lenis) lenis.start();
+    if (history.replaceState) history.replaceState(null, '', toHash || location.pathname);
+    if (infLastFocus && infLastFocus.focus) infLastFocus.focus({ preventScroll: true });
+  }
+  if (inf) {
+    infIndex = Number(inf.dataset.start) || 0;
+    $$('[data-inf-close]', inf).forEach((a) => a.addEventListener('click', (e) => {
+      const href = a.getAttribute('href');
+      e.preventDefault(); e.stopPropagation();
+      closeInf();
+      if (href && href !== '#top') { const t = document.getElementById(href.slice(1)); if (t) scrollToTarget(t); }
+    }));
+    const prev = $('[data-inf-prev]', inf), next = $('[data-inf-next]', inf);
+    if (prev) prev.addEventListener('click', () => infGo(infIndex - 1));
+    if (next) next.addEventListener('click', () => infGo(infIndex + 1));
+    $$('[data-inf-card]', inf).forEach((c, i) => c.addEventListener('click', () => { if (!infMoved) infGo(i); }));
+    document.addEventListener('keydown', (e) => {
+      if (!inf.classList.contains('is-open')) return;
+      if (e.key === 'Escape') closeInf();
+      else if (e.key === 'ArrowLeft') infGo(infIndex - 1);
+      else if (e.key === 'ArrowRight') infGo(infIndex + 1);
+      else if (e.key === 'Tab') { // keep focus inside the panel
+        const f = $$('a[href], button:not([disabled])', inf).filter((el) => el.tabIndex >= 0 && el.offsetParent !== null);
+        if (!f.length) return;
+        if (e.shiftKey && document.activeElement === f[0]) { e.preventDefault(); f[f.length - 1].focus(); }
+        else if (!e.shiftKey && document.activeElement === f[f.length - 1]) { e.preventDefault(); f[0].focus(); }
       }
     });
-    track.addEventListener('click', (e) => { if (moved) { e.preventDefault(); e.stopPropagation(); } }, true);
+    // drag / swipe sideways
+    const stage = $('[data-inf-stage]', inf);
+    let infDown = false, infX = 0, infMoved = false;
+    stage.addEventListener('dragstart', (e) => e.preventDefault());
+    stage.addEventListener('pointerdown', (e) => { if (e.button !== 0) return; infDown = true; infMoved = false; infX = e.clientX; });
+    window.addEventListener('pointermove', (e) => {
+      if (!infDown) return;
+      infDrag = e.clientX - infX;
+      if (Math.abs(infDrag) > 6 && !infMoved) { infMoved = true; stage.classList.add('is-dragging'); }
+      if (infMoved) infLayout();
+    });
+    const end = () => {
+      if (!infDown) return;
+      infDown = false; stage.classList.remove('is-dragging');
+      const cards = $$('[data-inf-card]', inf);
+      const step = (cards[0] ? cards[0].offsetWidth : 200) * (window.innerWidth < 760 ? 0.72 : 0.86);
+      const shift = Math.round(-infDrag / step) || (Math.abs(infDrag) > 40 ? -Math.sign(infDrag) : 0);
+      infDrag = 0;
+      infGo(infIndex + shift);
+      setTimeout(() => { infMoved = false; }, 0);
+    };
+    window.addEventListener('pointerup', end);
+    window.addEventListener('pointercancel', end);
+    // trackpad / horizontal wheel
+    let wheelLock = 0;
+    stage.addEventListener('wheel', (e) => {
+      const dx = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : 0;
+      if (!dx || Date.now() < wheelLock || Math.abs(dx) < 12) return;
+      e.preventDefault(); wheelLock = Date.now() + 380; infGo(infIndex + Math.sign(dx));
+    }, { passive: false });
+    window.addEventListener('resize', infLayout);
+    if (location.hash === '#influencers') openInf();
   }
 
   /* ---------------- Package / CTA → contact form prefill ---------------- */
@@ -548,12 +614,6 @@
       yPercent: 8, ease: 'none',
       scrollTrigger: { trigger: m, start: 'top bottom', end: 'bottom top', scrub: true },
     });
-  });
-
-  /* ---------------- Creators: cards slide in ---------------- */
-  if ($('.creator')) gsap.from('.creator', {
-    x: 120, opacity: 0, duration: 1.3, ease: 'expo.out', stagger: 0.07,
-    scrollTrigger: { trigger: '.creators__track', start: 'top 85%', once: true },
   });
 
   /* ---------------- About: manifesto scrub ---------------- */

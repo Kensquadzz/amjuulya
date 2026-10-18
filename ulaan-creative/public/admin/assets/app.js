@@ -223,13 +223,13 @@ route('/influencers', async () => {
       link(`/influencers/${p.id}`, { class: 'btn btn--sm' }, 'Засах')));
   return h('section.page',
     h('header.page__head', h('h1', 'Influencer-ууд'), link('/influencers/new', { class: 'btn' }, '+ Influencer нэмэх')),
-    h('p.muted', 'Зөвхөн баталгаажсан мэдээллийг оруулна уу. Хоосон талбарууд сайт дээр харагдахгүй. Нийтлэгдсэн influencer байхгүй үед сайтын influencer хэсэг автоматаар нуугдана.'),
+    h('p.muted', 'Зөвхөн баталгаажсан мэдээллийг оруулна уу. Хоосон талбарууд сайт дээр харагдахгүй. Сайтын цэсний «Influencers»-ийг дарахад нийтлэгдсэн influencer-ууд карт хэлбэрээр гарна. Үнэ зөвхөн энд харагдана, сайт болон public API-д хэзээ ч гарахгүй.'),
     items.length ? sortableList({ items, render: row, endpoint: '/influencers/reorder', onChanged: reload }) : h('div.empty', h('p', 'Одоогоор influencer бүртгэгдээгүй.'), link('/influencers/new', { class: 'btn' }, 'Эхнийхийг нэмэх')));
 });
 
 async function influencerEditor({ id }) {
   const isNew = id === 'new';
-  const p = isNew ? { name: '', photo: null, instagram: '', tiktok: '', youtube: '', followers: null, category: '', bio: '', engagement: '', status: 'draft' } : (await api(`/influencers/${id}`)).item;
+  const p = isNew ? { name: '', photo: null, instagram: '', tiktok: '', youtube: '', facebook: '', followers: null, category: '', bio: '', engagement: '', price: '', status: 'draft' } : (await api(`/influencers/${id}`)).item;
   const v = { ...p, followers: p.followers ?? '' };
   const input = (name, label, { textarea, wide, ...attrs } = {}) => {
     const el = h(textarea ? 'textarea' : 'input', { id: `i-${name}`, value: v[name] ?? '', ...attrs });
@@ -242,7 +242,7 @@ async function influencerEditor({ id }) {
   const save = async (status) => {
     errorBox.textContent = '';
     if (!v.name.trim()) { errorBox.textContent = 'Нэр оруулна уу.'; return; }
-    const body = { name: v.name, photoId: v.photo?.id || null, instagram: v.instagram, tiktok: v.tiktok, youtube: v.youtube, followers: v.followers, category: v.category, bio: v.bio, engagement: v.engagement, status: status || v.status };
+    const body = { name: v.name, photoId: v.photo?.id || null, instagram: v.instagram, tiktok: v.tiktok, youtube: v.youtube, facebook: v.facebook, price: v.price, followers: v.followers, category: v.category, bio: v.bio, engagement: v.engagement, status: status || v.status };
     try {
       const r = await api(isNew ? '/influencers' : `/influencers/${id}`, { method: isNew ? 'POST' : 'PUT', body });
       setDirty(false); toast('Хадгалагдлаа');
@@ -264,6 +264,8 @@ async function influencerEditor({ id }) {
         input('instagram', 'Instagram URL', { type: 'url', maxlength: 500 }),
         input('tiktok', 'TikTok URL', { type: 'url', maxlength: 500 }),
         input('youtube', 'YouTube URL', { type: 'url', maxlength: 500 }),
+        input('facebook', 'Facebook URL', { type: 'url', maxlength: 500 }),
+        input('price', 'Үнэ — зөвхөн admin-д (сайт дээр хэзээ ч харагдахгүй)', { maxlength: 200, placeholder: 'Жишээ: 1 пост ₮…, 1 reels ₮…' }),
         input('engagement', 'Engagement (заавал биш)', { maxlength: 100, placeholder: 'Жишээ: 4.2% (баталгаажсан бол)' }),
         input('bio', 'Товч танилцуулга', { textarea: true, rows: 4, maxlength: 600, wide: true }),
         h('div.field', h('label', { for: 'i-status' }, 'Төлөв'), statusSel))),

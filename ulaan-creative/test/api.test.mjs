@@ -77,6 +77,20 @@ test('drafts never appear in public endpoints', async () => {
   await fetch(`${BASE}/api/admin/projects/${item.id}`, { method: 'DELETE', headers: { ...H, Cookie: cookie } });
 });
 
+test('influencer price is admin-only', async () => {
+  const cookie = await login();
+  const price = 'PRICE-' + Date.now();
+  const create = await fetch(`${BASE}/api/admin/influencers`, { method: 'POST', headers: { ...H, Cookie: cookie }, body: JSON.stringify({ name: 'Price Test Creator', price, instagram: 'https://instagram.com/test', status: 'published' }) });
+  assert.equal(create.status, 200);
+  const { item } = await create.json();
+  assert.equal(item.price, price, 'admin sees the price');
+  const pub = await (await fetch(`${BASE}/api/public/content`)).json();
+  assert.ok(JSON.stringify(pub).includes('Price Test Creator'), 'published influencer is public');
+  assert.ok(!JSON.stringify(pub).includes(price), 'price not in public API');
+  assert.ok(!(await (await fetch(`${BASE}/`)).text()).includes(price), 'price not in public HTML');
+  await fetch(`${BASE}/api/admin/influencers/${item.id}`, { method: 'DELETE', headers: { ...H, Cookie: cookie } });
+});
+
 test('security headers on public and admin pages', async () => {
   const home = await fetch(`${BASE}/`);
   assert.match(home.headers.get('content-security-policy'), /script-src 'self' 'nonce-/);

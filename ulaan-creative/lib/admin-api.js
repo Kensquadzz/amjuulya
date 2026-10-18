@@ -248,10 +248,12 @@ function influencerInput(b) {
     instagram_url: url(b.instagram, 'Instagram', ['instagram.com']),
     tiktok_url: url(b.tiktok, 'TikTok', ['tiktok.com']),
     youtube_url: url(b.youtube, 'YouTube', ['youtube.com', 'youtu.be']),
+    facebook_url: url(b.facebook, 'Facebook', ['facebook.com', 'fb.com']),
     follower_count: followers,
     category: str(b.category, 100, 'Ангилал'),
     bio: str(b.bio, 600, 'Намтар'),
     engagement: str(b.engagement, 100, 'Engagement'),
+    price: str(b.price, 200, 'Үнэ'),
     status: status(b.status),
   };
 }
@@ -261,14 +263,14 @@ export async function listInfluencers(req, res) {
   const ids = rows.map((r) => r.profile_media_id).filter(Boolean);
   const { rows: m } = ids.length ? await query('select * from media where id = any($1::uuid[])', [ids]) : { rows: [] };
   const media = Object.fromEntries(m.map((x) => [x.id, mediaView(x)]));
-  json(res, 200, { items: rows.map((r) => influencerView(r, media)) });
+  json(res, 200, { items: rows.map((r) => influencerView(r, media, { admin: true })) });
 }
 
 export async function getInfluencer(req, res, id) {
   const r = await one('select * from influencers where id = $1', [id]);
   if (!r) throw new HttpError(404, 'not_found');
   const m = r.profile_media_id ? await one('select * from media where id = $1', [r.profile_media_id]) : null;
-  json(res, 200, { item: influencerView(r, m ? { [m.id]: mediaView(m) } : {}) });
+  json(res, 200, { item: influencerView(r, m ? { [m.id]: mediaView(m) } : {}, { admin: true }) });
 }
 
 export async function saveInfluencer(req, res, id = null) {

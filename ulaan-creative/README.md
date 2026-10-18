@@ -182,6 +182,8 @@ In the hero, the bomb sways around the hand, follows the cursor slightly, and th
 
 **Service visuals:** *AI Creative Production* shows real work (images / playable videos) added in *Admin → Үйлчилгээнүүд → Бүтээлүүд*; until then it shows "Бүтээлүүд удахгүй нэмэгдэнэ". *Brand & Digital* shows its own steps as a staircase. If a section was published before this update, press **Анхдагч руу буцаах** in the admin to load the new default texts.
 
+**Influencers:** the nav item *Influencers* opens a full-screen panel with the published influencers as fanned cards (swipe / drag / arrow keys; the active person's photo fills the background). Each card shows name, category, bio, followers, engagement and social links (Instagram, TikTok, YouTube, Facebook). The **price** field is stored for the admin only: it is never included in the public HTML or `/api/public/*` (covered by `test/api.test.mjs`). Run `npm run db:migrate` to add the new columns (`migrations/002_influencer_price.sql`).
+
 ## 9. Tests
 
 ```bash

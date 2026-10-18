@@ -154,14 +154,16 @@ export async function getProject({ slug, id, includeDrafts = false }) {
 
 /* ----------------------------- influencers ----------------------------- */
 
-export function influencerView(r, media) {
-  return {
+/** Public view never includes the price; pass { admin: true } only from authenticated admin endpoints. */
+export function influencerView(r, media, { admin = false } = {}) {
+  const view = {
     id: r.id,
     name: r.display_name,
     photo: media[r.profile_media_id] || null,
     instagram: r.instagram_url,
     tiktok: r.tiktok_url,
     youtube: r.youtube_url,
+    facebook: r.facebook_url || '',
     followers: r.follower_count != null ? Number(r.follower_count) : null,
     category: r.category,
     bio: r.bio,
@@ -170,6 +172,8 @@ export function influencerView(r, media) {
     sortOrder: r.sort_order,
     updatedAt: r.updated_at,
   };
+  if (admin) view.price = r.price || '';
+  return view;
 }
 
 export async function getPublishedInfluencers() {

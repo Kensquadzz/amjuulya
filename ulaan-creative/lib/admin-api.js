@@ -5,7 +5,7 @@ import { query, one, tx } from './db.js';
 import { HttpError, json, readJson, clientIp, hashIp } from './http.js';
 import { createSession, destroySession, verifyPassword, hashPassword, validatePasswordStrength, getSessionUser, assertSameOrigin } from './auth.js';
 import { hit, count, clear } from './ratelimit.js';
-import { assertStorage, presignPut, headObject, readHead, readRange, deleteObject, storageDriver, blobUploadToken } from './storage.js';
+import { assertStorage, presignPut, headObject, readHead, readRange, deleteObject, storageDriver, blobUploadToken, blobAuth, blobPresign } from './storage.js';
 import { probeMp4, isUniversalMp4 } from './mp4-probe.js';
 import { emailConfig, sendTestEmail } from './contact.js';
 import { checkDeclared, sniff, sniffMatches, LIMITS, TYPES } from './media-rules.js';
@@ -126,8 +126,12 @@ export async function logout(req, res) {
 }
 
 // Which settings this deployment can see — names and yes/no only, never values.
-const ENV_NAMES = ['BLOB_READ_WRITE_TOKEN', 'RESEND_API_KEY', 'CONTACT_TO_EMAIL'];
-const envPresence = () => Object.fromEntries(ENV_NAMES.map((k) => [k, Boolean(String(process.env[k] || '').trim())]));
+const has = (k) => Boolean(String(process.env[k] || '').trim());
+const envPresence = () => ({
+  'BLOB_STORE_ID / BLOB_READ_WRITE_TOKEN': has('BLOB_STORE_ID') || has('BLOB_READ_WRITE_TOKEN'),
+  RESEND_API_KEY: has('RESEND_API_KEY'),
+  CONTACT_TO_EMAIL: has('CONTACT_TO_EMAIL'),
+});
 
 export async function me(req, res) {
   const user = await getSessionUser(req);
@@ -449,6 +453,10 @@ export async function createUpload(req, res) {
     `insert into media (id, kind, status, storage_key, thumb_key, original_name, mime, size_bytes, width, height, duration_s, sha256)
      values ($1,$2,'pending',$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
     [id, declared.kind, key, thumbKey, str(b.name, 200, 'name').replace(/[\\/]/g, '_'), declared.mime, Number(b.size), num(b.width, 20000), num(b.height, 20000), num(b.duration, 86400), sha]);
+  if (storageDriver() === 'blob' && blobAuth() === 'oidc') {
+    // Vercel Blob over OIDC: the browser asks /media/:id/blob-presign for a presigned PUT per file
+    return json(res, 201, { id, kind: declared.kind, blob: { pathname: key, presign: true }, thumbBlob: thumbKey ? { pathname: thumbKey, presign: true } : null });
+  }
   if (storageDriver() === 'blob') {
     // Vercel Blob: the browser uploads with a client token limited to this exact key, size and type
     const blob = { pathname: key, token: await blobUploadToken(key, { maxBytes: LIMITS[declared.kind], contentTypes: [declared.mime] }) };
@@ -456,6 +464,25 @@ export async function createUpload(req, res) {
     return json(res, 201, { id, blob, thumbBlob, kind: declared.kind });
   }
   json(res, 201, { id, uploadUrl: await presignPut(key), thumbUploadUrl: thumbKey ? await presignPut(thumbKey) : null, kind: declared.kind });
+}
+
+/** Presigned PUT for a pending upload's file or thumbnail (Vercel Blob over OIDC). */
+export async function blobPresignUpload(req, res, id) {
+  assertStorage();
+  if (storageDriver() !== 'blob') throw new HttpError(404, 'not_found');
+  const b = await readJson(req, 8 * 1024);
+  const m = await one(`select kind, mime, storage_key, thumb_key from media where id = $1 and status = 'pending'`, [id]);
+  if (!m) throw new HttpError(404, 'not_found');
+  const pathname = String(b?.payload?.pathname || '');
+  const isThumb = Boolean(m.thumb_key) && pathname === m.thumb_key;
+  if (!isThumb && pathname !== m.storage_key) throw new HttpError(403, 'forbidden');
+  const limits = isThumb ? { maxBytes: LIMITS.thumb, contentTypes: ['image/webp'] } : { maxBytes: LIMITS[m.kind], contentTypes: [m.mime] };
+  try {
+    json(res, 200, await blobPresign(b, req, pathname, limits));
+  } catch (e) {
+    if (e instanceof HttpError) throw e;
+    throw new HttpError(502, 'storage_error', `Blob: ${e.message}`);
+  }
 }
 
 export async function completeUpload(req, res, id) {

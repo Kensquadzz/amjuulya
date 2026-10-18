@@ -82,7 +82,7 @@ TLS is required automatically for non-local hosts (`DATABASE_SSL=false` only for
 
 ## 3. Media storage
 
-**Easiest: Vercel Blob (no keys to copy).** Vercel → project → **Storage** → **Create** → **Blob** → name it → **Connect** to the project → Redeploy. Vercel adds `BLOB_READ_WRITE_TOKEN` and the site uses Blob automatically (images/videos upload straight from the admin's browser with short-lived, size- and type-limited client tokens). Check Admin → Тохиргоо → Систем: «Медиа storage: BLOB».
+**Easiest: Vercel Blob (no keys to copy).** Vercel → project → **Storage** → **Create** → **Blob** → name it → **Connect** to the project → Redeploy. Vercel adds `BLOB_STORE_ID` (new stores, OIDC) or `BLOB_READ_WRITE_TOKEN` (older stores) and the site uses Blob automatically. The store must be **Public**. Images and videos upload straight from the admin's browser with short-lived, single-file credentials limited by size and type: presigned URLs for OIDC stores, client tokens for read-write tokens. Check Admin → Тохиргоо → Систем: «Медиа storage: BLOB».
 
 **Alternative: any S3-compatible bucket** — Cloudflare R2 example below. When both are configured, S3 wins (`STORAGE_DRIVER=s3|blob` forces one).
 

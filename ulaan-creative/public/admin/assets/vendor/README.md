@@ -8,3 +8,4 @@ Third-party browser libraries used only by the admin upload screen (loaded on de
 
 Files are unmodified apart from the noted import path. Source code: see the linked repositories / npm packages.
 | `utif.js` | [UTIF.js](https://github.com/photopea/UTIF.js) (`utif2` 4.1.0) + [pako](https://github.com/nodeca/pako) inflate 1.0.11, concatenated with an `export default` line | 4.1.0 / 1.0.11 | MIT |
+| `vercel-blob-client.js` | [@vercel/blob](https://github.com/vercel/storage) `client` (`put`, `uploadPresigned`), bundled for the browser with esbuild | 2.8.0 | Apache-2.0 |

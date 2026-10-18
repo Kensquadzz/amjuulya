@@ -38,6 +38,13 @@ test/                    automated tests (node --test)
 
 ---
 
+## Live deployment
+
+* Vercel project: **amjuulya-ulaan-creative** (Root Directory `ulaan-creative`) → https://amjuulya-ulaan-creative.vercel.app
+* Admin: https://amjuulya-ulaan-creative.vercel.app/admin
+* Database: Neon `ulaan-db`, connected from the Vercel Storage tab (`DATABASE_URL` is set automatically).
+* After changing environment variables, redeploy — or merge any commit to `main`, which deploys automatically.
+
 ## 1. Run locally
 
 Requirements: Node 18+, PostgreSQL 14+.

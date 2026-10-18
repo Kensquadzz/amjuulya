@@ -79,11 +79,18 @@ export async function uploadFile(file, { replaceId, onProgress, onStage, onConve
   onStage?.('Байршуулж байна…');
   if (init.blob) {
     // Vercel Blob: upload straight from the browser with the server-issued client token
-    const { put: blobPut } = await import('./vendor/vercel-blob-client.js');
-    const send = (target, body, contentType, progress) => blobPut(target.pathname, body, {
-      access: 'public', token: target.token, contentType, multipart: body.size > 50 * 1048576,
-      onUploadProgress: progress ? (e) => progress(e.percentage / 100) : undefined,
-    }).catch((e) => { throw new Error(`Vercel Blob руу илгээж чадсангүй: ${e.message}`); });
+    const { put: blobPut, uploadPresigned } = await import('./vendor/vercel-blob-client.js');
+    const onUploadProgress = (progress) => (progress ? (e) => progress(e.percentage / 100) : undefined);
+    // OIDC-connected stores: a presigned PUT per file from /media/:id/blob-presign; older stores: client token
+    const send = (target, body, contentType, progress) => (target.presign
+      ? uploadPresigned(target.pathname, body, {
+        access: 'public', contentType, handleUploadUrl: `/api/admin/media/${init.id}/blob-presign`,
+        headers: { 'X-UC-Admin': '1' }, onUploadProgress: onUploadProgress(progress),
+      })
+      : blobPut(target.pathname, body, {
+        access: 'public', token: target.token, contentType, multipart: body.size > 50 * 1048576,
+        onUploadProgress: onUploadProgress(progress),
+      })).catch((e) => { throw new Error(`Vercel Blob руу илгээж чадсангүй: ${e.message}`); });
     await send(init.blob, file, MIME[ext], onProgress);
     if (init.thumbBlob && meta.thumb) await send(init.thumbBlob, meta.thumb, 'image/webp').catch(() => {});
   } else {

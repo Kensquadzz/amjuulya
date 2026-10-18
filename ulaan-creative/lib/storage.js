@@ -4,9 +4,11 @@
 //                         Backblaze B2, Supabase Storage S3 … Files go straight from the
 //                         admin's browser to the bucket through short-lived presigned URLs,
 //                         so large videos never pass through (or sit in memory of) a function.
-//  STORAGE_DRIVER=blob   Vercel Blob — chosen automatically when BLOB_READ_WRITE_TOKEN is set
-//                         (Vercel → Storage → Create → Blob → Connect). The browser uploads
-//                         directly to Blob with a short-lived client token from the server.
+//  STORAGE_DRIVER=blob   Vercel Blob — chosen automatically when BLOB_READ_WRITE_TOKEN or
+//                         BLOB_STORE_ID is set (Vercel → Storage → Create → Blob → Connect).
+//                         Newer stores connect with OIDC (BLOB_STORE_ID, no read-write token);
+//                         older ones with BLOB_READ_WRITE_TOKEN. Either way the browser uploads
+//                         directly to Blob with short-lived, single-file credentials.
 //  STORAGE_DRIVER=local  development only: files on local disk. Refused on Vercel, whose
 //                         filesystem is ephemeral.
 import crypto from 'node:crypto';
@@ -28,18 +30,41 @@ export function storageDriver() {
     const need = ['S3_ENDPOINT', 'S3_BUCKET', 'S3_ACCESS_KEY_ID', 'S3_SECRET_ACCESS_KEY', 'MEDIA_PUBLIC_BASE_URL'];
     return need.every((k) => process.env[k]) ? 's3' : null;
   }
-  if (d === 'blob' || (!d && process.env.BLOB_READ_WRITE_TOKEN)) return blobStoreId() ? 'blob' : null;
+  if (d === 'blob' || (!d && (process.env.BLOB_READ_WRITE_TOKEN || process.env.BLOB_STORE_ID))) return blobStoreId() ? 'blob' : null;
   return null;
 }
 
 /* ---------------------------- Vercel Blob ---------------------------- */
-// Token format: vercel_blob_rw_<storeId>_<secret>. Public files live at
-// https://<storeId>.public.blob.vercel-storage.com/<pathname> (pathname = our key, no random suffix).
+// Token format: vercel_blob_rw_<storeId>_<secret>; BLOB_STORE_ID is store_<storeId>. Public files
+// live at https://<storeId>.public.blob.vercel-storage.com/<pathname> (pathname = our key, no suffix).
 export function blobStoreId() {
   const m = /^vercel_blob_rw_([a-z0-9]+)_/i.exec(process.env.BLOB_READ_WRITE_TOKEN || '');
-  return m ? m[1].toLowerCase() : '';
+  if (m) return m[1].toLowerCase();
+  const id = String(process.env.BLOB_STORE_ID || '').trim().replace(/^store_/i, '');
+  return /^[a-z0-9]+$/i.test(id) ? id.toLowerCase() : '';
 }
+/** 'rw' (read-write token) or 'oidc' (Vercel OIDC + BLOB_STORE_ID). */
+export const blobAuth = () => (process.env.BLOB_READ_WRITE_TOKEN ? 'rw' : 'oidc');
+// SDK options: the read-write token when there is one; otherwise the SDK uses OIDC on its own
+const blobOpts = () => (blobAuth() === 'rw' ? { token: process.env.BLOB_READ_WRITE_TOKEN } : {});
 export const blobPublicBase = () => process.env.BLOB_PUBLIC_BASE_URL || (blobStoreId() ? `https://${blobStoreId()}.public.blob.vercel-storage.com` : '');
+
+/** OIDC stores: presigned PUT for exactly this key (1 hour, size/type limited). Answers the
+ *  browser's `uploadPresigned` request (body = { type: 'blob.generate-presigned-url', … }). */
+export async function blobPresign(body, req, key, { maxBytes, contentTypes }) {
+  const { issueSignedToken } = await import('@vercel/blob');
+  const { handleUploadPresigned } = await import('@vercel/blob/client');
+  const limits = { maximumSizeInBytes: maxBytes, allowedContentTypes: contentTypes, validUntil: Date.now() + 60 * 60 * 1000 };
+  return handleUploadPresigned({
+    body, request: req,
+    webhookPublicKey: process.env.BLOB_WEBHOOK_PUBLIC_KEY || 'unused', // only checks upload-completed callbacks, which we don't use
+    getSignedToken: async (pathname) => {
+      if (pathname !== key) throw new HttpError(403, 'forbidden', 'Path mismatch.');
+      const token = await issueSignedToken({ pathname: key, operations: ['put'], ...limits });
+      return { token, urlOptions: { ...limits, addRandomSuffix: false, allowOverwrite: false } };
+    },
+  });
+}
 
 /** Client token the admin's browser uses to upload exactly this key (1 hour, size/type limited). */
 export async function blobUploadToken(key, { maxBytes, contentTypes }) {
@@ -120,7 +145,7 @@ export async function headObject(key) {
   if (storageDriver() === 'blob') {
     const { head, BlobNotFoundError } = await import('@vercel/blob');
     try {
-      const h = await head(key, { token: process.env.BLOB_READ_WRITE_TOKEN });
+      const h = await head(key, blobOpts());
       return { size: Number(h.size || 0), contentType: h.contentType || '' };
     } catch (e) { if (e instanceof BlobNotFoundError) return null; throw new HttpError(502, 'storage_error', `Blob head: ${e.message}`); }
   }
@@ -152,7 +177,7 @@ export async function readRange(key, start, length) {
 export async function deleteObject(key) {
   if (!key) return;
   if (storageDriver() === 'local') { await fs.promises.rm(localPath(key), { force: true }); return; }
-  if (storageDriver() === 'blob') { const { del } = await import('@vercel/blob'); await del(key, { token: process.env.BLOB_READ_WRITE_TOKEN }); return; }
+  if (storageDriver() === 'blob') { const { del } = await import('@vercel/blob'); await del(key, blobOpts()); return; }
   const r = await s3().fetch(s3ObjectUrl(key), { method: 'DELETE' });
   if (!r.ok && r.status !== 404) throw new HttpError(502, 'storage_error', `DELETE ${r.status}`);
 }

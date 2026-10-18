@@ -154,6 +154,7 @@ const routes = [
   ['GET', /^\/media$/, (q, s, c) => A.listMedia(q, s, c.q)],
   ['POST', /^\/media\/uploads$/, (q, s) => A.createUpload(q, s)],
   ['POST', new RegExp(`^/media/${UUID}/complete$`), (q, s, c) => A.completeUpload(q, s, c.id)],
+  ['POST', new RegExp(`^/media/${UUID}/blob-presign$`), (q, s, c) => A.blobPresignUpload(q, s, c.id)],
   ['PUT', new RegExp(`^/media/${UUID}$`), (q, s, c) => A.updateMedia(q, s, c.id)],
   ['GET', new RegExp(`^/media/${UUID}/usage$`), (q, s, c) => A.getMediaUsage(q, s, c.id)],
   ['DELETE', new RegExp(`^/media/${UUID}$`), (q, s, c) => A.deleteMedia(q, s, c.id)],
@@ -192,6 +193,10 @@ async function adminApi(req, res, sub, searchParams) {
 /* ------------------------------ entry ------------------------------ */
 
 export default async function handler(req, res) {
+  // Vercel hands each request a short-lived OIDC token; the Blob SDK reads it from here when the
+  // request context isn't available (Blob stores connected without a read-write token)
+  const oidc = req.headers['x-vercel-oidc-token'];
+  if (typeof oidc === 'string' && oidc) process.env.VERCEL_OIDC_TOKEN = oidc;
   const url = new URL(req.url, 'http://x');
   const path = (url.searchParams.get('__p') || url.pathname).replace(/\/+$/, '') || '/';
   url.searchParams.delete('__p');

@@ -3,7 +3,7 @@
 import { h, api, toast, modal, confirmDialog, fmtBytes, fmtDate, busy } from './lib.js';
 import { prepareFile, PICK_ACCEPT, IMAGE_EXT, CONVERT_IMAGE_EXT, VIDEO_EXT as PICK_VIDEO_EXT } from './prepare.js';
 
-export const session = { limits: { imageMB: 15, videoMB: 500 }, accept: [], storage: null };
+export const session = { limits: { imageMB: 50, videoMB: 2048 }, accept: [], storage: null };
 const ACCEPT = PICK_ACCEPT; // anything a phone/camera produces; prepare.js converts before upload
 const IMAGE_ACCEPT = ['image/*', ...[...IMAGE_EXT, ...CONVERT_IMAGE_EXT].map((e) => '.' + e)].join(',');
 const VIDEO_ACCEPT = ['video/*', ...PICK_VIDEO_EXT.map((e) => '.' + e)].join(',');

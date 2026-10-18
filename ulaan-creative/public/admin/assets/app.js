@@ -524,8 +524,8 @@ route('/settings', async () => {
     h('dt', 'Медиа storage'), h('dd', session.storage ? session.storage.toUpperCase() : 'Тохируулаагүй'),
     h('dt', 'Имэйл мэдэгдэл'), h('dd', session.email.ready ? `Идэвхтэй → ${session.email.to.join(', ')}` : 'Тохируулаагүй (RESEND_API_KEY, CONTACT_TO_EMAIL)'),
     h('dt', 'Зургийн дээд хэмжээ'), h('dd', `${session.limits.imageMB} MB`),
-    h('dt', 'Видеоны дээд хэмжээ'), h('dd', `${session.limits.videoMB} MB`),
-    h('dt', 'Зөвшөөрөгдөх төрөл'), h('dd', session.accept.join(', ')),
+    h('dt', 'Видеоны дээд хэмжээ'), h('dd', session.limits.videoMB >= 1024 ? `${+(session.limits.videoMB / 1024).toFixed(1)} GB` : `${session.limits.videoMB} MB`),
+    h('dt', 'Зөвшөөрөгдөх төрөл'), h('dd', `${session.accept.join(', ')} · HEIC, MOV, WebM, TIFF … автоматаар хөрвүүлэгдэнэ`),
     ...Object.entries(session.env || {}).flatMap(([k, ok]) => [h('dt', k), h('dd', ok ? '✓ Байна' : '✕ Алга — Vercel → Settings → Environment Variables, дараа нь Redeploy')])));
   const testBtn = h('button.btn.btn--ghost', { type: 'button', disabled: !session.email.ready, onclick: async () => {
     busy(testBtn, true);

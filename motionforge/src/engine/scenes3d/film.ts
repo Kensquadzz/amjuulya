@@ -176,8 +176,15 @@ export const film: SceneDef = {
           } else lastEnd = rise(l, X0, y, 'd', 800, px, PAL.ink, k);
         });
         // before the first word: the caret waits where the line will start
+        // before the first word: someone is typing (a bubble with three dots), so the hook moves from frame one
         const first = b[0] ?? 0.08;
-        if (t < first && Math.floor(t * 2.4) % 2 === 0) { c.fillStyle = PAL.accent; c.fillRect(X0, y0 - px * 0.42, px * 0.08, px * 0.84); }
+        if (first > 0.4 && t < first + 0.15) {
+          const k = expo(seg(t, 0, 0.35)) * (1 - seg(t, first - 0.1, first + 0.15)), bw = 250, bh = 128;
+          c.save(); c.globalAlpha *= k; c.translate(X0 + bw / 2, y0); c.scale(lerp(0.6, 1, k), lerp(0.6, 1, k));
+          rr(-bw / 2, -bh / 2, bw, bh, bh / 2); c.fillStyle = '#ffffff'; c.fill();
+          for (let d = 0; d < 3; d++) { const ph = (t * 2.6 - d * 0.18) % 1, up = Math.sin(Math.PI * clamp(ph / 0.5)) * 12; c.beginPath(); c.arc((d - 1) * 56, -up, 17, 0, Math.PI * 2); c.fillStyle = d === 1 ? PAL.accent : hexA(PAL.accent, 0.55); c.fill(); }
+          c.restore();
+        }
         const lastT = (b[ls.length - 1] ?? 0.08 + (ls.length - 1) * 0.16) + 0.6, yl = y0 + (ls.length - 1) * lh;
         if (t > lastT && Math.floor((t - lastT) * 2.2) % 2 === 0) { c.fillStyle = PAL.accent; c.fillRect(X0 + lastEnd + 18, yl - px * 0.42, px * 0.08, px * 0.84); }
         c.restore();
@@ -490,7 +497,10 @@ export const film: SceneDef = {
         pointer(mx, my, 1, seg(t, typeAt, typeAt + 0.2) * (1 - seg(t, send + 0.8, send + 1.0)), sp);
         // closing signature
         const ek = seg(t, D - 1.6, D - 1.0);
-        if (ek > 0) { c.save(); c.globalAlpha *= ek; mark(W / 2 - 230, 1420, 0.5); T(s.copy.brand ?? sb!.brand, W / 2 - 180, 1420, 'd', 800, 44, PAL.ink, 'l'); c.restore(); }
+        if (ek > 0) {
+          const br = s.copy.brand ?? sb!.brand, bpx = 50, bw = measure(br, 'd', 800, bpx), total = 84 + 26 + bw, x0 = W / 2 - total / 2;
+          c.save(); c.globalAlpha *= ek; c.translate(0, (1 - expo(ek)) * 30); mark(x0 + 42, 1410, 0.7, back(ek)); T(br, x0 + 84 + 26, 1412, 'd', 800, bpx, PAL.ink, 'l'); c.restore();
+        }
         c.restore();
       },
     };

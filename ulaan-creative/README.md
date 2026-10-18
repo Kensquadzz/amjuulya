@@ -1,65 +1,189 @@
-# Ulaan Creative — website
+# Ulaan Creative — website + CMS
 
-Single-page motion website for **Ulaan Creative**, a Mongolian creative marketing agency.
-Static HTML/CSS/JS + one Vercel serverless function for the contact form. No build step, no npm dependencies.
+Public agency website **and** a separate admin dashboard to manage portfolio projects, images, videos, influencer profiles, website text, services, pricing, SEO and contact submissions — without editing code.
+
+| Part | URL | Code |
+| --- | --- | --- |
+| Public website | `https://ulaancreative.mn/` | `lib/render.js` (server-rendered), `public/assets/*` |
+| Project pages | `https://ulaancreative.mn/work/<slug>` | `lib/render.js` |
+| Admin dashboard | `https://admin.ulaancreative.mn/login` (or `/admin/login`) | `public/admin/assets/*`, `lib/admin-shell.js` |
+| API | `/api/public/*`, `/api/contact`, `/api/admin/*` | `api/router.js` → `lib/*.js` |
+
+## Architecture
 
 ```
-ulaan-creative/
-├── index.html              # all content (edit text, packages, placeholders here)
-├── assets/css/styles.css   # design system + layout + motion initial states
-├── assets/js/main.js       # GSAP/ScrollTrigger motion, Lenis, slider, form
-├── assets/vendor/          # gsap 3.12.5, ScrollTrigger, lenis 1.1.13 (self-hosted)
-├── assets/img/             # mascot (from the reference image), OG image, icons
-├── api/contact.js          # POST /api/contact → Resend email
-├── scripts/dev-server.mjs  # local server (static + API)
-└── vercel.json
+Browser ──► Vercel ──► api/router.js (one Node function)
+                         ├─ public pages: SSR from Postgres (published data only), 20 s CDN cache
+                         ├─ /api/contact: validate → store in Postgres (+ optional Resend e-mail)
+                         └─ /api/admin/*: session check (Postgres) + CSRF/origin check → CRUD
+Admin browser ──presigned PUT──► S3-compatible bucket (R2/S3)  ◄── public media URLs
 ```
 
-## Run locally
+* **Stack:** no build step. Plain HTML/CSS/JS, GSAP + ScrollTrigger + Lenis (self-hosted in `public/assets/vendor`). Node 18+ serverless function. Only two runtime dependencies: `pg` and `aws4fetch`.
+* **Database:** PostgreSQL. Schema: `migrations/001_init.sql`.
+* **Media:** any S3-compatible bucket (Cloudflare R2 recommended). Uploads go **directly from the browser to the bucket** through 15-minute presigned URLs, so large videos never pass through or sit in a serverless function. After upload the server checks the real size and **reads the file header (magic bytes)** to verify the type. It never trusts the extension or browser MIME type.
+* **Content model:** every website section is stored as JSON with **draft** and **published** versions (`site_content`). Public pages only read published data. The admin can preview drafts at `/admin/preview/site`.
+* **Fallback:** if the database is unreachable, the public site still renders using built-in default content (`lib/defaults.js`).
+
+### Folders
+
+```
+api/router.js            the only serverless function (routes everything)
+lib/                     server code: db, auth, storage, media rules, content, render, admin API, mascot
+migrations/              SQL schema
+public/                  static files served by Vercel (site assets, admin app, mascot files)
+scripts/                 dev server, migrations, admin creation, mascot export
+test/                    automated tests (node --test)
+```
+
+---
+
+## 1. Run locally
+
+Requirements: Node 18+, PostgreSQL 14+.
 
 ```bash
 cd ulaan-creative
-cp .env.example .env.local   # optional: fill in to test real email delivery
-npm run dev                  # http://localhost:3000
+npm install
+cp .env.example .env.local      # then edit .env.local
 ```
 
-## Deploy on Vercel
+Minimal `.env.local` for development (local disk storage, **never used in production**):
 
-This folder lives inside the `amjuulya` repository, so deploy it as its **own** Vercel project:
+```
+DATABASE_URL=postgres://postgres@127.0.0.1:5432/ulaan
+STORAGE_DRIVER=local
+```
 
-1. Vercel → Add New → Project → import this repository.
-2. **Root Directory:** `ulaan-creative`. Framework preset: **Other**. No build command, no output directory.
-3. Add the environment variables below, then deploy.
+```bash
+createdb ulaan                                   # or create it in your DB tool
+npm run db:migrate                               # creates tables (safe to re-run)
+npm run admin:create -- --email you@example.com  # asks for a password (hidden)
+npm run dev                                      # http://localhost:3000  ·  admin: http://localhost:3000/admin
+```
 
-### Contact form (required for real submissions)
+## 2. Database (production)
 
-The form posts to `/api/contact`, which sends the request through [Resend](https://resend.com).
-Without these variables the API answers `503 not_configured` and the visitor is told that **nothing was sent** — it never fakes success.
+Use a managed Postgres, e.g. **Neon** (Vercel Marketplace → Neon), **Supabase** or **AWS RDS**.
 
-| Variable | Example |
-| --- | --- |
-| `RESEND_API_KEY` | `re_…` |
-| `CONTACT_TO_EMAIL` | the agency inbox (comma-separate several) |
-| `CONTACT_FROM_EMAIL` | `Ulaan Creative <noreply@your-domain.mn>` (domain must be verified in Resend) |
+1. Create a database and copy the **pooled** connection string (Neon: "Pooled connection"; Supabase: "Transaction pooler").
+2. Put it in `DATABASE_URL` (Vercel env vars, and your local `.env.local` when running migrations).
+3. From your computer: `DATABASE_URL="postgres://…" npm run db:migrate`.
+4. Re-run `npm run db:migrate` after future updates that add files to `migrations/`.
 
-Spam protection: hidden honeypot field, minimum fill time, per-instance rate limit, server-side validation and HTML escaping.
+TLS is required automatically for non-local hosts (`DATABASE_SSL=false` only for a local DB).
 
-## Content still to supply / confirm
+## 3. Media storage (Cloudflare R2 example)
 
-Search `index.html` for `PLACEHOLDER` and `CONFIRM`.
+1. Cloudflare dashboard → **R2** → *Create bucket* (e.g. `ulaan-media`).
+2. Bucket → *Settings* → **Public access**: connect a custom domain (e.g. `media.ulaancreative.mn`) or enable the `r2.dev` URL. Put that URL in `MEDIA_PUBLIC_BASE_URL`.
+3. Bucket → *Settings* → **CORS policy** (needed for browser uploads):
 
-- [ ] **100+ brands/companies/projects** stat — owner-supplied claim; confirm or delete that `<li>`.
-- [ ] **Portfolio** — five clearly labelled placeholder slots. Add `<img>` inside each `.work__media` (instructions in the HTML comment) and real titles.
-- [ ] **Creators** — placeholder cards. Add portrait `<img>` in `.creator__portrait`, name, platform, follower count, and change the disabled “Профайл удахгүй” span to a real `<a href>`.
-- [ ] **Email, phone, social URLs** — contact section + footer show “тун удахгүй”. Replace with real `mailto:` / `tel:` / profile links.
-- [ ] **Mascot** — cropped and cleaned from the supplied 1199×675 reference, so it is ~609×675 px. Supply a high-resolution, background-matched render for sharper large screens (replace `assets/img/mascot.webp` and `mascot-sm.webp`, keep the same aspect or update `aspect-ratio` in `.hero__mascot`).
-- [ ] **Domain** — set `<link rel="canonical">` and make `og:image` an absolute URL once the domain is known.
-- [ ] **Packages** — edit names, prices and items directly in the Packages section.
+   ```json
+   [
+     {
+       "AllowedOrigins": ["https://admin.ulaancreative.mn", "https://ulaancreative.mn"],
+       "AllowedMethods": ["PUT", "GET", "HEAD"],
+       "AllowedHeaders": ["content-type"],
+       "MaxAgeSeconds": 3600
+     }
+   ]
+   ```
 
-## Motion & accessibility notes
+4. R2 → **Manage API tokens** → create a token with *Object Read & Write* on this bucket. Set:
 
-- GSAP + ScrollTrigger for reveals, counters, stacking service panels, pinned manifesto, marquee, footer wordmark. Lenis smooth scroll runs on desktop pointers only.
-- `prefers-reduced-motion`: no loader, no smooth scroll, no scroll/mouse animation — everything renders statically.
-- No JS: all content is visible (motion initial states only apply under `.motion-ok`, and a 4 s safety net removes them if scripts fail).
-- Mouse parallax, magnetic buttons and the cursor label only run on fine pointers.
-- Fonts: Anton (Latin display) with Oswald fallback for Mongolian Cyrillic (incl. Ө/Ү), Inter body, JetBrains Mono labels.
+   ```
+   STORAGE_DRIVER=s3
+   S3_ENDPOINT=https://<ACCOUNT_ID>.r2.cloudflarestorage.com
+   S3_REGION=auto
+   S3_BUCKET=ulaan-media
+   S3_ACCESS_KEY_ID=…
+   S3_SECRET_ACCESS_KEY=…
+   ```
+
+AWS S3 works the same way: `S3_ENDPOINT=https://s3.<region>.amazonaws.com`, `S3_REGION=<region>`, a bucket policy allowing public `GetObject`, and the same CORS rules. MinIO/Backblaze may need `S3_FORCE_PATH_STYLE=true`.
+
+**Upload limits:** images ≤ `MAX_IMAGE_MB` (default 15 MB; JPG, PNG, WebP, AVIF, GIF). Videos ≤ `MAX_VIDEO_MB` (default 500 MB; MP4, MOV, WebM). SVG is deliberately not accepted because SVG files can carry scripts. A single presigned PUT supports files up to 5 GB on R2/S3. For a smooth experience on the public site, export web videos as H.264 MP4, 1080p, ≤ 100 MB.
+
+## 4. Deploy on Vercel
+
+This folder lives inside the `amjuulya` repository, so deploy it as its **own Vercel project**:
+
+1. Vercel → *Add New → Project* → import the repository.
+2. **Root Directory:** `ulaan-creative`. Framework preset **Other**. Leave the build and output settings empty: Vercel serves `public/` and deploys `api/router.js`.
+3. Add environment variables from `.env.example` (DATABASE_URL, S3_*, MEDIA_PUBLIC_BASE_URL, SITE_URL, ADMIN_HOST, IP_HASH_SALT, optional RESEND_*). Generate `IP_HASH_SALT` with `openssl rand -hex 32`.
+4. Deploy. Then run migrations (section 2) and create the admin (section 5).
+
+## 5. Admin account
+
+There is **no default account and no default password**. Create the owner account from a computer that can reach the production DB:
+
+```bash
+DATABASE_URL="postgres://…production…" npm run admin:create -- --email owner@ulaancreative.mn
+```
+
+You'll be asked for the password (hidden input; at least 12 characters, letters + digits). Running the same command again for an existing e-mail **resets** its password and signs out all its sessions. The owner can also change the password in *Admin → Тохиргоо*.
+
+Security model:
+* Passwords are hashed with scrypt.
+* Sessions are random 256-bit tokens. Only their SHA-256 is stored in Postgres, and every request is validated server-side.
+* The cookie is `__Host-` prefixed, `HttpOnly`, `Secure`, `SameSite=Strict`, and expires after 12 h (`SESSION_TTL_HOURS`).
+* Logout deletes the session. *Change password* and *logout everywhere* revoke other sessions.
+* Login is rate-limited (5 failures per account and 10 per IP in 15 min), stored in Postgres.
+* Every admin write requires the session, a same-origin `Origin`, and the `X-UC-Admin` header.
+* CSP, `X-Frame-Options: DENY` and `noindex` are set on the admin.
+
+## 6. Domains & DNS
+
+1. In the Vercel project → *Settings → Domains*, add `ulaancreative.mn`, `www.ulaancreative.mn` (redirect to apex) and `admin.ulaancreative.mn`.
+2. At your DNS provider create the records Vercel shows. Typically:
+   * `A @ → 76.76.21.21`
+   * `CNAME www → cname.vercel-dns.com`
+   * `CNAME admin → cname.vercel-dns.com`
+3. Set `SITE_URL=https://ulaancreative.mn` and `ADMIN_HOST=admin.ulaancreative.mn`, then redeploy.
+4. If your admin domain is different, update the `"value"` of the `host` rule in `vercel.json` too.
+5. Media domain (R2 custom domain): add `media.ulaancreative.mn` in Cloudflare and point `MEDIA_PUBLIC_BASE_URL` at it.
+
+Without an admin subdomain, the dashboard works at `https://ulaancreative.mn/admin`. When `ADMIN_HOST` is set, `/admin` on the public domain redirects to the subdomain.
+
+## 7. Contact form
+
+* Submissions are validated server-side, protected by a honeypot, a minimum fill time and DB-backed rate limiting (5 per 10 min per visitor), require privacy consent, and are **stored in Postgres**. They appear in *Admin → Ирсэн хүсэлтүүд*.
+* Optional e-mail notification via [Resend](https://resend.com): verify your domain in Resend, then set `RESEND_API_KEY`, `CONTACT_TO_EMAIL`, `CONTACT_FROM_EMAIL`.
+* The visitor sees success only if the submission was stored or e-mailed. Otherwise they see an error and are told nothing was sent.
+* Visitor IPs are stored only as a salted hash. Delete old submissions from the admin when they are no longer needed.
+
+## 8. Mascot — "Ulaan"
+
+An original character, drawn in code (`lib/mascot.js`):
+* **Speech-bubble body:** brand voice and marketing.
+* **Black camera-visor:** production and digital.
+* **LED pill eyes:** expressive, and they follow the cursor on desktop.
+* **Spark antenna:** ideas.
+* **White "U" emblem.**
+
+Expressions: `default`, `happy`, `wink`, `surprised`, `focused`. `npm`-free export: `node scripts/export-mascot.mjs` writes `public/assets/mascot/*.svg` and the favicon. The icon version (`ulaan-icon.svg`) stays readable at 16 px.
+
+## 9. Tests
+
+```bash
+npm test                         # all tests in test/ (S3 tests need devDependencies)
+node --test test/storage-s3.test.mjs
+TEST_BASE=http://localhost:3000 TEST_EMAIL=… TEST_PASSWORD=… node --test test/api.test.mjs   # against a running dev server with DB
+```
+
+## 10. Launch checklist
+
+- [ ] Postgres created, `npm run db:migrate` run against production
+- [ ] R2/S3 bucket + public URL + CORS configured; upload a test image and video in *Media*
+- [ ] All env vars set in Vercel (see `.env.example`); `IP_HASH_SALT` generated
+- [ ] Owner admin account created with a strong password; test login/logout on phone and desktop
+- [ ] Domains added (site, www, admin, media) and HTTPS active; `SITE_URL` / `ADMIN_HOST` set
+- [ ] Settings → contact e-mail, phone and social links entered **and published** (hidden until then)
+- [ ] Services & pricing → confirm VAT wording for every package (flagged in the admin)
+- [ ] Website content → review statistics: only keep confirmed numbers visible
+- [ ] Add real portfolio projects (cover, gallery, video) and publish
+- [ ] Add influencers only with confirmed details and permission; publish when ready
+- [ ] SEO → title, description, Open Graph image (1200×630)
+- [ ] Submit `https://ulaancreative.mn/sitemap.xml` in Google Search Console
+- [ ] Optional: Resend configured and a test contact submission received

@@ -355,10 +355,11 @@
       },
       service: (v) => (!v ? 'Үйлчилгээ сонгоно уу.' : ''),
       message: (v) => (v.trim().length < 10 ? 'Төслийнхөө талаар товч бичнэ үү (дор хаяж 10 тэмдэгт).' : ''),
+      consent: (v, el) => (el.checked ? '' : 'Мэдээлэл хадгалахыг зөвшөөрнө үү.'),
     };
     const check = (name) => {
       const input = form.elements[name];
-      const msg = rules[name](input.value);
+      const msg = rules[name](input.value, input);
       const err = document.getElementById(`f-${name}-err`);
       input.setAttribute('aria-invalid', msg ? 'true' : 'false');
       if (err) err.textContent = msg;
@@ -399,7 +400,7 @@
         let body = {};
         try { body = await res.json(); } catch (_) { /* non-JSON response */ }
         if (res.ok && body.ok) {
-          setStatus('Баярлалаа! Таны хүсэлтийг хүлээн авлаа. Бид удахгүй эргэн холбогдоно.', 'success');
+          setStatus(form.dataset.success || 'Баярлалаа! Таны хүсэлтийг хүлээн авлаа.', 'success');
           form.reset();
           ts.value = String(Date.now());
           Object.keys(rules).forEach((n) => form.elements[n].removeAttribute('aria-invalid'));
@@ -433,24 +434,32 @@
 
   const mm = gsap.matchMedia();
 
-  /* ---------------- Loader + hero intro ---------------- */
+  /* ---------------- Loader + hero intro (home page only) ---------------- */
   const heroWords = $$('[data-hero-word]');
   const heroFades = $$('[data-hero-fade]');
   const mascotWrap = $('[data-hero-mascot]');
   const navItems = $$('.nav__inner > *');
+  const svgLine = $('[data-hero-line]');
+  const anchor = $('[data-hero-anchor]');
+  const lineEl = svgLine && $('line', svgLine);
+  const dotEl = svgLine && $('circle', svgLine);
+  const heroEye = $('.hero .m-eye-l');
+  const eyesGroup = $('.hero .m-eyes');
+  let lineReady = false;
 
   function heroIntro() {
     const tl = gsap.timeline({ defaults: { ease: 'expo.out' } });
-    tl.fromTo(mascotWrap, { opacity: 0, scale: 1.12, yPercent: 8 }, { opacity: 1, scale: 1, yPercent: 0, duration: 1.8 }, 0)
+    tl.to(navItems, { opacity: 1, duration: 1, stagger: 0.06 }, 0.35);
+    if (!hero) return tl;
+    tl.fromTo(mascotWrap, { opacity: 0, scale: 0.86, yPercent: 10, rotation: -6 }, { opacity: 1, scale: 1, yPercent: 0, rotation: 0, duration: 1.8 }, 0)
       .to(heroWords, { y: 0, duration: 1.3, stagger: 0.09 }, 0.1)
-      .to(navItems, { opacity: 1, duration: 1, stagger: 0.06 }, 0.35)
       .fromTo(heroFades, { opacity: 0, y: 18 }, { opacity: 1, y: 0, duration: 1.1, stagger: 0.08 }, 0.55)
       .add(() => { lineReady = true; drawLine(true); }, 0.9);
     return tl;
   }
 
   const loader = $('.loader');
-  if (root.classList.contains('is-loading') && loader) {
+  if (hero && root.classList.contains('is-loading') && loader) {
     const countEl = $('[data-loader-count]', loader);
     const bar = $('.loader__bar span', loader);
     const counter = { v: 0 };
@@ -461,67 +470,76 @@
       .add(() => heroIntro(), 1.45)
       .add(() => { root.classList.remove('is-loading'); try { sessionStorage.setItem('uc-loaded', '1'); } catch (e) { /* storage blocked */ } }, 2.1);
   } else {
+    root.classList.remove('is-loading');
     heroIntro();
   }
 
-  /* ---------------- Hero: dotted line from CTA to the mascot's eye ---------------- */
-  const svgLine = $('[data-hero-line]');
-  const anchor = $('[data-hero-anchor]');
-  const lineEl = svgLine && $('line', svgLine);
-  const dotEl = svgLine && $('circle', svgLine);
-  const mascotImg = $('.hero__mascot img');
-  let lineReady = false, lineLen = 0;
-  const EYE = { x: 0.48, y: 0.255 }; // position of the left pupil inside mascot.webp
+  /* ---------------- Hero: dotted line from the CTA to the mascot's eye ---------------- */
   function drawLine(animate) {
-    if (!svgLine || !lineReady || getComputedStyle(svgLine).display === 'none') return;
+    if (!hero || !svgLine || !anchor || !heroEye || !lineReady || getComputedStyle(svgLine).display === 'none') return;
     const hr = hero.getBoundingClientRect();
     const ar = anchor.getBoundingClientRect();
-    const mr = mascotImg.getBoundingClientRect();
+    const er = heroEye.getBoundingClientRect();
     const x1 = ar.left + ar.width / 2 - hr.left, y1 = ar.top + ar.height / 2 - hr.top;
-    const x2 = mr.left + mr.width * EYE.x - hr.left, y2 = mr.top + mr.height * EYE.y - hr.top;
+    const x2 = er.left + er.width / 2 - hr.left, y2 = er.top + er.height * 0.62 - hr.top;
     lineEl.setAttribute('x1', x1); lineEl.setAttribute('y1', y1);
     lineEl.setAttribute('x2', x2); lineEl.setAttribute('y2', y2);
     dotEl.setAttribute('cx', x2); dotEl.setAttribute('cy', y2);
-    lineLen = Math.hypot(x2 - x1, y2 - y1);
     if (animate) {
+      const len = Math.hypot(x2 - x1, y2 - y1);
       gsap.fromTo(svgLine, { opacity: 0 }, { opacity: 1, duration: 0.4 });
-      gsap.fromTo(lineEl, { attr: { 'stroke-dashoffset': lineLen } , strokeDasharray: `${lineLen} ${lineLen}` },
+      gsap.fromTo(lineEl, { attr: { 'stroke-dashoffset': len }, strokeDasharray: `${len} ${len}` },
         { attr: { 'stroke-dashoffset': 0 }, duration: 1.4, ease: 'expo.inOut', onComplete: () => { lineEl.style.strokeDasharray = ''; } });
       gsap.fromTo(dotEl, { scale: 0, transformOrigin: 'center' }, { scale: 1, duration: 0.6, delay: 1.1, ease: 'back.out(3)' });
     }
   }
-  window.addEventListener('resize', () => drawLine(false));
 
-  /* ---------------- Hero: idle float, mouse parallax, scroll parallax ---------------- */
-  const floatEl = $('[data-hero-float]');
-  gsap.to(floatEl, { y: -10, rotation: 0.8, duration: 4.2, ease: 'sine.inOut', yoyo: true, repeat: -1 });
+  if (hero) {
+    window.addEventListener('resize', () => drawLine(false));
 
-  if (finePointer) {
-    const mx = gsap.quickTo(mascotWrap, 'x', { duration: 1.2, ease: 'power3.out' });
-    const my = gsap.quickTo(mascotWrap, 'y', { duration: 1.2, ease: 'power3.out' });
-    const mr = gsap.quickTo(mascotWrap, 'rotation', { duration: 1.4, ease: 'power3.out' });
-    const title = $('.hero__title');
-    const tx = gsap.quickTo(title, 'x', { duration: 1.4, ease: 'power3.out' });
-    const ty = gsap.quickTo(title, 'y', { duration: 1.4, ease: 'power3.out' });
-    hero.addEventListener('pointermove', (e) => {
-      const nx = e.clientX / window.innerWidth - 0.5;
-      const ny = e.clientY / window.innerHeight - 0.5;
-      mx(nx * 26); my(ny * 16); mr(nx * 1.6);
-      tx(nx * -10); ty(ny * -6);
+    /* Idle float + blinking eyes */
+    gsap.to('[data-hero-float]', { y: -12, rotation: 1.2, duration: 3.6, ease: 'sine.inOut', yoyo: true, repeat: -1 });
+    const blinkTargets = $$('.hero .m-eye');
+    if (blinkTargets.length) {
+      const blink = () => {
+        gsap.timeline({ onComplete: () => gsap.delayedCall(2.5 + Math.random() * 3.5, blink) })
+          .to(blinkTargets, { scaleY: 0.08, transformOrigin: '50% 50%', duration: 0.08, ease: 'power2.in' })
+          .to(blinkTargets, { scaleY: 1, duration: 0.14, ease: 'power2.out' });
+      };
+      gsap.delayedCall(2.4, blink);
+    }
+
+    /* Mouse parallax + eyes that follow the cursor (desktop) */
+    if (finePointer) {
+      const mx = gsap.quickTo(mascotWrap, 'x', { duration: 1.2, ease: 'power3.out' });
+      const my = gsap.quickTo(mascotWrap, 'y', { duration: 1.2, ease: 'power3.out' });
+      const mr = gsap.quickTo(mascotWrap, 'rotation', { duration: 1.4, ease: 'power3.out' });
+      const ex = eyesGroup && gsap.quickTo(eyesGroup, 'x', { duration: 0.5, ease: 'power3.out' });
+      const ey = eyesGroup && gsap.quickTo(eyesGroup, 'y', { duration: 0.5, ease: 'power3.out' });
+      const title = $('.hero__title');
+      const tx = gsap.quickTo(title, 'x', { duration: 1.4, ease: 'power3.out' });
+      const ty = gsap.quickTo(title, 'y', { duration: 1.4, ease: 'power3.out' });
+      window.addEventListener('pointermove', (e) => {
+        if (window.scrollY > hero.offsetHeight) return;
+        const nx = e.clientX / window.innerWidth - 0.5;
+        const ny = e.clientY / window.innerHeight - 0.5;
+        mx(nx * 22); my(ny * 14); mr(nx * 2);
+        tx(nx * -10); ty(ny * -6);
+        if (ex) { ex(gsap.utils.clamp(-46, 30, nx * 90)); ey(gsap.utils.clamp(-18, 18, ny * 40)); }
+      }, { passive: true });
+    }
+    // Keep the dotted line attached while the mascot / CTA move (only while the hero is on screen).
+    gsap.ticker.add(() => { if (window.scrollY < hero.offsetHeight) drawLine(false); });
+
+    gsap.to('.hero__mascot-float', {
+      yPercent: 10, scale: 1.05, ease: 'none',
+      scrollTrigger: { trigger: hero, start: 'top top', end: 'bottom top', scrub: true },
     });
-    hero.addEventListener('pointerleave', () => { mx(0); my(0); mr(0); tx(0); ty(0); });
+    gsap.to('.hero__content', {
+      yPercent: -14, opacity: 0.2, ease: 'none',
+      scrollTrigger: { trigger: hero, start: 'top top', end: 'bottom top', scrub: true },
+    });
   }
-  // Keep the dotted line attached while the mascot / CTA move (only while the hero is on screen).
-  gsap.ticker.add(() => { if (window.scrollY < hero.offsetHeight) drawLine(false); });
-
-  gsap.to('.hero__mascot-float img', {
-    yPercent: 12, scale: 1.06, ease: 'none',
-    scrollTrigger: { trigger: hero, start: 'top top', end: 'bottom top', scrub: true },
-  });
-  gsap.to('.hero__content', {
-    yPercent: -14, opacity: 0.2, ease: 'none',
-    scrollTrigger: { trigger: hero, start: 'top top', end: 'bottom top', scrub: true },
-  });
 
   /* ---------------- Marquee (scroll-velocity aware) ---------------- */
   const mq = $('[data-marquee]');
@@ -584,7 +602,7 @@
       panel.querySelector('.svc__title'),
       panel.querySelector('.svc__desc'),
       ...panel.querySelectorAll('.svc__list li'),
-    ];
+    ].filter(Boolean);
     gsap.from(items, {
       y: 50, opacity: 0, duration: 1.1, ease: 'expo.out', stagger: 0.06,
       scrollTrigger: { trigger: panel, start: 'top 65%', once: true },
@@ -624,7 +642,7 @@
   });
 
   /* ---------------- Creators: cards slide in ---------------- */
-  gsap.from('.creator', {
+  if ($('.creator')) gsap.from('.creator', {
     x: 120, opacity: 0, duration: 1.3, ease: 'expo.out', stagger: 0.07,
     scrollTrigger: { trigger: '.creators__track', start: 'top 85%', once: true },
   });

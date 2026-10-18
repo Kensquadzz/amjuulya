@@ -1,40 +1,31 @@
-// Minimal local server: serves the static site and routes /api/contact to the
-// same handler Vercel runs. Usage: `npm run dev` (reads .env.local if present).
+// Local development server: serves public/ like Vercel's static output and
+// sends everything else to the same router function Vercel runs.
+// Usage: npm run dev   (reads .env.local)
 import http from 'node:http';
 import { readFile, stat } from 'node:fs/promises';
-import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import './load-env.mjs';
 
-const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const envFile = path.join(root, '.env.local');
-if (existsSync(envFile)) {
-  for (const line of readFileSync(envFile, 'utf8').split('\n')) {
-    const m = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*)\s*$/);
-    if (m && !(m[1] in process.env)) process.env[m[1]] = m[2].replace(/^["']|["']$/g, '');
-  }
-}
-const { default: contact } = await import('../api/contact.js');
-
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../public');
+const { default: router } = await import('../api/router.js');
 const TYPES = {
-  '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8',
-  '.svg': 'image/svg+xml', '.webp': 'image/webp', '.png': 'image/png', '.jpg': 'image/jpeg', '.ico': 'image/x-icon',
-  '.json': 'application/json', '.txt': 'text/plain; charset=utf-8', '.xml': 'application/xml',
+  '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.mjs': 'text/javascript; charset=utf-8',
+  '.svg': 'image/svg+xml', '.webp': 'image/webp', '.png': 'image/png', '.jpg': 'image/jpeg', '.ico': 'image/x-icon', '.json': 'application/json',
 };
 const port = Number(process.env.PORT) || 3000;
 
 http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://localhost');
-  if (url.pathname === '/api/contact') return contact(req, res);
-  let file = path.join(root, decodeURIComponent(url.pathname));
-  if (!file.startsWith(root) || file.includes(`${path.sep}api${path.sep}`) || file.includes(`${path.sep}scripts${path.sep}`)) {
-    res.writeHead(404).end('Not found'); return;
+  const file = path.join(root, decodeURIComponent(url.pathname));
+  if (file.startsWith(root + path.sep) && (req.method === 'GET' || req.method === 'HEAD')) {
+    try {
+      const st = await stat(file);
+      if (st.isFile()) {
+        res.writeHead(200, { 'Content-Type': TYPES[path.extname(file)] || 'application/octet-stream', 'Cache-Control': 'no-cache' });
+        return res.end(req.method === 'HEAD' ? undefined : await readFile(file));
+      }
+    } catch { /* not a static file — fall through to the router */ }
   }
-  try {
-    if ((await stat(file)).isDirectory()) file = path.join(file, 'index.html');
-    const body = await readFile(file);
-    res.writeHead(200, { 'Content-Type': TYPES[path.extname(file)] || 'application/octet-stream' }).end(body);
-  } catch {
-    res.writeHead(404, { 'Content-Type': 'text/plain' }).end('Not found');
-  }
-}).listen(port, () => console.log(`Ulaan Creative → http://localhost:${port}`));
+  router(req, res).catch((e) => { console.error(e); if (!res.headersSent) { res.statusCode = 500; res.end('error'); } });
+}).listen(port, () => console.log(`Ulaan Creative → http://localhost:${port}  (admin: http://localhost:${port}/admin)`));

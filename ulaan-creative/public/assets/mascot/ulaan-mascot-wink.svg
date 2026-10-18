@@ -1,0 +1,83 @@
+<svg xmlns:xlink="http://www.w3.org/1999/xlink" class="mascot " viewBox="0 0 640 700" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="m-wink-t">
+  <title id="m-wink-t">Ulaan — wink</title>
+  <defs>
+    <radialGradient id="m-wink-body" cx="34%" cy="26%" r="78%">
+      <stop offset="0" stop-color="#FF6A70"/>
+      <stop offset=".42" stop-color="#F2283A"/>
+      <stop offset=".82" stop-color="#C8061C"/>
+      <stop offset="1" stop-color="#8E0012"/>
+    </radialGradient>
+    <linearGradient id="m-wink-rim" x1="0" y1="0" x2="1" y2="0">
+      <stop offset=".72" stop-color="#fff" stop-opacity="0"/>
+      <stop offset="1" stop-color="#fff" stop-opacity=".55"/>
+    </linearGradient>
+    <linearGradient id="m-wink-visor" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2B2B2E"/>
+      <stop offset=".55" stop-color="#121214"/>
+      <stop offset="1" stop-color="#050506"/>
+    </linearGradient>
+    <radialGradient id="m-wink-glow" cx="50%" cy="50%" r="50%">
+      <stop offset="0" stop-color="#fff" stop-opacity=".95"/>
+      <stop offset=".4" stop-color="#fff" stop-opacity=".35"/>
+      <stop offset="1" stop-color="#fff" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="m-wink-shadow" cx="50%" cy="50%" r="50%">
+      <stop offset="0" stop-color="#3A0006" stop-opacity=".55"/>
+      <stop offset="1" stop-color="#3A0006" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <ellipse cx="318" cy="668" rx="230" ry="26" fill="url(#m-wink-shadow)"/>
+
+  <!-- feet -->
+  <g class="m-feet">
+    <rect x="196" y="600" width="96" height="58" rx="29" fill="#111"/>
+    <rect x="344" y="600" width="96" height="58" rx="29" fill="#111"/>
+    <rect x="206" y="642" width="76" height="8" rx="4" fill="#fff" opacity=".9"/>
+    <rect x="354" y="642" width="76" height="8" rx="4" fill="#fff" opacity=".9"/>
+  </g>
+
+  <!-- left arm (resting) -->
+  <rect x="62" y="400" width="74" height="132" rx="37" fill="#B00418" transform="rotate(14 99 466)"/>
+
+  <!-- body: rounded speech bubble with a tail at the lower left -->
+  <path class="m-body" fill="url(#m-wink-body)" stroke="#7A0010" stroke-width="6" stroke-linejoin="round"
+    d="M318 128
+       C462 128 540 196 540 352
+       C540 520 470 616 318 616
+       C258 616 212 604 176 584
+       L92 626
+       C84 630 76 622 80 614
+       L110 538
+       C96 492 96 430 96 352
+       C96 196 174 128 318 128 Z"/>
+  <path fill="url(#m-wink-rim)" d="M318 128 C462 128 540 196 540 352 C540 520 470 616 318 616 C430 600 500 520 506 352 C506 210 440 140 318 128 Z" opacity=".6"/>
+  <!-- soft top highlight -->
+  <ellipse cx="236" cy="196" rx="96" ry="40" fill="#fff" opacity=".18" transform="rotate(-18 236 196)"/>
+
+  <!-- visor -->
+  <g class="m-visor">
+    <rect x="150" y="236" width="318" height="152" rx="76" fill="url(#m-wink-visor)" stroke="#000" stroke-width="4"/>
+    <path d="M196 252 H330 Q350 252 344 262 Q330 276 300 276 H190 Q172 276 176 264 Q182 252 196 252 Z" fill="#fff" opacity=".12"/>
+    <g class="m-eyes">
+    <rect class="m-eye m-eye-l" x="226" y="266" width="52" height="92" rx="26" fill="#fff"/>
+    <path d="M332 316 Q362 342 392 316" fill="none" stroke="#fff" stroke-width="20" stroke-linecap="round"/></g>
+  </g>
+
+  <!-- U emblem -->
+  <path d="M286 452 v34 a32 32 0 0 0 64 0 v-34" fill="none" stroke="#fff" stroke-width="18" stroke-linecap="round"/>
+
+  <!-- raised hand -->
+  <g class="m-hand">
+    <rect x="500" y="300" width="72" height="150" rx="36" fill="#D80C22" stroke="#7A0010" stroke-width="5" transform="rotate(28 536 375)"/>
+    <circle cx="582" cy="290" r="44" fill="#E8142B" stroke="#7A0010" stroke-width="5"/>
+    <circle cx="570" cy="276" r="12" fill="#fff" opacity=".25"/>
+  </g>
+
+  <!-- spark antenna -->
+  <path d="M318 130 C318 92 336 70 362 56" fill="none" stroke="#111" stroke-width="10" stroke-linecap="round"/>
+  <g transform="translate(374 46)"><g class="m-spark">
+    <circle r="46" fill="url(#m-wink-glow)"/>
+    <path d="M0 -36 C4 -10 10 -4 36 0 C10 4 4 10 0 36 C-4 10 -10 4 -36 0 C-10 -4 -4 -10 0 -36 Z" fill="#fff" stroke="#111" stroke-width="4" stroke-linejoin="round"/>
+  </g></g>
+</svg>

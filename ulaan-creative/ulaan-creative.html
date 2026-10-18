@@ -333,14 +333,15 @@ ul, ol { padding: 0; list-style: none; }
 .menu {
   position: fixed; inset: 0; z-index: 110; background: var(--black); color: var(--white);
   display: flex; flex-direction: column; justify-content: space-between;
-  padding: calc(var(--nav-h) + 24px) var(--pad) 32px;
+  padding: calc(var(--nav-h) + 24px) var(--pad) max(32px, env(safe-area-inset-bottom));
   clip-path: inset(0 0 100% 0); transition: clip-path .7s var(--ease-io);
+  overflow-y: auto; overscroll-behavior: contain; gap: 24px; /* short screens (landscape) scroll instead of cutting links off */
 }
 .menu[hidden] { display: none; }
 .menu.is-open { clip-path: inset(0 0 0 0); }
 .menu nav { display: flex; flex-direction: column; }
 .menu nav a {
-  font-family: var(--f-display); font-size: clamp(48px, 14vw, 96px); line-height: 1; text-transform: uppercase;
+  font-family: var(--f-display); font-size: clamp(34px, min(14vw, 8.5svh), 96px); line-height: 1; text-transform: uppercase;
   border-bottom: 1px solid var(--line-light); padding: 8px 0; display: flex; align-items: baseline; gap: 14px;
   transform: translateY(30px); opacity: 0; transition: transform .7s var(--ease), opacity .7s var(--ease), color .3s;
 }
@@ -1010,15 +1011,29 @@ html.inf-open, html.inf-open body { overflow: hidden; }
 .inf-row__head { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 0 var(--pad); margin-bottom: 14px; }
 .inf-row__title { font-family: var(--f-display); font-weight: 700; text-transform: uppercase; font-size: clamp(22px, 2.2vw, 32px); line-height: 1; }
 .inf-row__title .mono { font-family: var(--f-mono); font-size: 11px; font-weight: 400; opacity: .55; vertical-align: middle; margin-left: 6px; }
-.inf-row__nav { display: flex; gap: 6px; }
-.inf-row__btn { width: 38px; height: 38px; border-radius: 50%; border: 1px solid rgba(255,255,255,.3); background: none; color: inherit; display: grid; place-items: center; cursor: pointer; transition: background-color .3s, color .3s, opacity .3s; }
-.inf-row__btn svg { width: 14px; height: 14px; }
-.inf-row__btn:hover, .inf-row__btn:focus-visible { background: var(--white); color: var(--black); }
-.inf-row__btn:disabled { opacity: .25; cursor: default; background: none; color: inherit; }
-.inf-row__track {
-  list-style: none; margin: 0; display: flex; gap: clamp(12px, 1.2vw, 18px); overflow-x: auto; overscroll-behavior-x: contain;
-  scroll-snap-type: x proximity; scroll-padding-inline: var(--pad); padding: 8px var(--pad) 14px; scrollbar-width: none;
+.inf-row__pages { display: flex; gap: 3px; }
+.inf-row__pages i { width: 14px; height: 2px; background: rgba(255,255,255,.25); transition: background-color .3s; }
+.inf-row__pages i.is-on { background: var(--white); }
+.inf-row__viewport { position: relative; }
+/* Netflix-style edge arrows: full card height, appear on row hover (pointer devices only) */
+.inf-row__edge {
+  position: absolute; top: 0; bottom: 0; z-index: 4; width: max(var(--pad), 52px); border: 0; padding: 0; color: var(--white); cursor: pointer;
+  display: grid; place-items: center; opacity: 0; transition: opacity .3s, background-color .3s;
 }
+.inf-row__edge--prev { left: 0; background: linear-gradient(90deg, rgba(13,13,13,.92), rgba(13,13,13,0)); }
+.inf-row__edge--next { right: 0; background: linear-gradient(270deg, rgba(13,13,13,.92), rgba(13,13,13,0)); }
+.inf-row__edge svg { width: 26px; height: 26px; transition: transform .3s var(--ease); }
+.inf-row__edge:hover svg, .inf-row__edge:focus-visible svg { transform: scale(1.25); }
+.inf-row:hover .inf-row__edge:not(:disabled), .inf-row__edge:focus-visible { opacity: 1; }
+.inf-row__edge:disabled { opacity: 0 !important; pointer-events: none; }
+.inf-row__track {
+  list-style: none; margin: 0; display: flex; gap: clamp(10px, 1vw, 16px); overflow-x: auto; overflow-y: hidden; overscroll-behavior-x: contain;
+  scroll-padding-inline: var(--pad); padding: 18px var(--pad) 22px; scrollbar-width: none; /* desktop: JS paging, no snap */
+  -webkit-overflow-scrolling: touch; touch-action: pan-x pan-y;
+}
+.inf-row__track.is-animating, .inf-row__track.is-dragging { scroll-snap-type: none; }
+.inf-row__track.is-dragging { cursor: grabbing; user-select: none; -webkit-user-select: none; }
+.inf-row__track.is-dragging .inf-card { pointer-events: none; }
 .inf-row__track::-webkit-scrollbar { display: none; }
 
 /* cards */
@@ -1027,7 +1042,9 @@ html.inf-open, html.inf-open body { overflow: hidden; }
   background: #171717; border: 1px solid rgba(255,255,255,.08); transition: transform .45s var(--ease), border-color .3s;
 }
 .inf-card[hidden] { display: none; }
-.inf-card:hover, .inf-card:focus-within { transform: scale(1.03); border-color: rgba(255,255,255,.35); }
+.inf-card { will-change: transform; }
+@media (hover: hover) and (pointer: fine) { .inf-card:hover, .inf-card:focus-within { transform: scale(1.06); z-index: 3; border-color: rgba(255,255,255,.4); box-shadow: 0 18px 40px rgba(0,0,0,.55); } }
+.inf-card:focus-within { border-color: rgba(255,255,255,.4); }
 .inf-card.is-picked { border-color: var(--red); box-shadow: inset 0 0 0 1px var(--red); }
 .inf-card__media { position: relative; aspect-ratio: 4 / 5; background: linear-gradient(160deg, #2a2a2a, #121212); display: grid; place-items: center; }
 .inf-card__media img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
@@ -1116,9 +1133,9 @@ html.inf-open, html.inf-open body { overflow: hidden; }
   .inf__filter-btn { height: 44px; padding: 0 16px; }
   .inf-filter { position: fixed; left: 0; right: 0; bottom: 0; top: auto; width: auto; max-height: 85svh; overflow-y: auto; border-radius: 22px 22px 0 0; padding: 18px var(--pad) max(18px, env(safe-area-inset-bottom)); z-index: 14; }
   .inf-feat { grid-template-columns: 1fr; }
-  .inf-row__nav { display: none; } /* touch: swipe the row */
+  .inf-row__edge { display: none; } /* touch: swipe the row */
+  .inf-row__track { scroll-snap-type: x mandatory; padding-block: 10px 16px; }
   .inf-card { flex-basis: 44vw; }
-  .inf-card:hover, .inf-card:focus-within { transform: none; }
   .inf-bar { left: 0; right: 0; bottom: 0; translate: none; width: auto; border-radius: 18px 18px 0 0; padding: 10px var(--pad) max(10px, env(safe-area-inset-bottom)); }
   .inf-bar__go { padding-inline: 18px; }
   .inf-sheet { padding: 0; align-items: flex-end; }
@@ -1134,6 +1151,7 @@ html:not(.js) .inf-pick, html:not(.js) .inf__tools { display: none; }
 .inf-q .form__status.is-error { color: #ff6b78; background: none; padding: 0; }
 /* preview / demo label stays visible above the influencer panel without covering the selection bar */
 html.inf-open .preview-bar { bottom: auto; top: max(70px, calc(env(safe-area-inset-top) + 64px)); background: var(--red); max-width: calc(100vw - 32px); text-align: center; }
+@media (hover: none) { .inf-row__edge { display: none; } .inf-row__track { scroll-snap-type: x mandatory; } }
 
 </style>
 <script type="application/ld+json" nonce="standalone">{"@context":"https://schema.org","@type":"Organization","name":"Ulaan Creative","url":"https://ulaancreative.mn/","logo":"https://ulaancreative.mn/assets/img/ulaan-logo-light.png"}</script>
@@ -1163,7 +1181,7 @@ html.inf-open .preview-bar { bottom: auto; top: max(70px, calc(env(safe-area-ins
     </button>
   </div>
 </header>
-<div class="menu" id="mobile-menu" data-menu hidden>
+<div class="menu" id="mobile-menu" data-menu data-lenis-prevent hidden>
   <nav aria-label="Гар утасны цэс">
     <a href="#work"><small>01</small>Work</a>
     <a href="#services"><small>02</small>Services</a>
@@ -1711,7 +1729,7 @@ html.inf-open .preview-bar { bottom: auto; top: max(70px, calc(env(safe-area-ins
     document.documentElement.classList.add('inf-open');
     if (lenis) lenis.stop();
     if (history.replaceState) history.replaceState(null, '', '#influencers');
-    $$('[data-inf-track]', inf).forEach(updateRowNav);
+    $$('[data-inf-track]', inf).forEach((t) => { updateRowNav(t); if (inf._pages) inf._pages(t); });
     setTimeout(() => { const c = $('.inf__close', inf); if (c) c.focus({ preventScroll: true }); }, 30);
   }
   function closeInf(toHash) {
@@ -1821,8 +1839,10 @@ html.inf-open .preview-bar { bottom: auto; top: max(70px, calc(env(safe-area-ins
         cards.sort(cmp).forEach((c) => { track.appendChild(c); const ok = rowAllowed && matches(c.dataset.infItem); c.hidden = !ok; if (ok) visible++; });
         row.hidden = visible === 0;
         $('[data-inf-row-count]', row).textContent = String(visible);
+        cancelAnimationFrame(track._raf);
         track.scrollLeft = 0;
         updateRowNav(track);
+        updatePages(track);
         shown += visible;
       });
       const feat = $('[data-inf-featured]', inf);
@@ -1859,15 +1879,92 @@ html.inf-open .preview-bar { bottom: auto; top: max(70px, calc(env(safe-area-ins
     if (search) search.addEventListener('input', () => { clearTimeout(qTimer); qTimer = setTimeout(() => { state.q = search.value; applyFilters(); }, 120); });
     document.addEventListener('click', (e) => { if (panel && !panel.hidden && !panel.contains(e.target) && e.target !== toggleBtn) setFilterOpen(false); });
 
-    /* --- rows: arrows + state --- */
+    /* --- rows: Netflix-style paging with eased scroll, mouse drag with momentum, page dashes --- */
+    const easeInOut = (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
+    const cardStep = (track) => { const c = track.querySelector('.inf-card:not([hidden])'); if (!c) return track.clientWidth; const gap = parseFloat(getComputedStyle(track).columnGap) || 0; return c.offsetWidth + gap; };
+    function glide(track, to, dur) {
+      const max = track.scrollWidth - track.clientWidth;
+      to = Math.max(0, Math.min(max, to));
+      cancelAnimationFrame(track._raf);
+      if (reduceMotion) { track.scrollLeft = to; return; }
+      const from = track.scrollLeft, d = to - from;
+      if (Math.abs(d) < 1) return;
+      const ms = dur || Math.min(900, 420 + Math.abs(d) * 0.35);
+      const t0 = performance.now();
+      track.classList.add('is-animating');
+      const step = (now) => {
+        const t = Math.min(1, (now - t0) / ms);
+        track.scrollLeft = from + d * easeInOut(t);
+        if (t < 1) track._raf = requestAnimationFrame(step);
+        else track.classList.remove('is-animating');
+      };
+      track._raf = requestAnimationFrame(step);
+    }
+    // page = as many whole cards as fit; targets land on card edges like Netflix
+    const page = (track, dir) => {
+      const w = cardStep(track);
+      const perPage = Math.max(1, Math.floor((track.clientWidth - 2 * parseFloat(getComputedStyle(track).paddingLeft)) / w));
+      const idx = Math.round(track.scrollLeft / w) + dir * perPage;
+      glide(track, idx * w);
+    };
+    function updatePages(track) {
+      const row = track.closest('.inf-row'), box = $('[data-inf-pages]', row);
+      if (!box) return;
+      const max = track.scrollWidth - track.clientWidth;
+      const n = max > 4 ? Math.ceil(track.scrollWidth / track.clientWidth) : 0;
+      if (box.childElementCount !== n) box.replaceChildren(...Array.from({ length: n }, () => document.createElement('i')));
+      const on = n ? Math.round((track.scrollLeft / max) * (n - 1)) : -1;
+      [...box.children].forEach((el, i) => el.classList.toggle('is-on', i === on));
+    }
     $$('[data-inf-track]', inf).forEach((track) => {
       const row = track.closest('.inf-row');
-      const by = (d) => track.scrollBy({ left: d * track.clientWidth * 0.85, behavior: reduceMotion ? 'auto' : 'smooth' });
-      $('[data-inf-row-prev]', row).addEventListener('click', () => by(-1));
-      $('[data-inf-row-next]', row).addEventListener('click', () => by(1));
-      track.addEventListener('scroll', () => updateRowNav(track), { passive: true });
+      $('[data-inf-row-prev]', row).addEventListener('click', () => page(track, -1));
+      $('[data-inf-row-next]', row).addEventListener('click', () => page(track, 1));
+      let ticking = false;
+      track.addEventListener('scroll', () => {
+        if (ticking) return; ticking = true;
+        requestAnimationFrame(() => { ticking = false; updateRowNav(track); updatePages(track); });
+      }, { passive: true });
+      // mouse drag (touch already scrolls natively with momentum)
+      let down = false, moved = false, startX = 0, startLeft = 0, lastX = 0, lastT = 0, vel = 0;
+      track.addEventListener('pointerdown', (e) => {
+        if (e.pointerType !== 'mouse' || e.button !== 0 || e.target.closest('[data-inf-pick]')) return;
+        down = true; moved = false; startX = lastX = e.clientX; startLeft = track.scrollLeft; lastT = performance.now(); vel = 0;
+        cancelAnimationFrame(track._raf);
+      });
+      window.addEventListener('pointermove', (e) => {
+        if (!down) return;
+        const dx = e.clientX - startX;
+        if (!moved && Math.abs(dx) > 5) { moved = true; track.classList.add('is-dragging'); }
+        if (!moved) return;
+        track.scrollLeft = startLeft - dx;
+        const now = performance.now();
+        vel = 0.8 * ((lastX - e.clientX) / Math.max(1, now - lastT)) + 0.2 * vel;
+        lastX = e.clientX; lastT = now;
+      });
+      const release = () => {
+        if (!down) return;
+        down = false;
+        if (!moved) return;
+        track.classList.remove('is-dragging');
+        // momentum, then settle on the nearest card edge
+        const w = cardStep(track);
+        const target = Math.round((track.scrollLeft + vel * 260) / w) * w;
+        glide(track, target, 650);
+        const swallow = (ev) => { ev.stopPropagation(); ev.preventDefault(); };
+        track.addEventListener('click', swallow, { capture: true, once: true });
+        setTimeout(() => track.removeEventListener('click', swallow, { capture: true }), 0);
+      };
+      window.addEventListener('pointerup', release);
+      window.addEventListener('pointercancel', release);
+      track.addEventListener('dragstart', (e) => e.preventDefault());
+      // keyboard: arrow keys inside a row page through it
+      track.addEventListener('keydown', (e) => {
+        if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') { e.preventDefault(); page(track, e.key === 'ArrowRight' ? 1 : -1); }
+      });
     });
-    window.addEventListener('resize', () => $$('[data-inf-track]', inf).forEach(updateRowNav));
+    window.addEventListener('resize', () => $$('[data-inf-track]', inf).forEach((t) => { updateRowNav(t); updatePages(t); }));
+    inf._pages = updatePages;
 
     /* --- one click handler for the panel --- */
     inf.addEventListener('click', (e) => {

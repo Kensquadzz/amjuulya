@@ -216,7 +216,7 @@
     document.documentElement.classList.add('inf-open');
     if (lenis) lenis.stop();
     if (history.replaceState) history.replaceState(null, '', '#influencers');
-    $$('[data-inf-track]', inf).forEach(updateRowNav);
+    $$('[data-inf-track]', inf).forEach((t) => { updateRowNav(t); if (inf._pages) inf._pages(t); });
     setTimeout(() => { const c = $('.inf__close', inf); if (c) c.focus({ preventScroll: true }); }, 30);
   }
   function closeInf(toHash) {
@@ -326,8 +326,10 @@
         cards.sort(cmp).forEach((c) => { track.appendChild(c); const ok = rowAllowed && matches(c.dataset.infItem); c.hidden = !ok; if (ok) visible++; });
         row.hidden = visible === 0;
         $('[data-inf-row-count]', row).textContent = String(visible);
+        cancelAnimationFrame(track._raf);
         track.scrollLeft = 0;
         updateRowNav(track);
+        updatePages(track);
         shown += visible;
       });
       const feat = $('[data-inf-featured]', inf);
@@ -364,15 +366,92 @@
     if (search) search.addEventListener('input', () => { clearTimeout(qTimer); qTimer = setTimeout(() => { state.q = search.value; applyFilters(); }, 120); });
     document.addEventListener('click', (e) => { if (panel && !panel.hidden && !panel.contains(e.target) && e.target !== toggleBtn) setFilterOpen(false); });
 
-    /* --- rows: arrows + state --- */
+    /* --- rows: Netflix-style paging with eased scroll, mouse drag with momentum, page dashes --- */
+    const easeInOut = (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
+    const cardStep = (track) => { const c = track.querySelector('.inf-card:not([hidden])'); if (!c) return track.clientWidth; const gap = parseFloat(getComputedStyle(track).columnGap) || 0; return c.offsetWidth + gap; };
+    function glide(track, to, dur) {
+      const max = track.scrollWidth - track.clientWidth;
+      to = Math.max(0, Math.min(max, to));
+      cancelAnimationFrame(track._raf);
+      if (reduceMotion) { track.scrollLeft = to; return; }
+      const from = track.scrollLeft, d = to - from;
+      if (Math.abs(d) < 1) return;
+      const ms = dur || Math.min(900, 420 + Math.abs(d) * 0.35);
+      const t0 = performance.now();
+      track.classList.add('is-animating');
+      const step = (now) => {
+        const t = Math.min(1, (now - t0) / ms);
+        track.scrollLeft = from + d * easeInOut(t);
+        if (t < 1) track._raf = requestAnimationFrame(step);
+        else track.classList.remove('is-animating');
+      };
+      track._raf = requestAnimationFrame(step);
+    }
+    // page = as many whole cards as fit; targets land on card edges like Netflix
+    const page = (track, dir) => {
+      const w = cardStep(track);
+      const perPage = Math.max(1, Math.floor((track.clientWidth - 2 * parseFloat(getComputedStyle(track).paddingLeft)) / w));
+      const idx = Math.round(track.scrollLeft / w) + dir * perPage;
+      glide(track, idx * w);
+    };
+    function updatePages(track) {
+      const row = track.closest('.inf-row'), box = $('[data-inf-pages]', row);
+      if (!box) return;
+      const max = track.scrollWidth - track.clientWidth;
+      const n = max > 4 ? Math.ceil(track.scrollWidth / track.clientWidth) : 0;
+      if (box.childElementCount !== n) box.replaceChildren(...Array.from({ length: n }, () => document.createElement('i')));
+      const on = n ? Math.round((track.scrollLeft / max) * (n - 1)) : -1;
+      [...box.children].forEach((el, i) => el.classList.toggle('is-on', i === on));
+    }
     $$('[data-inf-track]', inf).forEach((track) => {
       const row = track.closest('.inf-row');
-      const by = (d) => track.scrollBy({ left: d * track.clientWidth * 0.85, behavior: reduceMotion ? 'auto' : 'smooth' });
-      $('[data-inf-row-prev]', row).addEventListener('click', () => by(-1));
-      $('[data-inf-row-next]', row).addEventListener('click', () => by(1));
-      track.addEventListener('scroll', () => updateRowNav(track), { passive: true });
+      $('[data-inf-row-prev]', row).addEventListener('click', () => page(track, -1));
+      $('[data-inf-row-next]', row).addEventListener('click', () => page(track, 1));
+      let ticking = false;
+      track.addEventListener('scroll', () => {
+        if (ticking) return; ticking = true;
+        requestAnimationFrame(() => { ticking = false; updateRowNav(track); updatePages(track); });
+      }, { passive: true });
+      // mouse drag (touch already scrolls natively with momentum)
+      let down = false, moved = false, startX = 0, startLeft = 0, lastX = 0, lastT = 0, vel = 0;
+      track.addEventListener('pointerdown', (e) => {
+        if (e.pointerType !== 'mouse' || e.button !== 0 || e.target.closest('[data-inf-pick]')) return;
+        down = true; moved = false; startX = lastX = e.clientX; startLeft = track.scrollLeft; lastT = performance.now(); vel = 0;
+        cancelAnimationFrame(track._raf);
+      });
+      window.addEventListener('pointermove', (e) => {
+        if (!down) return;
+        const dx = e.clientX - startX;
+        if (!moved && Math.abs(dx) > 5) { moved = true; track.classList.add('is-dragging'); }
+        if (!moved) return;
+        track.scrollLeft = startLeft - dx;
+        const now = performance.now();
+        vel = 0.8 * ((lastX - e.clientX) / Math.max(1, now - lastT)) + 0.2 * vel;
+        lastX = e.clientX; lastT = now;
+      });
+      const release = () => {
+        if (!down) return;
+        down = false;
+        if (!moved) return;
+        track.classList.remove('is-dragging');
+        // momentum, then settle on the nearest card edge
+        const w = cardStep(track);
+        const target = Math.round((track.scrollLeft + vel * 260) / w) * w;
+        glide(track, target, 650);
+        const swallow = (ev) => { ev.stopPropagation(); ev.preventDefault(); };
+        track.addEventListener('click', swallow, { capture: true, once: true });
+        setTimeout(() => track.removeEventListener('click', swallow, { capture: true }), 0);
+      };
+      window.addEventListener('pointerup', release);
+      window.addEventListener('pointercancel', release);
+      track.addEventListener('dragstart', (e) => e.preventDefault());
+      // keyboard: arrow keys inside a row page through it
+      track.addEventListener('keydown', (e) => {
+        if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') { e.preventDefault(); page(track, e.key === 'ArrowRight' ? 1 : -1); }
+      });
     });
-    window.addEventListener('resize', () => $$('[data-inf-track]', inf).forEach(updateRowNav));
+    window.addEventListener('resize', () => $$('[data-inf-track]', inf).forEach((t) => { updateRowNav(t); updatePages(t); }));
+    inf._pages = updatePages;
 
     /* --- one click handler for the panel --- */
     inf.addEventListener('click', (e) => {

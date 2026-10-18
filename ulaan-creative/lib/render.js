@@ -104,7 +104,7 @@ function nav({ hasInfluencers, base = '' }) {
     </button>
   </div>
 </header>
-<div class="menu" id="mobile-menu" data-menu hidden>
+<div class="menu" id="mobile-menu" data-menu data-lenis-prevent hidden>
   <nav aria-label="Гар утасны цэс">
     ${links.map(([id, l], i) => `<a href="${base}#${id}"><small>0${i + 1}</small>${l}</a>`).join('\n    ')}
   </nav>
@@ -433,14 +433,15 @@ function influencersPanel(s, list, categories = []) {
       ${rows.filter((r) => r.people.length).map((r) => `<section class="inf-row" data-inf-row="${attr(r.id)}" aria-label="${attr(r.name)}">
         <div class="inf-row__head">
           <h3 class="inf-row__title">${esc(r.name)} <span class="mono" data-inf-row-count>${r.people.length}</span></h3>
-          <div class="inf-row__nav">
-            <button type="button" class="inf-row__btn" data-inf-row-prev aria-label="${attr(r.name)} — өмнөх"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M10 3 5 8l5 5" fill="none" stroke="currentColor" stroke-width="1.6"/></svg></button>
-            <button type="button" class="inf-row__btn" data-inf-row-next aria-label="${attr(r.name)} — дараагийн"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m6 3 5 5-5 5" fill="none" stroke="currentColor" stroke-width="1.6"/></svg></button>
-          </div>
+          <div class="inf-row__pages" aria-hidden="true" data-inf-pages></div>
         </div>
-        <ul class="inf-row__track" role="list" data-inf-track>
+        <div class="inf-row__viewport">
+          <button type="button" class="inf-row__edge inf-row__edge--prev" data-inf-row-prev aria-label="${attr(r.name)} — өмнөх"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M10 3 5 8l5 5" fill="none" stroke="currentColor" stroke-width="1.8"/></svg></button>
+          <ul class="inf-row__track" role="list" data-inf-track>
       ${r.people.map(influencerCard).join('\n      ')}
-        </ul>
+          </ul>
+          <button type="button" class="inf-row__edge inf-row__edge--next" data-inf-row-next aria-label="${attr(r.name)} — дараагийн"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m6 3 5 5-5 5" fill="none" stroke="currentColor" stroke-width="1.8"/></svg></button>
+        </div>
       </section>`).join('\n      ')}
       <div class="inf__none" data-inf-none hidden><p class="display">Бүтээгч олдсонгүй.</p><p>Шүүлтүүр эсвэл хайлтаа өөрчлөөд дахин оролдоно уу.</p><button type="button" class="inf-link mono" data-inf-reset>Шүүлтүүр цэвэрлэх</button></div>
     </div>`}

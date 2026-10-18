@@ -8,7 +8,8 @@ import { hrPack } from './hrPack';
 import { story2d } from './story2d';
 import { pastel3d } from './pastel3d';
 import { glowUI } from './glowUI';
+import { film } from './film';
 
 
-export const SCENES3D: SceneDef[] = [productOrbit, chromeLogo, liquidGlass, floatingUI, hrPack, story2d, pastel3d, glowUI];
+export const SCENES3D: SceneDef[] = [productOrbit, chromeLogo, liquidGlass, floatingUI, hrPack, story2d, pastel3d, glowUI, film];
 export const sceneById = (id: string) => SCENES3D.find((s) => s.id === id);

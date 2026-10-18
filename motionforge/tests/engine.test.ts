@@ -277,3 +277,39 @@ describe('voice-over drives the video', () => {
     expect(timing(runs[2])).toBe(timing(runs[0]));
   });
 });
+
+describe('art-directed film storyboard', () => {
+  it('the demo storyboard is valid and covers the film', async () => {
+    const { validateStoryboard } = await import('../src/engine/film/plan');
+    const { DEMO_STORYBOARD } = await import('../src/engine/film/demo');
+    expect(validateStoryboard(DEMO_STORYBOARD, 36).filter((i) => i.level === 'error')).toEqual([]);
+  });
+  it('catches gaps, invented copy, a misspelt brand and a film shorter than the voice', async () => {
+    const { validateStoryboard } = await import('../src/engine/film/plan');
+    const { DEMO_STORYBOARD } = await import('../src/engine/film/demo');
+    const sb = JSON.parse(JSON.stringify(DEMO_STORYBOARD));
+    sb.scenes[1].start += 0.5; // gap
+    sb.scenes[2].copy.lead = 'the best kit in the world'; // not in the narration or facts
+    sb.scenes[12].copy.brand = 'Nova DOCS KIT'; // brand case changed
+    const msgs = validateStoryboard(sb, 40).filter((i) => i.level === 'error').map((i) => i.msg).join('\n');
+    expect(msgs).toMatch(/gap of 0.50s/);
+    expect(msgs).toMatch(/"the best kit in the world" is neither narration nor a product fact/);
+    expect(msgs).toMatch(/brand word "Nova" must be written "NOVA"/);
+    expect(msgs).toMatch(/shorter than the voice/);
+  });
+  it('sound design follows the choreography and the project keeps the full voice', async () => {
+    const { filmSfx } = await import('../src/engine/film/plan');
+    const { buildFilmProject } = await import('../src/engine/film/project');
+    const { DEMO_STORYBOARD } = await import('../src/engine/film/demo');
+    const cues = filmSfx(DEMO_STORYBOARD);
+    expect(cues.length).toBeGreaterThan(20);
+    expect(cues.every((q) => q.t >= 0 && q.t < 36)).toBe(true);
+    // every roll beat gets a tick exactly on the beat
+    for (const b of DEMO_STORYBOARD.scenes[4].beats!) expect(cues.some((q) => q.t === b)).toBe(true);
+    const { project, missing } = buildFilmProject(DEMO_STORYBOARD, { voiceAssetId: 'asset:v', voiceDuration: 36, images: [] });
+    expect(missing).toEqual([]);
+    expect(project.duration).toBe(36);
+    expect(project.audio[0].duration).toBe(36);
+    expect(project.layers).toHaveLength(1);
+  });
+});

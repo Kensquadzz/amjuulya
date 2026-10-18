@@ -10,7 +10,7 @@
     "preview": "vite preview --host",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:e2e": "node tests/e2e.mjs && node tests/app.mjs test-results && node tests/cap.mjs && node tests/cine-ui.mjs && node tests/three-ui.mjs && node tests/model.mjs && node tests/voice-video.mjs",
+    "test:e2e": "node tests/e2e.mjs && node tests/app.mjs test-results && node tests/cap.mjs && node tests/cine-ui.mjs && node tests/three-ui.mjs && node tests/model.mjs && node tests/voice-video.mjs && node tests/film.mjs",
     "icons": "node tests/icons.mjs",
     "fonts": "node scripts/build-fonts.mjs",
     "assets": "node scripts/copy-ort.mjs"

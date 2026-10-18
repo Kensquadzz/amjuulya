@@ -47,7 +47,7 @@ setRouteHandler(async (view, params, path) => {
     try {
       const r = await api('/auth/me');
       if (!r.user) return navigate('/login', { replace: true });
-      me = r.user; Object.assign(session, { limits: r.limits, accept: r.accept, storage: r.storage, email: r.email || { ready: false, to: [] } });
+      me = r.user; Object.assign(session, { limits: r.limits, accept: r.accept, storage: r.storage, email: r.email || { ready: false, to: [] }, env: r.env || {} });
     } catch { return navigate('/login', { replace: true }); }
   }
   if (!view) { app.replaceChildren(layout(h('section.page', h('h1', 'Хуудас олдсонгүй')), path)); return; }

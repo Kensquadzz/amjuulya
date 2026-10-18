@@ -2,7 +2,7 @@
   "name": "ulaan-creative",
   "version": "1.0.0",
   "private": true,
-  "description": "Ulaan Creative \u2014 creative marketing agency website",
+  "description": "Ulaan Creative — creative marketing agency website",
   "type": "module",
   "engines": {
     "node": ">=18"
@@ -16,6 +16,7 @@
     "test": "node --test test/*.test.mjs"
   },
   "dependencies": {
+    "@vercel/blob": "2.8.0",
     "aws4fetch": "^1.0.20",
     "pg": "^8.23.1"
   },

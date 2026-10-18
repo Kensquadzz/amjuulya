@@ -33,7 +33,7 @@ const ERRORS = {
   unauthorized: 'Нэвтрэх шаардлагатай.',
   invalid_credentials: 'Имэйл эсвэл нууц үг буруу байна.',
   too_many_attempts: 'Хэт олон оролдлого. 15 минутын дараа дахин оролдоно уу.',
-  storage_not_configured: 'Медиа storage тохируулагдаагүй байна (S3/R2 env хувьсагчид).',
+  storage_not_configured: 'Зураг/видео хадгалах сан холбогдоогүй байна (Vercel → Storage → Blob).',
   db_not_configured: 'Өгөгдлийн сан тохируулагдаагүй байна (DATABASE_URL).',
   not_found: 'Олдсонгүй.',
   in_use: 'Ашиглагдаж байгаа тул устгах боломжгүй.',

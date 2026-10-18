@@ -77,8 +77,19 @@ export async function uploadFile(file, { replaceId, onProgress, onStage, onConve
   const init = await api('/media/uploads', { method: 'POST', body: { name: file.name, size: file.size, type: file.type, sha256: sha, width: meta.width, height: meta.height, duration: meta.duration, hasThumb: Boolean(meta.thumb), replaceId } });
   if (init.existing) return { item: init.existing, existing: true };
   onStage?.('Байршуулж байна…');
-  await put(init.uploadUrl, file, file.type || MIME[ext], onProgress);
-  if (init.thumbUploadUrl && meta.thumb) await put(init.thumbUploadUrl, meta.thumb, 'image/webp').catch(() => {});
+  if (init.blob) {
+    // Vercel Blob: upload straight from the browser with the server-issued client token
+    const { put: blobPut } = await import('./vendor/vercel-blob-client.js');
+    const send = (target, body, contentType, progress) => blobPut(target.pathname, body, {
+      access: 'public', token: target.token, contentType, multipart: body.size > 50 * 1048576,
+      onUploadProgress: progress ? (e) => progress(e.percentage / 100) : undefined,
+    }).catch((e) => { throw new Error(`Vercel Blob руу илгээж чадсангүй: ${e.message}`); });
+    await send(init.blob, file, MIME[ext], onProgress);
+    if (init.thumbBlob && meta.thumb) await send(init.thumbBlob, meta.thumb, 'image/webp').catch(() => {});
+  } else {
+    await put(init.uploadUrl, file, file.type || MIME[ext], onProgress);
+    if (init.thumbUploadUrl && meta.thumb) await put(init.thumbUploadUrl, meta.thumb, 'image/webp').catch(() => {});
+  }
   onStage?.('Баталгаажуулж байна…');
   const done = await api(`/media/${init.id}/complete`, { method: 'POST', body: { replaceId } });
   return { item: done.item, existing: false };
@@ -129,7 +140,7 @@ function uploadZone({ onFiles, multiple = true, accept = ACCEPT }) {
 }
 
 function storageWarning() {
-  return session.storage ? null : h('div.notice.notice--warn', h('strong', 'Медиа storage тохируулагдаагүй байна. '), 'Зураг, видео байршуулахын тулд S3/R2 тохиргоог хийнэ үү (README → Storage).');
+  return session.storage ? null : h('div.notice.notice--warn', h('strong', 'Медиа storage тохируулагдаагүй байна. '), 'Vercel → Storage → Create → Blob → Connect дараад Redeploy хийнэ (эсвэл S3/R2).');
 }
 
 /* ---------------------------- detail dialog ---------------------------- */

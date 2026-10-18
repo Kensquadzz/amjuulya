@@ -4,6 +4,9 @@
 //                         Backblaze B2, Supabase Storage S3 … Files go straight from the
 //                         admin's browser to the bucket through short-lived presigned URLs,
 //                         so large videos never pass through (or sit in memory of) a function.
+//  STORAGE_DRIVER=blob   Vercel Blob — chosen automatically when BLOB_READ_WRITE_TOKEN is set
+//                         (Vercel → Storage → Create → Blob → Connect). The browser uploads
+//                         directly to Blob with a short-lived client token from the server.
 //  STORAGE_DRIVER=local  development only: files on local disk. Refused on Vercel, whose
 //                         filesystem is ephemeral.
 import crypto from 'node:crypto';
@@ -25,7 +28,31 @@ export function storageDriver() {
     const need = ['S3_ENDPOINT', 'S3_BUCKET', 'S3_ACCESS_KEY_ID', 'S3_SECRET_ACCESS_KEY', 'MEDIA_PUBLIC_BASE_URL'];
     return need.every((k) => process.env[k]) ? 's3' : null;
   }
+  if (d === 'blob' || (!d && process.env.BLOB_READ_WRITE_TOKEN)) return blobStoreId() ? 'blob' : null;
   return null;
+}
+
+/* ---------------------------- Vercel Blob ---------------------------- */
+// Token format: vercel_blob_rw_<storeId>_<secret>. Public files live at
+// https://<storeId>.public.blob.vercel-storage.com/<pathname> (pathname = our key, no random suffix).
+export function blobStoreId() {
+  const m = /^vercel_blob_rw_([a-z0-9]+)_/i.exec(process.env.BLOB_READ_WRITE_TOKEN || '');
+  return m ? m[1].toLowerCase() : '';
+}
+export const blobPublicBase = () => process.env.BLOB_PUBLIC_BASE_URL || (blobStoreId() ? `https://${blobStoreId()}.public.blob.vercel-storage.com` : '');
+
+/** Client token the admin's browser uses to upload exactly this key (1 hour, size/type limited). */
+export async function blobUploadToken(key, { maxBytes, contentTypes }) {
+  const { generateClientTokenFromReadWriteToken } = await import('@vercel/blob/client');
+  return generateClientTokenFromReadWriteToken({
+    token: process.env.BLOB_READ_WRITE_TOKEN,
+    pathname: key,
+    addRandomSuffix: false,
+    allowOverwrite: false,
+    maximumSizeInBytes: maxBytes,
+    allowedContentTypes: contentTypes,
+    validUntil: Date.now() + 60 * 60 * 1000,
+  });
 }
 
 export function assertStorage() {
@@ -37,6 +64,7 @@ const encodeKey = (key) => key.split('/').map(encodeURIComponent).join('/');
 export function publicUrl(key) {
   if (!key) return '';
   if (storageDriver() === 'local') return `/api/_local-storage/${encodeKey(key)}`;
+  if (storageDriver() === 'blob') return `${blobPublicBase()}/${encodeKey(key)}`;
   return `${String(process.env.MEDIA_PUBLIC_BASE_URL || '').replace(/\/$/, '')}/${encodeKey(key)}`;
 }
 
@@ -89,6 +117,13 @@ export async function headObject(key) {
   if (storageDriver() === 'local') {
     try { const st = await fs.promises.stat(localPath(key)); return { size: st.size, contentType: '' }; } catch { return null; }
   }
+  if (storageDriver() === 'blob') {
+    const { head, BlobNotFoundError } = await import('@vercel/blob');
+    try {
+      const h = await head(key, { token: process.env.BLOB_READ_WRITE_TOKEN });
+      return { size: Number(h.size || 0), contentType: h.contentType || '' };
+    } catch (e) { if (e instanceof BlobNotFoundError) return null; throw new HttpError(502, 'storage_error', `Blob head: ${e.message}`); }
+  }
   const r = await s3().fetch(s3ObjectUrl(key), { method: 'HEAD' });
   if (r.status === 404) return null;
   if (!r.ok) throw new HttpError(502, 'storage_error', `HEAD ${r.status}`);
@@ -106,7 +141,9 @@ export async function readRange(key, start, length) {
     const fh = await fs.promises.open(localPath(key), 'r');
     try { const buf = Buffer.alloc(length); const { bytesRead } = await fh.read(buf, 0, length, start); return buf.subarray(0, bytesRead); } finally { await fh.close(); }
   }
-  const r = await s3().fetch(s3ObjectUrl(key), { headers: { Range: `bytes=${start}-${start + length - 1}` } });
+  const r = storageDriver() === 'blob'
+    ? await fetch(publicUrl(key), { headers: { Range: `bytes=${start}-${start + length - 1}` }, cache: 'no-store' })
+    : await s3().fetch(s3ObjectUrl(key), { headers: { Range: `bytes=${start}-${start + length - 1}` } });
   if (r.status === 416) return Buffer.alloc(0);
   if (!r.ok) throw new HttpError(502, 'storage_error', `GET ${r.status}`);
   return Buffer.from(await r.arrayBuffer());
@@ -115,6 +152,7 @@ export async function readRange(key, start, length) {
 export async function deleteObject(key) {
   if (!key) return;
   if (storageDriver() === 'local') { await fs.promises.rm(localPath(key), { force: true }); return; }
+  if (storageDriver() === 'blob') { const { del } = await import('@vercel/blob'); await del(key, { token: process.env.BLOB_READ_WRITE_TOKEN }); return; }
   const r = await s3().fetch(s3ObjectUrl(key), { method: 'DELETE' });
   if (!r.ok && r.status !== 404) throw new HttpError(502, 'storage_error', `DELETE ${r.status}`);
 }

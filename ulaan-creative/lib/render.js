@@ -383,7 +383,8 @@ function influencerDetail(p) {
   const links = SOCIALS.filter(([k]) => p[k]);
   const data = [p.followers != null && ['Дагагч', fmtFollowers(p.followers)], p.engagement && ['Engagement (баталгаажсан)', p.engagement]].filter(Boolean);
   return `<template data-inf-detail="${attr(p.id)}">
-    <div class="inf-detail__media">${p.photo ? `${mediaImg(p.photo, { alt: '', sizes: '(max-width: 760px) 100vw, 420px', cls: 'inf-detail__backdrop' })}${mediaImg(p.photo, { alt: p.photo.alt || p.name, sizes: '(max-width: 760px) 100vw, 420px', cls: 'inf-detail__photo' })}` : `<span class="display" aria-hidden="true">${esc(initials(p.name))}</span>`}</div>
+    ${p.photo ? mediaImg(p.photo, { alt: '', sizes: '(max-width: 760px) 100vw, 420px', cls: 'inf-detail__backdrop' }) : ''}
+    <div class="inf-detail__media${p.photo ? ' has-photo' : ''}">${p.photo ? mediaImg(p.photo, { alt: p.photo.alt || p.name, sizes: '(max-width: 760px) 100vw, 420px', cls: 'inf-detail__photo' }) : `<span class="display" aria-hidden="true">${esc(initials(p.name))}</span>`}</div>
     <div class="inf-detail__body">
       <p class="mono inf-detail__cat">${esc(catNames(p).join(' · ') || 'Influencer')}</p>
       <h3 class="display inf-detail__name" id="inf-detail-title">${esc(p.name)}</h3>

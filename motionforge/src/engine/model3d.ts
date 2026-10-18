@@ -145,7 +145,7 @@ export class ModelHost {
     if (this.canvas.width !== W || this.canvas.height !== H) r.setSize(W, H, false);
     const span = Math.max(1e-3, l.end - l.start);
     r.setClearColor(0x000000, 0);
-    e.inst.render({ p: Math.max(0, Math.min(1, (env.t - l.start) / span)), t: Math.max(0, env.t - l.start), W, H, params: this.params(l) });
+    e.inst.render({ p: Math.max(0, Math.min(1, (env.t - l.start) / span)), t: Math.max(0, env.t - l.start), W, H, params: this.params(l), dur: span });
     ctx.save();
     ctx.translate(l.x * W, l.y * H);
     ctx.rotate((l.rotation * Math.PI) / 180);

@@ -58,6 +58,8 @@ export function validateContact(body, services) {
   return { data, fields };
 }
 
+const MAX_PICKED = 10; // creators per campaign request (the site enforces the same limit)
+
 export async function handleContact(req, res) {
   const body = await readJson(req, 64 * 1024);
   if (str(body.website, 200)) return json(res, 200, { ok: true }); // honeypot: silently drop bots
@@ -92,7 +94,8 @@ export async function handleContact(req, res) {
 
   // Selected influencers: only ids of currently published profiles are kept (names are
   // looked up server-side, so the client can't inject arbitrary names). No prices involved.
-  const pickedIds = [...new Set((Array.isArray(body.influencers) ? body.influencers : []).filter(isUuid))].slice(0, 30);
+  const pickedIds = [...new Set((Array.isArray(body.influencers) ? body.influencers : []).filter(isUuid))];
+  if (pickedIds.length > MAX_PICKED) return json(res, 400, { ok: false, error: 'invalid', fields: { influencers: 'too_many' } });
   data.influencers = [];
   if (pickedIds.length && dbConfigured()) {
     try {

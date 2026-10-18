@@ -284,6 +284,23 @@ export const reorderProjects = (req, res) => reorder('projects', req, res);
 export const reorderInfluencers = (req, res) => reorder('influencers', req, res);
 export const reorderInfluencerCategories = (req, res) => reorder('influencer_categories', req, res);
 
+/** Sets the whole hero collage at once: body.items = [{ id, size, focus }] in display order.
+ *  Listed creators are in the collage (max 20), everyone else is taken out. */
+export async function saveInfluencerCollage(req, res) {
+  const b = await readJson(req, 32 * 1024);
+  const items = (Array.isArray(b.items) ? b.items : []).filter((x) => x && isUuid(x.id));
+  if (new Set(items.map((x) => x.id)).size !== items.length) throw new HttpError(400, 'invalid', 'Давхардсан influencer байна.');
+  if (items.length > COLLAGE_MAX) throw new HttpError(400, 'invalid', `Collage-д хамгийн ихдээ ${COLLAGE_MAX} influencer оруулна.`);
+  await tx(async (c) => {
+    await c.query('update influencers set in_collage = false where in_collage and not (id = any($1::uuid[]))', [items.map((x) => x.id)]);
+    for (const [i, x] of items.entries()) {
+      await c.query('update influencers set in_collage = true, collage_order = $2, collage_size = $3, collage_focus = $4, updated_at = now() where id = $1',
+        [x.id, i + 1, COLLAGE_SIZES.includes(x.size) ? x.size : 'm', COLLAGE_FOCUS.includes(x.focus) ? x.focus : 'top']);
+    }
+  });
+  json(res, 200, { ok: true });
+}
+
 /* ------------------------- influencer categories ------------------------- */
 
 export async function listInfluencerCategories(req, res) {
@@ -326,6 +343,10 @@ export async function deleteInfluencerCategory(req, res, id) {
 
 /* ----------------------------- influencers ----------------------------- */
 
+const COLLAGE_SIZES = ['s', 'm', 'l', 'xl'];
+const COLLAGE_FOCUS = ['top', 'center', 'bottom'];
+const COLLAGE_MAX = 20;
+
 function influencerInput(b) {
   const followers = b.followers === '' || b.followers == null ? null : Number(String(b.followers).replace(/[\s,]/g, ''));
   if (followers !== null && (!Number.isInteger(followers) || followers < 0 || followers > 1e10)) throw new HttpError(400, 'invalid', 'Дагагчдын тоо бүхэл тоо байх ёстой.', { field: 'followers' });
@@ -342,6 +363,9 @@ function influencerInput(b) {
     engagement: str(b.engagement, 100, 'Engagement'),
     engagement_verified: b.engagementVerified === true,
     featured: b.featured === true,
+    in_collage: b.inCollage === true,
+    collage_size: COLLAGE_SIZES.includes(b.collageSize) ? b.collageSize : 'm',
+    collage_focus: COLLAGE_FOCUS.includes(b.collageFocus) ? b.collageFocus : 'top',
     price: str(b.price, 200, 'Үнэ'),
     status: status(b.status),
   };
@@ -383,6 +407,9 @@ export async function saveInfluencer(req, res, id = null) {
          (select coalesce(max(sort_order), 0) + 1 from influencers), case when $${cols.indexOf('status') + 1} = 'published' then now() end) returning id`,
       cols.map((k) => d[k]));
   }
+  // newly added to the collage → goes to the end of it
+  await query(`update influencers set collage_order = (select coalesce(max(collage_order), 0) + 1 from influencers where in_collage and id <> $1)
+    where id = $1 and in_collage and collage_order = 0`, [row.id]);
   await tx(async (c) => {
     await c.query('delete from influencer_category_links where influencer_id = $1', [row.id]);
     if (categoryIds.length) {

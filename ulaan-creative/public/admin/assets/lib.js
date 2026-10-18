@@ -60,7 +60,7 @@ export async function api(path, { method = 'GET', body } = {}) {
   let data = {};
   try { data = await r.json(); } catch { /* empty */ }
   if (r.status === 401 && !path.startsWith('/auth/')) { navigate('/login'); throw new ApiError(ERRORS.unauthorized, 401, data); }
-  if (!r.ok) throw new ApiError(data.message || ERRORS[data.error] || `Алдаа (${r.status})`, r.status, data);
+  if (!r.ok) throw new ApiError(`${data.message || ERRORS[data.error] || `Алдаа (${r.status})`}${data.detail ? ` [${data.detail}]` : ''}`, r.status, data);
   return data;
 }
 

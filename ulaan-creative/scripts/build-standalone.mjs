@@ -30,7 +30,11 @@ swap('<link rel="stylesheet" href="/assets/css/styles.css">', `<style>\n${read('
 html = html.replace(/<script src="\/assets\/vendor\/[^"]+" defer><\/script>\n?/g, '');
 const vendor = ['gsap.min.js', 'ScrollTrigger.min.js', 'lenis.min.js'].map((f) => read(`assets/vendor/${f}`)).join('\n');
 swap('<script src="/assets/js/main.js" defer></script>', `<script>\n${vendor}\n</script>\n<script>\n${read('assets/js/main.js')}\n</script>`);
-swap('href="/assets/img/favicon.svg"', `href="data:image/svg+xml;base64,${Buffer.from(read('assets/img/favicon.svg')).toString('base64')}"`);
+const dataUri = (p, mime) => `data:${mime};base64,${readFileSync(path.join(root, 'public', p)).toString('base64')}`;
+swap('href="/assets/img/favicon-32.png"', `href="${dataUri('assets/img/favicon-32.png', 'image/png')}"`);
+html = html.split('/assets/img/ulaan-bomb-sm.webp').join(dataUri('assets/img/ulaan-bomb-sm.webp', 'image/webp'));
+html = html.split('/assets/img/ulaan-bomb.webp').join(dataUri('assets/img/ulaan-bomb.webp', 'image/webp'));
+for (const v of ['light', 'on-red', 'dark']) html = html.split(`/assets/img/ulaan-logo-${v}.webp`).join(dataUri(`assets/img/ulaan-logo-${v}.webp`, 'image/webp'));
 
 const out = path.join(root, 'ulaan-creative.html');
 writeFileSync(out, html);

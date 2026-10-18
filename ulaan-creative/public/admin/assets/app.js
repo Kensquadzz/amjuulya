@@ -283,7 +283,7 @@ route('/media', async () => mediaLibraryView());
 
 const SCHEMAS = {
   hero: { title: 'Hero (нүүр хэсэг)', fields: [
-    { name: 'headline', label: 'Гол гарчиг', type: 'textarea', rows: 3, help: 'Мөр бүр тусдаа мөрөнд харагдана. Жишээ: WE / BUILD / BRANDS.' },
+    { name: 'headline', label: 'Гол гарчиг', type: 'textarea', rows: 3, help: 'Мөр бүр тусдаа мөрөнд харагдана. Жишээ: CREATE / GROW / GO VIRAL.' },
     { name: 'lede', label: 'Дэд текст', type: 'textarea', rows: 3 },
     { name: 'metaLabel', label: 'Жижиг тэмдэглэгээ', type: 'text' },
     { name: 'ctaLabel', label: 'CTA товчны текст', type: 'text' },

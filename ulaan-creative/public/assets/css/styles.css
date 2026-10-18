@@ -230,23 +230,18 @@ ul, ol { padding: 0; list-style: none; }
 }
 @supports not (height: 100svh) { .hero { min-height: 640px; } }
 .hero__mascot {
-  position: absolute; z-index: 0; right: clamp(0px, 4vw, 90px); bottom: clamp(8px, 3vh, 36px);
-  height: min(88%, 900px); aspect-ratio: 640 / 700; max-width: 54vw;
+  position: absolute; z-index: 0; right: clamp(0px, 5vw, 110px); bottom: 0;
+  height: calc(100% - 28px); aspect-ratio: 959 / 1492; max-width: 48vw;
 }
-/* soft light pool behind the mascot so a red character reads on the red background */
+/* soft light pool behind the black bomb */
 .hero__mascot::before {
-  content: ""; position: absolute; inset: 6% -6% 2% -6%; border-radius: 50%;
-  background: radial-gradient(closest-side, rgba(255, 220, 220, .38), rgba(255, 160, 160, .12) 60%, transparent 72%);
+  content: ""; position: absolute; inset: 14% -18% 20% -18%; border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(255, 120, 120, .45), rgba(255, 60, 60, .12) 60%, transparent 75%);
 }
-.hero__mascot-float { position: relative; width: 100%; height: 100%; transform-origin: 50% 90%; }
-.hero__mascot .mascot { width: 100%; height: 100%; overflow: visible; filter: drop-shadow(0 30px 40px rgba(70, 0, 0, .35)); }
-.mascot .m-hand { transform-box: fill-box; transform-origin: 20% 90%; }
-.mascot .m-spark { transform-box: fill-box; transform-origin: center; }
-.mascot .m-eyes { transform-box: view-box; }
-.motion-ok .hero .m-hand { animation: wave 2.6s var(--ease) 2.2s 2; }
-.motion-ok .mascot .m-spark { animation: spark 2.4s ease-in-out infinite; }
-@keyframes wave { 0%, 100% { transform: rotate(0); } 20% { transform: rotate(-14deg); } 40% { transform: rotate(8deg); } 60% { transform: rotate(-10deg); } 80% { transform: rotate(4deg); } }
-@keyframes spark { 0%, 100% { transform: scale(1) rotate(0); } 50% { transform: scale(1.18) rotate(20deg); } }
+/* the arm runs off the bottom edge, so the bomb sways around the hand instead of floating */
+.hero__mascot-float { position: relative; width: 100%; height: 100%; transform-origin: 50% 100%; }
+.hero__mascot .bomb { width: 100%; height: 100%; object-fit: contain; object-position: bottom center; filter: drop-shadow(0 24px 40px rgba(60, 0, 0, .35)); }
+.hero__eye { position: absolute; left: 17.4%; top: 53.4%; width: 2px; height: 2px; }
 .hero__grain {
   position: absolute; inset: 0; z-index: 1; pointer-events: none;
   background:
@@ -259,7 +254,7 @@ ul, ol { padding: 0; list-style: none; }
 .hero__line circle { fill: var(--white); }
 .hero__content {
   position: relative; z-index: 3;
-  --hero-fs: clamp(88px, min(15.5vw, 24svh), 320px);
+  --hero-fs: clamp(72px, min(12.4vw, 22svh), 280px);
   display: flex; flex-direction: column; align-items: flex-start;
   padding: calc(var(--nav-h) + clamp(16px, 4vh, 48px)) var(--pad) 96px; max-width: 1680px; margin-inline: auto;
 }
@@ -273,14 +268,10 @@ ul, ol { padding: 0; list-style: none; }
 .hero__title .line { display: block; overflow: hidden; padding: .2em .3em; margin: -.2em -.3em; }
 .hero__title .word { display: inline-block; will-change: transform; }
 .hero__title em { font-style: normal; }
-.hero__aside {
-  position: absolute; width: min(300px, 22vw);
-  top: calc(var(--nav-h) + clamp(16px, 4vh, 48px) + var(--hero-fs) * .05);
-  left: calc(var(--pad) + var(--hero-fs) * 1.12 + clamp(32px, 4vw, 72px));
-}
-.hero__meta { opacity: .75; margin-bottom: 18px; font-size: 11px; }
-.hero__lede { font-size: 13.5px; line-height: 1.7; letter-spacing: .07em; max-width: 30ch; }
-.hero__actions { display: flex; align-items: center; margin-top: clamp(22px, 4vh, 44px); }
+.hero__aside { position: static; width: auto; max-width: 40ch; margin-top: clamp(14px, 2.6vh, 30px); }
+.hero__meta { opacity: .75; margin-bottom: 8px; font-size: 11px; }
+.hero__lede { font-size: 13.5px; line-height: 1.7; letter-spacing: .07em; max-width: 46ch; }
+.hero__actions { display: flex; align-items: center; margin-top: clamp(16px, 3vh, 34px); }
 .hero__anchor {
   width: 12px; height: 12px; border-radius: 50%; background: var(--white); margin-left: 6px;
   box-shadow: 0 0 0 4px rgba(255,255,255,.18), 0 0 18px rgba(255,255,255,.8);
@@ -304,12 +295,12 @@ ul, ol { padding: 0; list-style: none; }
 }
 @media (max-width: 760px), (max-width: 1100px) and (orientation: portrait) {
   .hero { min-height: max(100svh, 720px); }
-  .hero__content { padding-top: calc(var(--nav-h) + 12px); --hero-fs: clamp(76px, 25vw, 200px); }
+  .hero__content { padding-top: calc(var(--nav-h) + 12px); --hero-fs: clamp(60px, 19vw, 170px); }
   .hero__aside { position: static; width: auto; padding-top: 18px; }
   .hero__meta { display: none; }
   .hero__lede { font-size: 12px; max-width: 34ch; }
   .hero__actions { margin-top: 22px; }
-  .hero__mascot { height: 46%; max-width: none; right: -6vw; bottom: 64px; }
+  .hero__mascot { height: 52%; max-width: none; right: -4vw; bottom: 0; }
   .hero__lede { text-shadow: 0 1px 14px rgba(110, 0, 0, .55); }
   .hero__line { display: none; }
   .hero__anchor { display: none; }
@@ -752,7 +743,7 @@ html:not(.motion-ok) .marquee__track { animation: none; }
 .work__empty { display: grid; grid-template-columns: minmax(160px, 260px) 1fr; gap: clamp(24px, 4vw, 64px); align-items: center; padding: clamp(28px, 4vw, 56px); background: var(--white); border: 1.5px solid var(--ink); }
 .work__empty h3 { font-size: clamp(36px, 4.4vw, 72px); margin-bottom: 14px; }
 .work__empty p { max-width: 52ch; margin-bottom: 24px; color: #333; }
-.work__empty-art .mascot { width: 100%; height: auto; }
+.work__empty-art .bomb { width: 100%; height: auto; max-height: 340px; object-fit: contain; }
 @media (max-width: 700px) { .work__empty { grid-template-columns: 1fr; } .work__empty-art { max-width: 180px; } }
 
 /* Influencer cards */
@@ -768,8 +759,9 @@ html:not(.motion-ok) .marquee__track { animation: none; }
 
 /* About mascot figure */
 .about__figure { display: grid; place-items: center; background: var(--red-hero); }
-.about__mascot { width: 78%; }
-.about__mascot .mascot { width: 100%; height: auto; overflow: visible; }
+.about__figure { align-items: end; }
+.about__mascot { width: 72%; align-self: end; }
+.about__mascot .bomb { width: 100%; height: auto; display: block; }
 
 /* FAQ */
 .faq { background: var(--paper); padding: clamp(96px, 11vw, 160px) 0; }
@@ -824,7 +816,7 @@ html:not(.motion-ok) .marquee__track { animation: none; }
 /* 404 */
 .notfound { min-height: 100vh; display: grid; grid-template-columns: minmax(180px, 360px) auto; gap: 48px; align-items: center; justify-content: center; padding: 40px var(--pad); background: var(--red-hero); color: var(--white); }
 .notfound h1 { font-size: clamp(56px, 9vw, 140px); margin: 10px 0 28px; }
-.notfound .mascot { width: 100%; height: auto; }
+.notfound .bomb { width: 100%; height: auto; max-height: 70vh; object-fit: contain; }
 @media (max-width: 700px) { .notfound { grid-template-columns: 1fr; text-align: left; } .notfound__art { max-width: 200px; } }
 
 /* Brand logo (white + red on dark, white + black on the red hero) */

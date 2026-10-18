@@ -1,7 +1,6 @@
 // Server-side rendering of the public website from CMS data.
 // Markup/classes follow the original design (public/assets/css/styles.css).
 import { esc } from './http.js';
-import { mascotSVG } from './mascot.js';
 import { SERVICE_OPTIONS, BUDGET_OPTIONS } from './defaults.js';
 
 /* ------------------------------ helpers ------------------------------ */
@@ -66,7 +65,8 @@ ${noindex ? '<meta name="robots" content="noindex, nofollow">' : `<link rel="can
 <meta name="twitter:title" content="${attr(ogTitle || title)}">
 <meta name="twitter:description" content="${attr(ogDescription || description)}">
 <meta name="twitter:image" content="${attr(ogImage)}">
-<link rel="icon" href="/assets/img/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/assets/img/favicon-32.png" type="image/png" sizes="32x32">
+<link rel="icon" href="/assets/img/icon-192.png" type="image/png" sizes="192x192">
 <link rel="apple-touch-icon" href="/assets/img/apple-touch-icon.png">
 <script nonce="${nonce}">
   (function (d) {
@@ -160,7 +160,10 @@ function hero(h) {
   const words = lines(h.headline);
   return `<section class="hero" id="top" aria-labelledby="hero-title" data-cursor-theme="light">
   <div class="hero__mascot" data-hero-mascot>
-    <div class="hero__mascot-float" data-hero-float>${mascotSVG({ id: 'hero-m', title: 'Ulaan Creative-ийн дүр — улаан бөмбөг Улаан', className: 'mascot--hero' })}</div>
+    <div class="hero__mascot-float" data-hero-float>
+      <img class="bomb" src="/assets/img/ulaan-bomb.webp" srcset="/assets/img/ulaan-bomb-sm.webp 480w, /assets/img/ulaan-bomb.webp 959w" width="959" height="1492" decoding="async" sizes="(max-width: 760px) 70vw, 40vw" fetchpriority="high" alt="Ulaan Creative-ийн дүр — гартаа барьсан, гал нь асаж буй хар бөмбөг">
+      <span class="hero__eye" data-eye-anchor aria-hidden="true"></span>
+    </div>
   </div>
   <div class="hero__grain" aria-hidden="true"></div>
   <svg class="hero__line" aria-hidden="true" data-hero-line><line x1="0" y1="0" x2="0" y2="0"/><circle r="3.5" cx="0" cy="0"/></svg>
@@ -272,7 +275,7 @@ function work(w, projects) {
       <p class="work__intro" data-reveal>${esc(w.intro)}</p>
     </div>
     ${items.length ? `<div class="work__grid">${items.join('\n      ')}</div>` : `<div class="work__empty" data-reveal>
-      <div class="work__empty-art" aria-hidden="true">${mascotSVG({ id: 'work-m', expression: 'focused', shadow: false })}</div>
+      <div class="work__empty-art" aria-hidden="true"><img class="bomb" src="/assets/img/ulaan-bomb.webp" srcset="/assets/img/ulaan-bomb-sm.webp 480w, /assets/img/ulaan-bomb.webp 959w" width="959" height="1492" decoding="async" sizes="260px" loading="lazy" alt=""></div>
       <div><h3 class="display">${esc(w.emptyTitle)}</h3><p>${esc(w.emptyText)}</p>
       <a class="btn-fill btn-fill--dark" href="#contact" data-magnetic><span>Төслөө ярилцах</span><i class="dot" aria-hidden="true"></i></a></div>
     </div>`}
@@ -355,7 +358,7 @@ function about(a) {
   </div>
   <div class="container about__grid">
     <figure class="about__figure" data-reveal-media>
-      <div class="about__mascot" data-parallax-img>${mascotSVG({ id: 'about-m', expression: 'happy', shadow: true })}</div>
+      <div class="about__mascot" data-parallax-img><img class="bomb" src="/assets/img/ulaan-bomb.webp" srcset="/assets/img/ulaan-bomb-sm.webp 480w, /assets/img/ulaan-bomb.webp 959w" width="959" height="1492" decoding="async" sizes="(max-width: 900px) 80vw, 40vw" loading="lazy" alt="Ulaan Creative-ийн бөмбөг дүр"></div>
       <figcaption class="mono">Fig. 01 — Ulaan, the idea bomb</figcaption>
     </figure>
     <div class="about__copy">
@@ -498,7 +501,7 @@ export function renderNotFound({ content, site, nonce }) {
   return `${head({ title: 'Хуудас олдсонгүй — Ulaan Creative', description: content.seo.description, canonical: site + '/', ogImage: `${site}/assets/img/og.jpg`, nonce, noindex: true })}
 <body class="page-404">
 <main id="main" class="notfound">
-  <div class="notfound__art" aria-hidden="true">${mascotSVG({ id: 'nf-m', expression: 'surprised' })}</div>
+  <div class="notfound__art" aria-hidden="true"><img class="bomb" src="/assets/img/ulaan-bomb.webp" srcset="/assets/img/ulaan-bomb-sm.webp 480w, /assets/img/ulaan-bomb.webp 959w" width="959" height="1492" decoding="async" sizes="360px" alt=""></div>
   <div><p class="mono">Error 404</p><h1 class="display">Хуудас<br>олдсонгүй.</h1><p><a class="btn-fill btn-fill--dark" href="/"><span>Нүүр хуудас руу</span><i class="dot" aria-hidden="true"></i></a></p></div>
 </main>
 </body>

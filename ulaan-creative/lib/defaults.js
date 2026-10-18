@@ -4,15 +4,15 @@
 
 export const DEFAULT_CONTENT = {
   seo: {
-    title: 'Ulaan Creative — We Build Brands | Creative Marketing Agency, Mongolia',
+    title: 'Ulaan Creative — Create. Grow. Go Viral. | Creative Marketing Agency, Mongolia',
     description: 'Ulaan Creative — бүтээлч маркетинг, AI-д суурилсан контент үйлдвэрлэл, influencer кампанит ажил. Creative marketing, AI-powered production and influencer campaigns that move brands forward.',
-    ogTitle: 'Ulaan Creative — We Build Brands',
+    ogTitle: 'Ulaan Creative — Create. Grow. Go Viral.',
     ogDescription: 'Creative thinking. AI-powered production. Influencer-driven reach.',
     ogImageMediaId: null,
   },
   hero: {
     metaLabel: '( 001 ) — Creative marketing agency, Mongolia',
-    headline: 'WE\nBUILD\nBRANDS.',
+    headline: 'CREATE\nGROW\nGO VIRAL.',
     lede: 'Creative marketing, AI-powered production, and influencer campaigns that move brands forward.',
     ctaLabel: 'START A PROJECT',
     ctaHref: '#contact',

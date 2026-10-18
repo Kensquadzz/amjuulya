@@ -443,15 +443,14 @@
   const anchor = $('[data-hero-anchor]');
   const lineEl = svgLine && $('line', svgLine);
   const dotEl = svgLine && $('circle', svgLine);
-  const heroEye = $('.hero .m-eye-l');
-  const pupils = $$('.hero .m-pupil');
+  const heroEye = $('[data-eye-anchor]');
   let lineReady = false;
 
   function heroIntro() {
     const tl = gsap.timeline({ defaults: { ease: 'expo.out' } });
     tl.to(navItems, { opacity: 1, duration: 1, stagger: 0.06 }, 0.35);
     if (!hero) return tl;
-    tl.fromTo(mascotWrap, { opacity: 0, scale: 0.86, yPercent: 10, rotation: -6 }, { opacity: 1, scale: 1, yPercent: 0, rotation: 0, duration: 1.8 }, 0)
+    tl.fromTo(mascotWrap, { opacity: 0, yPercent: 30, rotation: -4 }, { opacity: 1, yPercent: 0, rotation: 0, duration: 1.8 }, 0)
       .to(heroWords, { y: 0, duration: 1.3, stagger: 0.09 }, 0.1)
       .fromTo(heroFades, { opacity: 0, y: 18 }, { opacity: 1, y: 0, duration: 1.1, stagger: 0.08 }, 0.55)
       .add(() => { lineReady = true; drawLine(true); }, 0.9);
@@ -481,7 +480,7 @@
     const ar = anchor.getBoundingClientRect();
     const er = heroEye.getBoundingClientRect();
     const x1 = ar.left + ar.width / 2 - hr.left, y1 = ar.top + ar.height / 2 - hr.top;
-    const x2 = er.left + er.width / 2 - hr.left, y2 = er.top + er.height * 0.62 - hr.top;
+    const x2 = er.left + er.width / 2 - hr.left, y2 = er.top + er.height / 2 - hr.top;
     lineEl.setAttribute('x1', x1); lineEl.setAttribute('y1', y1);
     lineEl.setAttribute('x2', x2); lineEl.setAttribute('y2', y2);
     dotEl.setAttribute('cx', x2); dotEl.setAttribute('cy', y2);
@@ -497,25 +496,13 @@
   if (hero) {
     window.addEventListener('resize', () => drawLine(false));
 
-    /* Idle float + blinking eyes */
-    gsap.to('[data-hero-float]', { y: -12, rotation: 1.2, duration: 3.6, ease: 'sine.inOut', yoyo: true, repeat: -1 });
-    const blinkTargets = $$('.hero .m-eye');
-    if (blinkTargets.length) {
-      const blink = () => {
-        gsap.timeline({ onComplete: () => gsap.delayedCall(2.5 + Math.random() * 3.5, blink) })
-          .to(blinkTargets, { scaleY: 0.08, transformOrigin: '50% 50%', duration: 0.08, ease: 'power2.in' })
-          .to(blinkTargets, { scaleY: 1, duration: 0.14, ease: 'power2.out' });
-      };
-      gsap.delayedCall(2.4, blink);
-    }
+    /* Idle sway around the hand holding the bomb */
+    gsap.to('[data-hero-float]', { rotation: 1.6, duration: 3.4, ease: 'sine.inOut', yoyo: true, repeat: -1 });
 
-    /* Mouse parallax + eyes that follow the cursor (desktop) */
+    /* Mouse parallax (desktop) */
     if (finePointer) {
       const mx = gsap.quickTo(mascotWrap, 'x', { duration: 1.2, ease: 'power3.out' });
-      const my = gsap.quickTo(mascotWrap, 'y', { duration: 1.2, ease: 'power3.out' });
       const mr = gsap.quickTo(mascotWrap, 'rotation', { duration: 1.4, ease: 'power3.out' });
-      const ex = pupils.length && gsap.quickTo(pupils, 'x', { duration: 0.5, ease: 'power3.out' });
-      const ey = pupils.length && gsap.quickTo(pupils, 'y', { duration: 0.5, ease: 'power3.out' });
       const title = $('.hero__title');
       const tx = gsap.quickTo(title, 'x', { duration: 1.4, ease: 'power3.out' });
       const ty = gsap.quickTo(title, 'y', { duration: 1.4, ease: 'power3.out' });
@@ -523,9 +510,8 @@
         if (window.scrollY > hero.offsetHeight) return;
         const nx = e.clientX / window.innerWidth - 0.5;
         const ny = e.clientY / window.innerHeight - 0.5;
-        mx(nx * 22); my(ny * 14); mr(nx * 2);
+        mx(nx * 24); mr(nx * 2.5);
         tx(nx * -10); ty(ny * -6);
-        if (ex) { ex(gsap.utils.clamp(-26, 10, nx * 60)); ey(gsap.utils.clamp(-14, 6, ny * 30)); }
       }, { passive: true });
     }
     // Keep the dotted line attached while the mascot / CTA move (only while the hero is on screen).

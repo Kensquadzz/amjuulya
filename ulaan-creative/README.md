@@ -165,13 +165,18 @@ Without an admin subdomain, the dashboard works at `https://ulaancreative.mn/adm
 
 For print or large formats, ask the designer for the original vector (SVG/AI) file.
 
-**Mascot "Ulaan":** a red cartoon bomb with a lit fuse, an "idea bomb". It is original artwork drawn in code (`lib/mascot.js`):
-* glossy red body, black metal cap, rope fuse with a spark;
-* sly half-lidded eyes whose pupils follow the cursor on desktop;
-* blinks, waves, and the spark flickers;
-* the "Start a project" line points to its eye.
+**Mascot (bomb character):** the 3D bomb character from the owner-supplied poster, used **with the creator's permission** (keep that permission in writing). It was cut out of the poster:
+* background, poster typography and logo removed;
+* the yellow bounce light re-tinted red so it sits on the red site;
+* the arm is cropped where the poster tagline crossed it.
 
-Expressions: `default` (sly), `happy`, `wink`, `surprised`, `focused`. `node scripts/export-mascot.mjs` writes `public/assets/mascot/*.svg` and the favicon. PNG renders (`ulaan-mascot-default.png`, `ulaan-mascot-happy.png`, `ulaan-icon-512.png`) are included for social media. The icon version stays readable at 16 px.
+| File | Use |
+| --- | --- |
+| `public/assets/img/ulaan-bomb.webp` (959×1492) + `ulaan-bomb-sm.webp` (480 px) | hero, about, empty-portfolio state, 404 |
+| `public/assets/mascot/ulaan-bomb.png` | transparent PNG for social / presentations |
+| `public/assets/mascot/ulaan-bomb-icon-512.png`, `public/assets/img/favicon-32.png`, `icon-192.png`, `apple-touch-icon.png` | icons (bomb head on red) |
+
+In the hero, the bomb sways around the hand, follows the cursor slightly, and the "Start a project" line points to its left eye (`.hero__eye` in `styles.css`; adjust `left/top` if the image is replaced). For a sharper or animated version (e.g. a lit fuse), ask the creator for the original render or 3D file.
 
 ## 9. Tests
 

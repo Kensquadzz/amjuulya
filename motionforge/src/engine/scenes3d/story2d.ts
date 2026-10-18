@@ -344,16 +344,16 @@ export const story2d: SceneDef = {
       const z = 1.12 - 0.1 * (lt / per), dx = (i % 2 ? -1 : 1) * 30 * (lt / per);
       c.save(); c.translate(W / 2 + dx, 760); c.scale(z, z); c.translate(-W / 2, -760); page(Math.round(SEED) + i, 0, 118, W, H - 236, 0.15); c.restore();
       const sh = c.createLinearGradient(0, 118, 0, H); sh.addColorStop(0, 'rgba(0,0,0,0.75)'); sh.addColorStop(0.35, 'rgba(0,0,0,0.15)'); sh.addColorStop(0.65, 'rgba(0,0,0,0.25)'); sh.addColorStop(1, 'rgba(0,0,0,0.9)'); c.fillStyle = sh; c.fillRect(0, 0, W, H);
-      if (!nImg()) { c.fillStyle = 'rgba(6,6,8,0.55)'; c.fillRect(0, 0, W, H); }
+      c.fillStyle = `rgba(6,6,8,${nImg() ? 0.5 : 0.55})`; c.fillRect(0, 0, W, H);
       tag(`${num2(i)} / ${num2(n - 1)}`, t);
       slam(fmt(P.title), 90, 420, W - 180, 96, t, 0.15, 3);
     };
     const cineStrip = (t: number, D: number) => {
       cineBg(t);
       tag('LIBRARY', t);
-      slam(fmt(P.title), 90, 400, W - 180, 88, t, 0.1, 3);
-      // a moving film strip of documents
-      const FW = 400, FH = 540, y = 780, off = (t * 140 + SEED * 37) % (FW + 40), k = eo(seg(t, 0.1, 0.6));
+      slam(fmt(P.title), 90, 420, W - 180, 76, t, 0.1, 3);
+      // a moving film strip of documents (below the headline, above the subtitles)
+      const FW = 400, FH = 520, y = 870, off = (t * 140 + SEED * 37) % (FW + 40), k = eo(seg(t, 0.1, 0.6));
       c.save(); c.globalAlpha *= k; c.fillStyle = '#111'; c.fillRect(0, y - FH / 2 - 60, W, FH + 120);
       for (let x = -off - 40; x < W + 40; x += 60) { rr(x, y - FH / 2 - 44, 30, 24, 5); c.fillStyle = '#2a2a2a'; c.fill(); rr(x, y + FH / 2 + 20, 30, 24, 5); c.fill(); }
       for (let j = -1; j < 4; j++) { const x = j * (FW + 40) - off + 60, idx = j + Math.floor((t * 140 + SEED * 37) / (FW + 40)); c.save(); rr(x, y - FH / 2, FW, FH, 6); c.clip(); page(idx, x, y - FH / 2, FW, FH, 0); c.restore(); }

@@ -47,7 +47,7 @@ setRouteHandler(async (view, params, path) => {
     try {
       const r = await api('/auth/me');
       if (!r.user) return navigate('/login', { replace: true });
-      me = r.user; Object.assign(session, { limits: r.limits, accept: r.accept, storage: r.storage });
+      me = r.user; Object.assign(session, { limits: r.limits, accept: r.accept, storage: r.storage, email: r.email || { ready: false, to: [] } });
     } catch { return navigate('/login', { replace: true }); }
   }
   if (!view) { app.replaceChildren(layout(h('section.page', h('h1', 'Хуудас олдсонгүй')), path)); return; }
@@ -491,10 +491,21 @@ route('/settings', async () => {
     h('button.btn.btn--danger', { type: 'button', onclick: async () => { if (await confirmDialog('Бүх төхөөрөмжөөс гарах уу?')) { await api('/auth/logout-all', { method: 'POST' }).catch(() => {}); me = null; navigate('/login', { replace: true }); } } }, 'Бүх төхөөрөмжөөс гарах'));
   const sys = h('div.card', h('h2', 'Систем'), h('dl.meta',
     h('dt', 'Медиа storage'), h('dd', session.storage ? session.storage.toUpperCase() : 'Тохируулаагүй'),
+    h('dt', 'Имэйл мэдэгдэл'), h('dd', session.email.ready ? `Идэвхтэй → ${session.email.to.join(', ')}` : 'Тохируулаагүй (RESEND_API_KEY, CONTACT_TO_EMAIL)'),
     h('dt', 'Зургийн дээд хэмжээ'), h('dd', `${session.limits.imageMB} MB`),
     h('dt', 'Видеоны дээд хэмжээ'), h('dd', `${session.limits.videoMB} MB`),
     h('dt', 'Зөвшөөрөгдөх төрөл'), h('dd', session.accept.join(', '))));
-  contactPanel.append(pwForm, sessions, sys);
+  const testBtn = h('button.btn.btn--ghost', { type: 'button', disabled: !session.email.ready, onclick: async () => {
+    busy(testBtn, true);
+    try { const r = await api('/email/test', { method: 'POST' }); toast(`Туршилтын имэйл илгээгдлээ → ${r.to.join(', ')}`); }
+    catch (ex) { toast(`Имэйл илгээгдсэнгүй: ${ex.message}`, 'error'); } finally { busy(testBtn, false); }
+  } }, 'Туршилтын имэйл илгээх');
+  const mail = h('div.card', h('h2', 'Формын имэйл мэдэгдэл'),
+    h('p.muted', session.email.ready
+      ? `Холбоо барих болон influencer-ийн хүсэлт бүр ${session.email.to.join(', ')} хаяг руу имэйлээр ирнэ (мөн «Ирсэн хүсэлтүүд»-д хадгалагдана).`
+      : 'Одоогоор зөвхөн «Ирсэн хүсэлтүүд»-д хадгалагдаж байна. Имэйлээр авахын тулд серверт RESEND_API_KEY болон CONTACT_TO_EMAIL тохируулна (README → Contact form).'),
+    testBtn);
+  contactPanel.append(mail, pwForm, sessions, sys);
   return contactPanel;
 });
 

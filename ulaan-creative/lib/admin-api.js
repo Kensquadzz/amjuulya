@@ -7,6 +7,7 @@ import { createSession, destroySession, verifyPassword, hashPassword, validatePa
 import { hit, count, clear } from './ratelimit.js';
 import { assertStorage, presignPut, headObject, readHead, readRange, deleteObject, storageDriver } from './storage.js';
 import { probeMp4, isUniversalMp4 } from './mp4-probe.js';
+import { emailConfig, sendTestEmail } from './contact.js';
 import { checkDeclared, sniff, sniffMatches, LIMITS, TYPES } from './media-rules.js';
 import { sanitizeContent, getContentForAdmin, mediaView, influencerView, attachCategories, getProject, isUuid } from './content.js';
 import { CONTENT_KEYS, DEFAULT_CONTENT } from './defaults.js';
@@ -91,7 +92,7 @@ export async function logout(req, res) {
 export async function me(req, res) {
   const user = await getSessionUser(req);
   if (!user) return json(res, 200, { user: null });
-  json(res, 200, { user: { email: user.email }, storage: storageDriver() || null, limits: { imageMB: LIMITS.image / 1048576, videoMB: LIMITS.video / 1048576 }, accept: Object.keys(TYPES) });
+  json(res, 200, { user: { email: user.email }, storage: storageDriver() || null, limits: { imageMB: LIMITS.image / 1048576, videoMB: LIMITS.video / 1048576 }, accept: Object.keys(TYPES), email: { ready: emailConfig().ready, to: emailConfig().to } });
 }
 
 export async function changePassword(req, res, user) {
@@ -536,6 +537,12 @@ export async function discardContentDraft(req, res, key) {
 }
 
 /* ----------------------------- submissions ----------------------------- */
+
+export async function testEmail(req, res) {
+  const user = await getSessionUser(req);
+  const r = await sendTestEmail(user?.email);
+  json(res, r.ok ? 200 : r.error === 'not_configured' ? 409 : 502, r.ok ? r : { ...r, message: r.error === 'not_configured' ? 'Имэйл тохируулагдаагүй байна (RESEND_API_KEY, CONTACT_TO_EMAIL).' : r.error });
+}
 
 export async function listSubmissions(req, res, searchParams) {
   const st = ['new', 'read', 'archived'].includes(searchParams.get('status')) ? searchParams.get('status') : null;

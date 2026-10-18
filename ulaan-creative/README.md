@@ -152,7 +152,13 @@ Without an admin subdomain, the dashboard works at `https://ulaancreative.mn/adm
 ## 7. Contact form
 
 * Submissions are validated server-side, protected by a honeypot, a minimum fill time and DB-backed rate limiting (5 per 10 min per visitor), require privacy consent, and are **stored in Postgres**. They appear in *Admin → Ирсэн хүсэлтүүд*.
-* Optional e-mail notification via [Resend](https://resend.com): verify your domain in Resend, then set `RESEND_API_KEY`, `CONTACT_TO_EMAIL`, `CONTACT_FROM_EMAIL`.
+* **E-mail to your inbox** for every contact form and influencer inquiry (via [Resend](https://resend.com), free tier):
+  1. Sign up at resend.com **with the e-mail address that should receive the messages**.
+  2. Resend → *API Keys* → *Create API key* (permission "Sending access").
+  3. Vercel → Project → *Settings → Environment Variables*: `RESEND_API_KEY` = the key, `CONTACT_TO_EMAIL` = that same e-mail address. Redeploy.
+  4. Admin → *Тохиргоо* → «Формын имэйл мэдэгдэл» shows the status; press «Туршилтын имэйл илгээх» to send a real test.
+  Without a domain, Resend's shared sender `onboarding@resend.dev` is used and can only deliver to the Resend account's own address. To send to other addresses (or from `hello@yourdomain`), verify your domain in Resend and set `CONTACT_FROM_EMAIL="Ulaan Creative <hello@yourdomain>"`.
+  E-mails are in Mongolian, include all fields (selected influencers, campaign dates, notes for influencer inquiries) and use the visitor's e-mail as *Reply-To*. If sending fails the submission is still stored and marked «Илгээгдээгүй» in the admin.
 * The visitor sees success only if the submission was stored or e-mailed. Otherwise they see an error and are told nothing was sent.
 * Visitor IPs are stored only as a salted hash. Delete old submissions from the admin when they are no longer needed.
 

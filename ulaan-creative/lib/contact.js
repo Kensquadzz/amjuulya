@@ -14,6 +14,22 @@ const MIN_FILL_MS = 2500;
 const str = (v, max) => (typeof v === 'string' ? v.trim().slice(0, max) : '');
 const memHits = new Map(); // fallback limiter when no database is configured
 
+/**
+ * E-mail notification settings (Resend). Only RESEND_API_KEY and CONTACT_TO_EMAIL are required:
+ * without a verified domain, Resend's shared sender onboarding@resend.dev can deliver to the
+ * e-mail address the Resend account was created with.
+ */
+export function emailConfig() {
+  const to = String(process.env.CONTACT_TO_EMAIL || '').split(',').map((s) => s.trim()).filter((s) => EMAIL_RE.test(s));
+  return {
+    key: process.env.RESEND_API_KEY || '',
+    to,
+    from: process.env.CONTACT_FROM_EMAIL || 'Ulaan Creative <onboarding@resend.dev>',
+    api: (process.env.RESEND_API_BASE || 'https://api.resend.com').replace(/\/$/, ''),
+    ready: Boolean(process.env.RESEND_API_KEY && to.length),
+  };
+}
+
 export function validateContact(body, services) {
   const fields = {};
   const data = {
@@ -65,7 +81,7 @@ export async function handleContact(req, res) {
   const { data, fields } = validateContact(body, services);
   if (Object.keys(fields).length) return json(res, 400, { ok: false, error: 'invalid', fields });
 
-  const emailReady = Boolean(process.env.RESEND_API_KEY && process.env.CONTACT_TO_EMAIL && process.env.CONTACT_FROM_EMAIL);
+  const emailReady = emailConfig().ready;
   if (!dbConfigured() && !emailReady) {
     console.error('[contact] Neither DATABASE_URL nor Resend is configured — submission NOT stored or delivered.');
     return json(res, 503, { ok: false, error: 'not_configured' });
@@ -111,22 +127,44 @@ export async function handleContact(req, res) {
 async function sendEmail(data, services) {
   const serviceLabel = (services.find(([v]) => v === data.service) || [, data.service])[1];
   const budget = (BUDGET_OPTIONS.find(([v]) => v === data.budget) || [, '—'])[1];
-  const rows = [['Name', data.name], ['Company / brand', data.company || '—'], ['Email / phone', data.contact], ['Service', serviceLabel], ['Budget', budget]];
-  if (data.influencers?.length) rows.push(['Influencers', data.influencers.map((i) => i.name).join(', ')]);
-  if (data.campaignDates) rows.push(['Campaign dates', data.campaignDates]);
-  if (data.notes) rows.push(['Notes', data.notes]);
-  const r = await fetch('https://api.resend.com/emails', {
+  const isInf = data.kind === 'influencer';
+  const rows = [['Нэр', data.name], ['Компани / брэнд', data.company || '—'], ['Имэйл / утас', data.contact]];
+  if (isInf) rows.push(['Сонгосон influencer', (data.influencers || []).map((i) => i.name).join(', ') || '—'], ['Кампанит ажлын огноо', data.campaignDates || '—']);
+  else rows.push(['Үйлчилгээ', serviceLabel], ['Төсөв', budget]);
+  if (data.notes) rows.push(['Нэмэлт тэмдэглэл', data.notes]);
+  const title = isInf ? 'Influencer кампанит ажлын хүсэлт' : 'Шинэ хүсэлт';
+  const bodyLabel = isInf ? 'Кампанит ажлын зорилго, тайлбар' : 'Төслийн мэдээлэл';
+  const admin = process.env.SITE_URL ? `${process.env.SITE_URL.replace(/\/$/, '')}/admin/submissions` : '';
+  const cfg = emailConfig();
+  const r = await fetch(`${cfg.api}/emails`, {
     method: 'POST',
-    headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY}`, 'Content-Type': 'application/json' },
+    headers: { Authorization: `Bearer ${cfg.key}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      from: process.env.CONTACT_FROM_EMAIL,
-      to: process.env.CONTACT_TO_EMAIL.split(',').map((s) => s.trim()).filter(Boolean),
-      subject: `New ${data.kind === 'influencer' ? 'influencer campaign' : 'project'} request — ${data.name}${data.company ? ` (${data.company})` : ''}`,
-      text: rows.map(([k, v]) => `${k}: ${v}`).join('\n') + `\n\nProject:\n${data.message}`,
-      html: `<div style="font-family:Arial,sans-serif;font-size:15px;color:#111"><h2 style="color:#E50920">New project request — Ulaan Creative</h2><table cellpadding="6">${rows.map(([k, v]) => `<tr><td style="color:#666">${esc(k)}</td><td><strong>${esc(v)}</strong></td></tr>`).join('')}</table><p style="white-space:pre-wrap">${esc(data.message)}</p></div>`,
+      from: cfg.from,
+      to: cfg.to,
+      subject: `${title} — ${data.name}${data.company ? ` (${data.company})` : ''}`,
+      text: `${title} — Ulaan Creative\n\n${rows.map(([k, v]) => `${k}: ${v}`).join('\n')}\n\n${bodyLabel}:\n${data.message}${admin ? `\n\nБүх хүсэлт: ${admin}` : ''}${EMAIL_RE.test(data.contact) ? '\n\n«Reply» дарж шууд хариулж болно.' : ''}`,
+      html: `<div style="font-family:Arial,sans-serif;font-size:15px;line-height:1.5;color:#111;max-width:640px">
+<h2 style="color:#E50920;margin:0 0 16px">${esc(title)} — Ulaan Creative</h2>
+<table cellpadding="6" style="border-collapse:collapse">${rows.map(([k, v]) => `<tr><td style="color:#666;vertical-align:top;white-space:nowrap">${esc(k)}</td><td><strong>${esc(v)}</strong></td></tr>`).join('')}</table>
+<p style="margin:18px 0 6px;color:#666">${esc(bodyLabel)}:</p><p style="white-space:pre-wrap;margin:0;padding:12px 14px;background:#F5F3EF">${esc(data.message)}</p>
+${admin ? `<p style="margin-top:18px"><a href="${esc(admin)}" style="color:#E50920">Admin → Ирсэн хүсэлтүүд</a></p>` : ''}
+${EMAIL_RE.test(data.contact) ? '<p style="color:#666;font-size:13px">«Reply» дарж хүсэлт илгээгчид шууд хариулж болно.</p>' : ''}</div>`,
       ...(EMAIL_RE.test(data.contact) ? { reply_to: data.contact } : {}),
     }),
   });
-  if (!r.ok) throw new Error(`Resend ${r.status}`);
+  if (!r.ok) throw new Error(`Resend ${r.status}: ${(await r.text().catch(() => '')).slice(0, 300)}`);
   return true;
+}
+
+/** Admin "send test e-mail": reports Resend's real answer. */
+export async function sendTestEmail(adminEmail) {
+  const cfg = emailConfig();
+  if (!cfg.ready) return { ok: false, error: 'not_configured' };
+  try {
+    await sendEmail({ name: 'Туршилтын имэйл', company: '', contact: adminEmail || '', service: 'other', budget: '', message: 'Ulaan Creative вэб сайтын холбоо барих формын имэйл мэдэгдэл зөв тохируулагдсан байна.', influencers: [], campaignDates: '', notes: '', kind: 'project' }, [['other', 'Бусад']]);
+    return { ok: true, to: cfg.to };
+  } catch (e) {
+    return { ok: false, error: e.message };
+  }
 }

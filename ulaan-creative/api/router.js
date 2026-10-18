@@ -162,6 +162,7 @@ const routes = [
   ['POST', /^\/content\/([a-z_]+)\/discard$/, (q, s, c) => A.discardContentDraft(q, s, c.id)],
   ['POST', /^\/content\/([a-z_]+)\/reset$/, (q, s, c) => A.resetContent(q, s, c.id)],
 
+  ['POST', /^\/email\/test$/, (q, s) => A.testEmail(q, s)],
   ['GET', /^\/submissions$/, (q, s, c) => A.listSubmissions(q, s, c.q)],
   ['PUT', new RegExp(`^/submissions/${UUID}$`), (q, s, c) => A.updateSubmission(q, s, c.id)],
   ['DELETE', new RegExp(`^/submissions/${UUID}$`), (q, s, c) => A.deleteSubmission(q, s, c.id)],

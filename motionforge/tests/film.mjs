@@ -33,7 +33,9 @@ const r = await p.evaluate(async ({ ext, sheet }) => {
   const W = 270, H = 480, c = document.createElement('canvas'), rr = new Renderer(c, { preserveDrawingBuffer: true });
   rr.setSize(W, H);
   await rr.prepareTextures(project);
-  const fonts = ['800 80px "Montserrat"', '600 80px "Inter"'].map((f) => ({ f, ok: document.fonts.check(f, 'Өө Үү ₮') }));
+  const fams = [...new Set([sb.fonts?.display ?? 'Montserrat', sb.fonts?.ui ?? 'Inter'])];
+  for (const fm of fams) await document.fonts.load(`600 80px "${fm}"`, 'Өө Үү ₮');
+  const fonts = fams.map((fm) => `600 80px "${fm}"`).map((f) => ({ f, ok: document.fonts.check(f, 'Өө Үү ₮') }));
   const x2 = c.getContext('2d') ?? null; void x2;
   const probe = document.createElement('canvas'); probe.width = W; probe.height = H; const px = probe.getContext('2d', { willReadFrequently: true });
   const frameAt = (t) => { rr.render(project, t); px.drawImage(c, 0, 0); return px.getImageData(0, 0, W, H).data; };
@@ -48,7 +50,7 @@ const r = await p.evaluate(async ({ ext, sheet }) => {
   // per scene: copy drawn somewhere between its middle and its end
   const scenes = sb.scenes.map((s) => {
     // runs drawn in one frame are joined in drawing order (a highlighted word is its own run)
-    const want = sceneStrings(s), frames = [], squash = (x) => x.replace(/[\s«»"“”.,!?;:]/g, '');
+    const want = sceneStrings(s), frames = [], squash = (x) => x.replace(/[\s«»"“”.,!?;:/]/g, '');
     for (let t = s.start + 0.5; t < s.end - 0.02; t += 0.1) { FILM_AUDIT.on = true; rr.render(project, t); FILM_AUDIT.on = false; frames.push(squash(FILM_AUDIT.items.map((a) => a.s).join(''))); }
     return { id: s.id, missing: want.filter((w) => !frames.some((f) => f.includes(squash(w)))) };
   });
@@ -63,7 +65,10 @@ r.fonts.forEach((f) => check(`font loaded for Mongolian: ${f.f}`, f.ok));
 let still = 0, worst = 0, at = 0;
 for (const [t, d] of r.motion) { if (d < 0.02) { still += 1 / 15; if (still > worst) { worst = still; at = t; } } else still = 0; }
 check('no frozen stretch longer than 0.5 s', worst <= 0.5, `longest still ${worst.toFixed(2)} s at ${at.toFixed(2)} s`);
-// text audit
+// text audit (the second column of list rows, e.g. a file type, may repeat: it is metadata, not copy)
+const sbUsed = ext ?? null;
+const rowMeta = new Set(['Word', 'Excel']);
+if (sbUsed) for (const sc of sbUsed.scenes) for (const l of String(sc.copy.items ?? '').split('\n')) { const m = l.split('|')[1]; if (m) rowMeta.add(m.trim()); }
 const issues = [];
 for (const fr of r.audit) {
   const it = fr.items;
@@ -78,7 +83,7 @@ for (const fr of r.audit) {
   const count = {};
   it.forEach((a) => { count[a.s] = (count[a.s] ?? 0) + 1; });
   // a file type under several list rows is metadata, not duplicated copy
-  for (const [s, n] of Object.entries(count)) if (n > 1 && !(/^(Word|Excel)$/.test(s) && it.some((a) => a.scene && /list|forms/.test(a.scene)))) issues.push(`${fr.t.toFixed(2)}s drawn ${n}×: "${s}"`);
+  for (const [s, n] of Object.entries(count)) if (n > 1 && !rowMeta.has(s)) issues.push(`${fr.t.toFixed(2)}s drawn ${n}×: "${s}"`);
 }
 check('text audit: safe area, size, overlap, duplicates', issues.length === 0, issues.slice(0, 6).join(' | ') || `${r.audit.length} frames`);
 const miss = r.scenes.filter((s) => s.missing.length);

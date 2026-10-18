@@ -6,7 +6,12 @@
 //   validateStoryboard — coverage, timing, reading time, copy integrity
 //   filmSfx            — sound cues derived from the choreography itself
 
-export const FILM_KINDS = ['question', 'brand', 'folders', 'roll', 'list', 'blank', 'template', 'counter', 'apps', 'reveal', 'price', 'cta'] as const;
+export const FILM_KINDS = [
+  // paper theme
+  'question', 'brand', 'folders', 'roll', 'list', 'blank', 'template', 'counter', 'apps', 'reveal', 'price', 'cta',
+  // night theme (black, one wandering glow, blur and typing reveals)
+  'nLine', 'nTrack', 'nLogo', 'nCircles', 'nHeading', 'nRows', 'nPills', 'nCount', 'nPrice', 'nComment',
+] as const;
 export type FilmKind = typeof FILM_KINDS[number];
 export const FILM_TRANSITIONS = ['cut', 'pushUp', 'zoomIn', 'swipe', 'iris', 'flash'] as const;
 export type FilmTransition = typeof FILM_TRANSITIONS[number];
@@ -31,6 +36,8 @@ export interface FilmScene {
 export interface FilmPalette { paper: string; ink: string; muted: string; line: string; accent: string; alert: string; dark: string }
 export interface Storyboard {
   brand: string;
+  /** paper (light editorial) or night (dark, glow, streaming-app motion) */
+  theme?: 'paper' | 'night';
   duration: number;
   palette: FilmPalette;
   fonts: { display: string; ui: string };
@@ -45,7 +52,7 @@ export const TRANSITION_LEN = 0.45;
 
 /** slots that hold lists: one entry per line */
 export const listOf = (s: string | undefined) => (s ?? '').split('\n').map((x) => x.trim()).filter(Boolean);
-const norm = (s: string) => s.toLocaleLowerCase('mn').replace(/[«»"“”.,!?;:—–\-]/g, ' ').replace(/\s+/g, ' ').trim();
+const norm = (s: string) => s.toLocaleLowerCase('mn').replace(/[«»"“”.,!?;:—–\-/]/g, ' ').replace(/\s+/g, ' ').trim();
 /** every visible string a scene draws (list slots split per line) */
 export function sceneStrings(s: FilmScene) { return Object.values(s.copy).flatMap((v) => listOf(v)).flatMap((l) => l.split('|').map((x) => x.trim())).filter(Boolean); }
 
@@ -74,7 +81,7 @@ export function validateStoryboard(sb: Storyboard, audioDuration: number): FilmI
       const gap = s.start - sc[i - 1].end;
       if (gap > 0.001) out.push({ level: 'error', scene: s.id, msg: `gap of ${gap.toFixed(2)}s before this scene` });
       if (gap < -0.001) out.push({ level: 'error', scene: s.id, msg: `overlaps the previous scene by ${(-gap).toFixed(2)}s` });
-      if (s.kind === sc[i - 1].kind && s.kind !== 'question') out.push({ level: 'warn', scene: s.id, msg: `same kind as the previous scene (${s.kind})` });
+      if (s.kind === sc[i - 1].kind && !['question', 'nLine', 'nTrack'].includes(s.kind)) out.push({ level: 'warn', scene: s.id, msg: `same kind as the previous scene (${s.kind})` });
     }
     (s.beats ?? []).forEach((b) => { if (b < s.start - 0.01 || b > s.end + 0.01) out.push({ level: 'error', scene: s.id, msg: `beat ${b}s lies outside the scene` }); });
     // copy integrity: every on-screen string comes from the narration or the product facts
@@ -131,6 +138,16 @@ export function filmSfx(sb: Storyboard): FilmCue[] {
       case 'reveal': add(b[0] ?? s.start + 0.6, 'ks-sharp-pop', 0.55); add((b[0] ?? s.start + 0.6) + 0.3, 'ks-swoosh-2', 0.3); break;
       case 'price': if (b[0]) add(b[0], 'ks-swoosh-015', 0.45); if (b[1]) { add(b[1], 'ks-success', 0.4, 1.6); add(b[1] + 0.05, 'ks-shine-6', 0.3, 1.6); } break;
       case 'cta': if (b[0]) add(b[0], 'ks-iphone-keyboard-typing-sound-effect', 0.4, 0.4); if (b[1]) { add(b[1], 'ks-mouse-click', 0.9); add(b[1] + 0.08, 'ks-happy-message-ping', 0.5); } break;
+      case 'nLine': add(b[0] ?? s.start + 0.1, 'ks-swoosh-014', 0.18); if (s.copy.pill) add(s.start + 0.05, 'ks-soft-pop-sfx', 0.35); break;
+      case 'nTrack': add(b[0] ?? s.start + 0.1, 'ks-text-sound-4', 0.18, 1.0); break;
+      case 'nLogo': add(b[0] ?? s.start + 0.2, 'ks-swoosh-2', 0.25); add((b[0] ?? s.start + 0.2) + 0.55, 'ks-sharp-pop', 0.45); add((b[0] ?? s.start + 0.2) + 0.7, 'ks-interface-digital-de-texto-text-digital-interface', 0.22, 0.8); break;
+      case 'nCircles': add(s.start + 0.3, 'ks-soft-pop-sfx', 0.4); b.forEach((t) => add(t, 'ks-pop', 0.3)); break;
+      case 'nHeading': b.forEach((t) => add(t, 'ks-interface-digital-de-texto-text-digital-interface', 0.22, 0.6)); break;
+      case 'nRows': add(s.start + 0.3, 'ks-quick-double-swish-sfx', 0.25); break;
+      case 'nPills': b.forEach((t) => add(t, 'ks-minimal-pop-click-ui-11', 0.4, 0.5)); break;
+      case 'nCount': add(s.start + 0.1, 'ks-ui-processing-data-sequence-modern-interface-progress-02', 0.22, 1.2); if (b[0]) add(b[0], 'ks-plop', 0.45); if (b[1]) add(b[1], 'ks-soft-pop-sfx', 0.45); break;
+      case 'nPrice': add(s.start + 0.1, 'ks-interface-digital-de-texto-text-digital-interface', 0.22, 0.6); if (b[0]) add(b[0], 'ks-swoosh-015', 0.4); if (b[1]) { add(b[1], 'ks-interface-digital-de-texto-text-digital-interface', 0.25, 0.6); add(b[1] + 0.4, 'ks-shine-6', 0.3, 1.6); } break;
+      case 'nComment': if (b[0]) add(b[0], 'ks-iphone-keyboard-typing-sound-effect', 0.4, 0.4); if (b[1]) { add(b[1], 'ks-mouse-click', 0.8); add(b[1] + 0.08, 'ks-happy-message-ping', 0.45); } if (b[2]) { add(b[2], 'ks-sharp-pop', 0.45); add(b[2] + 0.3, 'ks-interface-digital-de-texto-text-digital-interface', 0.22, 0.8); } break;
     }
   }
   return cues.sort((a, b) => a.t - b.t);

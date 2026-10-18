@@ -521,11 +521,296 @@ export const film: SceneDef = {
       c.restore();
     };
 
+    // ================================================================ night theme
+    // Black with one large soft glow that wanders between scenes; text arrives out
+    // of a blur or letter by letter with collapsing tracking; the mark drops in and
+    // slides its name out; shapes morph (outline -> circle, pills -> one pill);
+    // headings change by deleting and retyping. Every scene leaves through a blur.
+    const NF = () => (sb?.fonts?.ui || 'Manrope');
+    const nfont = (w: number, px: number) => { c.font = `${w} ${px}px "${NF()}", Inter, sans-serif`; };
+    const nmeasure = (s: string, w: number, px: number, sp = 0) => { nfont(w, px); (c as any).letterSpacing = `${sp}px`; const m = c.measureText(s).width; (c as any).letterSpacing = '0px'; return m; };
+    const NT = (s: string, x: number, y: number, w: number, px: number, col: string, align: 'l' | 'c' | 'r' = 'l', sp = 0) => {
+      const wd = nmeasure(s, w, px, sp), x0 = align === 'l' ? x : align === 'c' ? x - wd / 2 : x - wd;
+      nfont(w, px); (c as any).letterSpacing = `${sp}px`; c.fillStyle = col; c.textAlign = 'left'; c.textBaseline = 'middle'; c.fillText(s, x0, y); (c as any).letterSpacing = '0px';
+      audit(s, x0, y, wd, px);
+      return wd;
+    };
+    const nfit = (lines: string[], w: number, max: number, min: number, maxW = XW) => { let px = max; while (px > min && lines.some((l) => nmeasure(l, w, px) > maxW)) px -= 2; return px; };
+    const NACC = () => PAL.accent, NMUTED = '#9a9aa3', NROW = '#161618';
+    /** a block of text arriving out of a blur (k: 0..1), leaving the same way */
+    const blurIn = (k: number, paint: () => void, rise = 18) => {
+      if (k <= 0.001) return;
+      c.save(); c.globalAlpha *= clamp(k); const b2 = (1 - k) * 16; if (b2 > 0.4) c.filter = `blur(${b2.toFixed(1)}px)`; c.translate(0, (1 - k) * rise); paint(); c.restore();
+    };
+    /** letters appear one by one while the tracking collapses */
+    const nTracked = (s: string, cx: number, y: number, w: number, px: number, col: string, t: number, t0: number, rate: number) => {
+      const done = seg(t, t0, t0 + s.length * rate + 0.3), sp = lerp(px * 0.22, px * 0.02, eio(done));
+      const total = nmeasure(s, w, px, sp); let x = cx - total / 2;
+      nfont(w, px); c.textAlign = 'left'; c.textBaseline = 'middle';
+      for (let i = 0; i < s.length; i++) {
+        const ch = s[i], cw = nmeasure(ch, w, px) + sp, a = seg(t, t0 + i * rate, t0 + i * rate + 0.22);
+        if (a > 0 && ch !== ' ') { c.save(); c.globalAlpha *= a; nfont(w, px); c.fillStyle = col; c.fillText(ch, x, y); c.restore(); }
+        x += cw;
+      }
+      if (done >= 1 && c.globalAlpha > 0.35) audit(s, cx - total / 2, y, total, px);
+    };
+    /** type text in, then (optionally) delete back to the common prefix and type the next */
+    const retype = (words: string[], beats: number[], t: number, rate = 0.045) => {
+      let cur = '';
+      for (let i = 0; i < words.length; i++) {
+        const st = beats[i] ?? 0; if (t < st) break;
+        const prev = i ? words[i - 1] : '', w = words[i];
+        let common = 0; while (common < prev.length && common < w.length && prev[common] === w[common]) common++;
+        const del = prev.length - common, dt = t - st;
+        if (dt < del * rate * 0.6) cur = prev.slice(0, prev.length - Math.floor(dt / (rate * 0.6)));
+        else cur = w.slice(0, common + Math.floor((dt - del * rate * 0.6) / rate));
+      }
+      return cur;
+    };
+    const npill = (s: string, x: number, y: number, k: number, on: boolean, px = 42) => {
+      if (k <= 0.001) return 0;
+      const w = nmeasure(s, 600, px) + px * 1.4, h = px * 1.8;
+      c.save(); c.globalAlpha *= clamp(k); c.translate(x, y); const sc = lerp(0.85, 1, eio(k)); c.scale(sc, sc);
+      rr(-w / 2, -h / 2, w, h, h / 2); c.fillStyle = on ? NACC() : 'rgba(255,255,255,0.14)'; c.fill();
+      NT(s, 0, 2, 600, px, on ? '#05130a' : '#f2f2f2', 'c');
+      c.restore();
+      return w;
+    };
+    /** the mark in night style: an accent disc with a page glyph */
+    const nmark = (x: number, y: number, r: number, k = 1, blurPx = 0) => {
+      if (k <= 0.001) return;
+      c.save(); if (blurPx > 0.4) c.filter = `blur(${blurPx.toFixed(1)}px)`; c.globalAlpha *= clamp(k); c.translate(x, y);
+      const g = c.createRadialGradient(0, 0, r * 0.6, 0, 0, r * 2.6); g.addColorStop(0, hexA(NACC(), 0.35)); g.addColorStop(1, hexA(NACC(), 0)); c.fillStyle = g; c.fillRect(-r * 3, -r * 3, r * 6, r * 6);
+      c.beginPath(); c.arc(0, 0, r, 0, Math.PI * 2); c.fillStyle = NACC(); c.fill();
+      c.fillStyle = '#05130a'; c.beginPath(); c.moveTo(-r * 0.36, -r * 0.5); c.lineTo(r * 0.18, -r * 0.5); c.lineTo(r * 0.4, -r * 0.28); c.lineTo(r * 0.4, r * 0.5); c.lineTo(-r * 0.36, r * 0.5); c.closePath(); c.fill();
+      c.strokeStyle = NACC(); c.lineCap = 'round'; c.lineWidth = r * 0.1;
+      for (let i = 0; i < 3; i++) { c.beginPath(); c.moveTo(-r * 0.2, (-0.16 + i * 0.22) * r); c.quadraticCurveTo(0, (-0.22 + i * 0.22) * r, (0.24 - i * 0.07) * r, (-0.14 + i * 0.22) * r); c.stroke(); }
+      c.restore();
+    };
+    /** mark + wordmark lockup; name types out of the mark (t0: mark lands) */
+    const nLockup = (t: number, t0: number, cx: number, cy: number, r = 64, px = 64, rate = 0.035) => {
+      const brand = sb!.brand, parts = brand.split(' '), a = parts.slice(0, 2).join(' '), bpart = parts.slice(2).join(' ');
+      const slide = eio(seg(t, t0 + 0.1, t0 + 0.6));
+      const wa = nmeasure(a + ' ', 700, px), wb = nmeasure(bpart, 600, px), total = r * 2 + 28 + wa + wb;
+      const mx = lerp(cx, cx - total / 2 + r, slide);
+      nmark(mx, cy, r, 1);
+      const full = a + ' ' + bpart, n = Math.floor(clamp((t - t0 - 0.2) / rate, 0, full.length));
+      const shown = full.slice(0, n), sa = shown.slice(0, a.length), sbp = shown.length > a.length + 1 ? shown.slice(a.length + 1) : '';
+      const tx = mx + r + 28;
+      if (sa) NT(sa, tx, cy + 2, 700, px, '#ffffff');
+      if (sbp) NT(sbp, tx + wa, cy + 2, 600, px, NACC());
+    };
+    /** one big soft glow for the whole film: each scene names a spot, the glow travels there */
+    const GLOW_SPOTS: Record<string, [number, number, number]> = {
+      nLine: [0.5, 0.47, 1], nTrack: [0.35, 0.42, 0.95], nLogo: [0.55, 0.5, 0.85], nCircles: [0.5, 0.6, 1.05], nHeading: [0.3, 0.35, 1],
+      nRows: [0.62, 0.62, 1.1], nPills: [0.5, 0.5, 0.9], nCount: [0.5, 0.42, 1.05], nPrice: [0.7, 0.45, 1], nComment: [0.45, 0.62, 1],
+    };
+    const nightBg = (T0: number) => {
+      c.fillStyle = '#000000'; c.fillRect(0, 0, W, H);
+      const sc = sb!.scenes;
+      let i = sc.findIndex((s) => T0 >= s.start && T0 < s.end); if (i < 0) i = sc.length - 1;
+      const cur = GLOW_SPOTS[sc[i].kind] ?? [0.5, 0.5, 1], pre = i > 0 ? GLOW_SPOTS[sc[i - 1].kind] ?? cur : cur;
+      const k = eio(seg(T0 - sc[i].start, 0, 1.4));
+      const gx = lerp(pre[0], cur[0], k) * W + Math.sin(T0 * 0.37) * 60, gy = lerp(pre[1], cur[1], k) * H + Math.cos(T0 * 0.29) * 80, gs = lerp(pre[2], cur[2], k) * (1 + 0.06 * Math.sin(T0 * 0.8));
+      c.save(); c.translate(gx, gy); c.scale(gs * 1.0, gs * 1.35);
+      const g = c.createRadialGradient(0, 0, 0, 0, 0, 760); g.addColorStop(0, hexA(PAL.accent, 0.34)); g.addColorStop(0.35, hexA(PAL.accent, 0.17)); g.addColorStop(0.7, hexA(PAL.accent, 0.05)); g.addColorStop(1, hexA(PAL.accent, 0));
+      c.fillStyle = g; c.fillRect(-800, -800, 1600, 1600);
+      // a darker core now and then turns the glow into a soft ring
+      const ring = 0.5 + 0.5 * Math.sin(T0 * 0.45 + 1);
+      const g2 = c.createRadialGradient(0, 0, 0, 0, 0, 420); g2.addColorStop(0, `rgba(0,0,0,${0.55 * ring})`); g2.addColorStop(1, 'rgba(0,0,0,0)'); c.fillStyle = g2; c.fillRect(-450, -450, 900, 900);
+      c.restore();
+      const v = c.createRadialGradient(W / 2, H / 2, 600, W / 2, H / 2, 1300); v.addColorStop(0, 'rgba(0,0,0,0)'); v.addColorStop(1, 'rgba(0,0,0,0.7)'); c.fillStyle = v; c.fillRect(0, 0, W, H);
+    };
+    const NIGHT: Record<string, (x: Ctx) => void> = {
+      // a pill that dissolves into the glow, then a line out of the blur (optionally replaced by a second line)
+      nLine({ s, t, D, b }) {
+        const p = s.copy.pill, b0 = b[0] ?? 0.1;
+        if (p) npill(p, W / 2, 900, eio(seg(t, 0, 0.3)) * (1 - eio(seg(t, b0 - 0.4, b0 - 0.05))), true, 46);
+        const l1 = listOf(s.copy.text), l2 = listOf(s.copy.next), b1 = b[1] ?? D;
+        const px = nfit([...l1, ...l2], 600, 80, 50), lh = px * 1.2;
+        const k1 = eio(seg(t, b0, b0 + 0.6)) * (l2.length ? 1 - eio(seg(t, b1 - 0.35, b1)) : 1 - eio(seg(t, D - 0.35, D)));
+        blurIn(k1, () => l1.forEach((l, i) => NT(l, W / 2, 900 + (i - (l1.length - 1) / 2) * lh, 600, px, '#ffffff', 'c')));
+        if (l2.length) { const k2 = eio(seg(t, b1, b1 + 0.6)) * (1 - eio(seg(t, D - 0.35, D))); blurIn(k2, () => l2.forEach((l, i) => NT(l, W / 2, 900 + (i - (l2.length - 1) / 2) * lh, 600, px, i === l2.length - 1 && s.copy.accentLast ? NACC() : '#ffffff', 'c'))); }
+      },
+      // letter-spaced line, letters arrive one by one
+      nTrack({ s, t, D, b }) {
+        const ls = listOf(s.copy.lines), px = nfit(ls, 500, 76, 48, XW - 60), lh = px * 1.3;
+        const out = 1 - eio(seg(t, D - 0.4, D));
+        c.save(); c.globalAlpha *= out; c.translate(0, -(1 - out) * 30);
+        ls.forEach((l, i) => nTracked(l, W / 2, 900 + (i - (ls.length - 1) / 2) * lh, 500, px, i === ls.length - 1 && s.copy.accentLast ? NACC() : '#ececf1', t, (b[i] ?? 0.08 + i * 0.5), Math.min(0.05, 0.9 / Math.max(1, l.length))));
+        c.restore();
+      },
+      // optional line, then the mark drops in out of a blur and slides its name out
+      nLogo({ s, t, D, b }) {
+        const b0 = b[0] ?? 0.2, pre = s.copy.pre;
+        if (pre) blurIn(eio(seg(t, 0.05, 0.5)) * (1 - eio(seg(t, b0 - 0.3, b0))), () => NT(pre, W / 2, 900, 500, nfit([pre], 500, 76, 50), '#e8e8ee', 'c'));
+        const drop = eio(seg(t, b0, b0 + 0.55)), out = 1 - eio(seg(t, D - 0.35, D));
+        if (t < b0) return;
+        c.save(); c.globalAlpha *= out;
+        if (drop < 1) nmark(W / 2, lerp(760, 900, drop), lerp(36, 64, drop), drop, (1 - drop) * 12);
+        else {
+          // the name must be complete well before the scene leaves
+          const room = D - 0.35 - 0.3 - (b0 + 0.75), rate = clamp(room / sb!.brand.length, 0.018, 0.035);
+          nLockup(t, b0 + 0.55, W / 2, 900, 64, nfit([sb!.brand], 700, 64, 40, XW - 180), rate);
+        }
+        c.restore();
+      },
+      // an outline morphs into a circle; the row of circles with labels
+      nCircles({ s, t, D, b }) {
+        const its = listOf(s.copy.items).map((x) => { const [a, bb] = x.split('|').map((y) => y.trim()); return { t: a, s: bb ?? '' }; }), n = its.length;
+        const R = n > 3 ? 92 : n > 2 ? 112 : 140, gap = n > 3 ? 230 : n > 2 ? 300 : 360, mid = Math.floor((n - 1) / 2), y = 900;
+        const morph = eio(seg(t, 0.05, 0.45)), out = 1 - eio(seg(t, D - 0.4, D));
+        c.save(); c.globalAlpha *= out; c.translate(0, (1 - out) * 60);
+        its.forEach((it, i) => {
+          const st = i === mid ? 0.05 : (b[i] ?? 0.55 + Math.abs(i - mid) * 0.12), k = eio(seg(t, st, st + 0.45));
+          if (k <= 0.001) return;
+          const x = W / 2 + (i - (n - 1) / 2) * gap;
+          c.save(); c.globalAlpha *= i === mid ? 1 : k;
+          const r = i === mid ? lerp(18, R, morph) : R * lerp(0.85, 1, k), corner = i === mid ? lerp(18, R, morph) : R;
+          rr(x - r, y - r, 2 * r, 2 * r, corner);
+          c.save(); c.clip();
+          const fillK = i === mid ? seg(t, 0.3, 0.6) : 1;
+          c.globalAlpha *= fillK;
+          const img = pic((s.images ?? [])[i]);
+          if (/^word$/i.test(it.t)) { c.fillStyle = '#185abd'; c.fillRect(x - r, y - r, 2 * r, 2 * r); NT('W', x, y + 4, 800, r * 1.0, '#ffffff', 'c'); }
+          else if (/^excel$/i.test(it.t)) { c.fillStyle = '#107c41'; c.fillRect(x - r, y - r, 2 * r, 2 * r); NT('X', x, y + 4, 800, r * 1.0, '#ffffff', 'c'); }
+          else if (img) { const sc2 = Math.max(2 * r / img.naturalWidth, 2 * r / img.naturalHeight), sw = 2 * r / sc2, sh = 2 * r / sc2; c.drawImage(img, (img.naturalWidth - sw) / 2, 0, sw, sh, x - r, y - r, 2 * r, 2 * r); }
+          else { c.fillStyle = '#1d1d21'; c.fillRect(x - r, y - r, 2 * r, 2 * r); folderIcon(x, y, r / 70, NACC()); }
+          c.restore();
+          rr(x - r - 6, y - r - 6, 2 * r + 12, 2 * r + 12, corner + 6); c.strokeStyle = i === mid ? NACC() : 'rgba(255,255,255,0.18)'; c.lineWidth = 4; c.stroke();
+          c.restore();
+          const la = seg(t, st + 0.3, st + 0.6);
+          if (la > 0) { c.save(); c.globalAlpha *= la; const lpx = nfit([it.t], 600, 36, 26, gap - 16); NT(it.t, x, y + R + 52, 600, lpx, '#ffffff', 'c'); if (it.s) NT(it.s, x, y + R + 96, 500, 28, NMUTED, 'c'); c.restore(); }
+        });
+        c.restore();
+      },
+      // a heading that changes by deleting and retyping; optional kicker, paragraph and pill
+      nHeading({ s, t, D, b }) {
+        const words = listOf(s.copy.words), out = 1 - eio(seg(t, D - 0.35, D));
+        c.save(); c.globalAlpha *= out; c.translate(0, -(1 - out) * 50);
+        if (s.copy.kicker) blurIn(eio(seg(t, 0.05, 0.5)), () => NT(s.copy.kicker!, X0, 640, 500, 40, NMUTED, 'l'));
+        // '/' in a heading is a line break
+        const px = nfit(words.flatMap((w) => w.split('/')), 700, 104, 64), cur = retype(words, b.length ? b : [0.1], t);
+        const curLines = cur.split('/'), lastLine = curLines[curLines.length - 1], ly = 760 + (curLines.length - 1) * px * 1.1;
+        curLines.forEach((l, i) => { if (l) NT(l, X0, 760 + i * px * 1.1, 700, px, '#ffffff', 'l'); });
+        const typing = words.some((w, i) => t >= (b[i] ?? 0) && t < (b[i] ?? 0) + (w.length + (i ? words[i - 1].length : 0)) * 0.045 + 0.1);
+        if (typing || Math.floor(t * 2.2) % 2 === 0) { c.fillStyle = NACC(); c.fillRect(X0 + nmeasure(lastLine, 700, px) + 10, ly - px * 0.42, 5, px * 0.84); }
+        if (s.copy.para) {
+          const pa = s.copy.para, lines = wrapN(pa, XW, 500, 38), pt = (b[b.length - 1] ?? 0) + 0.5, py = 760 + (words[words.length - 1].split('/').length) * px * 1.1 - px * 0.2;
+          const n = Math.floor(clamp((t - pt) / 0.018, 0, pa.length)); let used = 0;
+          lines.forEach((l, i) => { const show = l.slice(0, Math.max(0, n - used)); used += l.length + 1; if (show) NT(show, X0 + 6, py + i * 52, 500, 38, '#d9d9e0', 'l'); });
+        }
+        c.restore();
+      },
+      // heading + caption, then rows rise from below and scroll
+      nRows({ s, t, D }) {
+        const out = 1 - eio(seg(t, D - 0.4, D));
+        const lift = eio(seg(t, 0.9, 1.6));
+        c.save(); c.globalAlpha *= out;
+        c.save(); c.translate(0, -lift * 180);
+        if (s.copy.title) { const tt = s.copy.title, n = Math.floor(clamp((t - 0.05) / 0.04, 0, tt.length)); NT(tt.slice(0, n), X0, 560, 700, nfit([tt], 700, 76, 50), '#ffffff', 'l'); }
+        if (s.copy.caption) blurIn(eio(seg(t, 0.5, 1.0)), () => NT(s.copy.caption!, X0 + 4, 650, 500, 44, '#d9d9e0', 'l'));
+        c.restore();
+        const its = listOf(s.copy.items), rowH = 150, gap = 18, start = 1.0, top = 640;
+        const scroll = eio(seg(t, start, D)) * Math.max(0, its.length * (rowH + gap) - 760);
+        c.save(); c.beginPath(); c.rect(0, top - 20, W, 920); c.clip();
+        its.forEach((it, i) => {
+          const rk = eio(seg(t, start + i * 0.08, start + 0.6 + i * 0.08)); if (rk <= 0) return;
+          const y = top + i * (rowH + gap) - scroll + (1 - rk) * 260; if (y > top + 900 || y + rowH < top - 20) return;
+          const [name, kind] = it.split('|').map((x) => x.trim());
+          c.save(); c.globalAlpha *= rk;
+          rr(X0 - 20, y, XW + 40, rowH, 22); c.fillStyle = NROW; c.fill();
+          const img = pic((s.images ?? [])[i]);
+          c.save(); rr(X0, y + 20, 110, 110, 10); c.clip(); if (img) { const sc2 = Math.max(110 / img.naturalWidth, 110 / img.naturalHeight); c.drawImage(img, (img.naturalWidth - 110 / sc2) / 2, 0, 110 / sc2, 110 / sc2, X0, y + 20, 110, 110); } else { c.fillStyle = '#2a2a2e'; c.fillRect(X0, y + 20, 110, 110); } c.restore();
+          NT(name, X0 + 140, y + (kind ? 56 : rowH / 2), 600, nfit([name], 600, 38, 28, XW - 230), '#ffffff', 'l');
+          if (kind) NT(kind, X0 + 140, y + 100, 500, 30, NMUTED, 'l');
+          for (let d = 0; d < 3; d++) { c.beginPath(); c.arc(X0 + XW - 30 + d * 14, y + rowH / 2, 4, 0, Math.PI * 2); c.fillStyle = NMUTED; c.fill(); }
+          c.restore();
+        });
+        c.restore();
+        c.restore();
+      },
+      // pills appear one by one; the newest is active; at the end they fold into the active one
+      nPills({ s, t, D, b }) {
+        const its = listOf(s.copy.items), n = its.length, gapX = 22, px = 44;
+        const ws = its.map((x) => nmeasure(x, 600, px) + px * 1.4), total = ws.reduce((a, x) => a + x, 0) + gapX * (n - 1);
+        const fold = eio(seg(t, b[n] ?? D - 0.9, (b[n] ?? D - 0.9) + 0.5)), out = 1 - eio(seg(t, D - 0.3, D));
+        let x = W / 2 - total / 2, active = -1;
+        its.forEach((_, i) => { if (t >= (b[i] ?? 0.1 + i * 0.3) + 0.12) active = i; });
+        const ax = (() => { let xx = W / 2 - total / 2; for (let i = 0; i < active; i++) xx += ws[i] + gapX; return xx + (active >= 0 ? ws[active] / 2 : 0); })();
+        c.save(); c.globalAlpha *= out;
+        its.forEach((p, i) => {
+          const st = b[i] ?? 0.1 + i * 0.3, k = eio(seg(t, st, st + 0.35)), cx = x + ws[i] / 2;
+          const fx = i === active ? lerp(cx, W / 2, fold) : lerp(cx, ax, fold), fk = i === active ? 1 : 1 - fold;
+          npill(p, fx, 900, k * fk, i === active, px);
+          x += ws[i] + gapX;
+        });
+        c.restore();
+      },
+      // a number counts up; a line below; then a pill lands under it
+      nCount({ s, t, D, b }) {
+        const num = s.copy.number ?? '100+', digits = parseInt(num, 10) || 100, plus = num.replace(/[0-9]/g, '');
+        const done = b[0] ?? 1.2, v = Math.round(digits * eio(seg(t, 0.1, done))), out = 1 - eio(seg(t, D - 0.4, D));
+        c.save(); c.globalAlpha *= out; c.filter = out < 1 ? `blur(${((1 - out) * 14).toFixed(1)}px)` : 'none';
+        const npx = 230, wn = nmeasure(String(digits), 700, npx), wp = nmeasure(plus, 700, npx), x0 = W / 2 - (wn + wp + 10) / 2;
+        blurIn(eio(seg(t, 0.05, 0.4)), () => NT(String(v), x0 + wn, 820, 700, npx, '#ffffff', 'r'));
+        if (plus) { const pk = back(seg(t, done - 0.05, done + 0.35)); if (pk > 0) { c.save(); c.translate(x0 + wn + 10 + wp / 2, 820); c.scale(pk, pk); NT(plus, 0, 0, 700, npx, NACC(), 'c'); c.restore(); } }
+        if (s.copy.lead) blurIn(eio(seg(t, 0.5, 1.1)), () => NT(s.copy.lead!, W / 2, 990, 500, nfit([s.copy.lead!], 500, 52, 36), '#e8e8ee', 'c'));
+        if (s.copy.pill) npill(s.copy.pill, W / 2, 1120, eio(seg(t, b[1] ?? D * 0.5, (b[1] ?? D * 0.5) + 0.4)), true, 44);
+        c.restore();
+      },
+      // the old price types in, gets struck and steps back; the new one types in
+      nPrice({ s, t, D, b }) {
+        const old = s.copy.old ?? '', now = s.copy.now ?? '', s0 = b[0] ?? D * 0.35, s1 = b[1] ?? s0 + 0.3, out = 1 - eio(seg(t, D - 0.35, D));
+        c.save(); c.globalAlpha *= out;
+        // the mark stays as a small signature (continuity from the lockup)
+        blurIn(eio(seg(t, 0, 0.5)), () => nmark(W / 2, 520, 34, 1));
+        const step = eio(seg(t, s1 - 0.15, s1 + 0.4));
+        const oy = lerp(880, 760, step), opx = lerp(150, 84, step);
+        const n = Math.floor(clamp((t - 0.1) / 0.06, 0, old.length));
+        c.save(); c.globalAlpha *= lerp(1, 0.55, step);
+        const ow = NT(old.slice(0, n), W / 2, oy, 600, opx, '#ffffff', 'c'), owFull = nmeasure(old, 600, opx);
+        const sk = eio(seg(t, s0, s0 + 0.3)); if (sk > 0) { c.strokeStyle = NACC(); c.lineWidth = lerp(10, 6, step); c.lineCap = 'round'; c.beginPath(); c.moveTo(W / 2 - owFull / 2 - 14, oy + 4); c.lineTo(W / 2 - owFull / 2 - 14 + (owFull + 28) * sk, oy - 4); c.stroke(); }
+        void ow; c.restore();
+        const m = Math.floor(clamp((t - s1) / 0.07, 0, now.length));
+        if (m > 0) { const npx = nfit([now], 700, 190, 120); NT(now.slice(0, m), W / 2, 960, 700, npx, '#ffffff', 'c'); const u = eio(seg(t, s1 + now.length * 0.07, s1 + now.length * 0.07 + 0.5)), uw = nmeasure(now, 700, npx) * 0.6; c.fillStyle = NACC(); rr(W / 2 - uw / 2, 1075, uw * u, 10, 5); c.fill(); }
+        c.restore();
+      },
+      // call to action: a line, a comment field types the answer and sends; then the lockup closes the film
+      nComment({ s, t, D, b }) {
+        const typeAt = b[0] ?? 1, send = b[1] ?? typeAt + 0.8, end = b[2] ?? D - 1.8, val = s.copy.typed ?? '1';
+        const gone = eio(seg(t, end - 0.4, end));
+        c.save(); c.globalAlpha *= 1 - gone; if (gone > 0) c.filter = `blur(${(gone * 14).toFixed(1)}px)`;
+        if (s.copy.lead) blurIn(eio(seg(t, 0.05, 0.5)), () => NT(s.copy.lead!, W / 2, 640, 500, nfit([s.copy.lead!], 500, 44, 32), NMUTED, 'c'));
+        const main = listOf(s.copy.main), mpx = nfit(main, 600, 76, 48);
+        main.forEach((l, i) => nTracked(l, W / 2, 740 + i * mpx * 1.25, 600, mpx, i === main.length - 1 ? NACC() : '#ffffff', t, 0.25 + i * 0.45, 0.035));
+        const fk = eio(seg(t, typeAt - 0.6, typeAt - 0.1)), fw = 760, fh = 120, fx = W / 2 - fw / 2, fy = 1120;
+        if (fk > 0) {
+          c.save(); c.globalAlpha *= fk; c.translate(0, (1 - fk) * 40);
+          rr(fx, fy, fw, fh, fh / 2); c.fillStyle = '#1b1b1f'; c.fill(); c.strokeStyle = 'rgba(255,255,255,0.1)'; c.lineWidth = 2; c.stroke();
+          const typed = t >= typeAt && t < send + 0.1 ? val : '';
+          if (typed) NT(typed, fx + 60, fy + fh / 2 + 2, 700, 52, '#ffffff', 'l');
+          if (t < send && Math.floor(t * 2.4) % 2 === 0) { c.fillStyle = NACC(); c.fillRect(fx + 60 + (typed ? nmeasure(typed, 700, 52) + 8 : 0), fy + 34, 5, 52); }
+          const sp = Math.sin(Math.PI * seg(t, send - 0.05, send + 0.15)), sx = fx + fw - 64;
+          c.save(); c.translate(sx, fy + fh / 2); c.scale(1 - 0.14 * sp, 1 - 0.14 * sp); c.beginPath(); c.arc(0, 0, 40, 0, Math.PI * 2); c.fillStyle = typed || t > send ? NACC() : '#2a2a30'; c.fill();
+          c.fillStyle = '#05130a'; c.beginPath(); c.moveTo(-13, -15); c.lineTo(18, 0); c.lineTo(-13, 15); c.lineTo(-7, 0); c.closePath(); c.fill(); c.restore();
+          c.restore();
+          // the posted comment rises out of the field
+          const pk = eio(seg(t, send + 0.1, send + 0.55));
+          if (pk > 0) { c.save(); c.globalAlpha *= pk; const by = lerp(fy + fh / 2, fy - 120, pk); c.beginPath(); c.arc(fx + 44, by, 34, 0, Math.PI * 2); c.fillStyle = '#2a2a30'; c.fill(); rr(fx + 96, by - 40, 140, 80, 40); c.fillStyle = NACC(); c.fill(); NT(val, fx + 166, by + 2, 700, 48, '#05130a', 'c'); c.restore(); }
+        }
+        c.restore();
+        // closing lockup
+        if (t >= end) { const k = eio(seg(t, end, end + 0.5)); if (k < 1) nmark(W / 2, lerp(780, 900, k), lerp(36, 64, k), k, (1 - k) * 12); else nLockup(t, end + 0.5, W / 2, 900, 64, nfit([sb!.brand], 700, 64, 40, XW - 180)); }
+      },
+    };
+    const wrapN = (s: string, maxW: number, w: number, px: number) => { const out: string[] = []; let cur = ''; for (const word of s.split(/\s+/)) { const tr2 = cur ? cur + ' ' + word : word; if (nmeasure(tr2, w, px) > maxW && cur) { out.push(cur); cur = word; } else cur = tr2; } if (cur) out.push(cur); return out; };
+
     // ---------------------------------------------------------------- frame
     const drawScene = (s: FilmScene, T0: number) => {
       SCENE = s.id; camScale = 1;
       const t = T0 - s.start, D = s.end - s.start, b = (s.beats ?? []).map((x) => x - s.start);
-      (SC[s.kind] ?? SC.question)({ s, t, D, b });
+      (SC[s.kind] ?? NIGHT[s.kind] ?? SC.question)({ s, t, D, b });
     };
     const into = (buf: HTMLCanvasElement, f: FrameState, s: FilmScene, T0: number) => {
       if (buf.width !== f.W || buf.height !== f.H) { buf.width = f.W; buf.height = f.H; }
@@ -543,7 +828,7 @@ export const film: SceneDef = {
     const inst: Scene2DInstance = {
       async prepare(prm) {
         sb = parseStoryboard(prm.storyboard); sbSrc = String(prm.storyboard ?? '');
-        const fams = [sb?.fonts.display ?? 'Montserrat', sb?.fonts.ui ?? 'Inter'];
+        const fams = [sb?.fonts.display ?? 'Montserrat', sb?.fonts.ui ?? 'Inter', 'Manrope'];
         try { await Promise.all(fams.flatMap((fm) => [500, 600, 700, 800].map((w) => document.fonts.load(`${w} 40px "${fm}"`, 'Аа Өө Үү ₮ «1» 0123')))); } catch { /* fallback */ }
         await Promise.all(Array.from({ length: IMGS }, async (_, i) => { srcs[i] = String(prm[`img${i + 1}`] ?? ''); imgs[i] = await loadImg(srcs[i]); }));
       },
@@ -558,6 +843,7 @@ export const film: SceneDef = {
         const T0 = f.t, scenes = sb.scenes;
         let i = scenes.findIndex((s) => T0 >= s.start && T0 < s.end);
         if (i < 0) i = T0 < scenes[0].start ? 0 : scenes.length - 1;
+        if (sb.theme === 'night') { frame(f, () => { nightBg(T0); drawScene(scenes[i], T0); }); return; }
         const s = scenes[i], prev = scenes[i - 1], tr = s.enter ?? 'cut', into0 = T0 - s.start;
         if (!prev || tr === 'cut' || into0 >= TRANSITION_LEN) { frame(f, () => drawScene(s, T0)); return; }
         // transition: both scenes rendered, composited by the transition

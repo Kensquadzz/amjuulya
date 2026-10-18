@@ -5,7 +5,7 @@ import crypto from 'node:crypto';
 import { HttpError, json, html, send, siteUrl, isProd } from '../lib/http.js';
 import { dbConfigured } from '../lib/db.js';
 import { requireAdmin } from '../lib/auth.js';
-import { handleLocalStorage, storageDriver } from '../lib/storage.js';
+import { handleLocalStorage, storageDriver, blobPublicBase } from '../lib/storage.js';
 import { getPublishedContent, getDraftContent, getPublishedProjects, getPublishedInfluencers, getInfluencerCategories, getProject, getMediaView, getContentMediaMap } from '../lib/content.js';
 import { DEFAULT_CONTENT } from '../lib/defaults.js';
 import { ensureMigrated } from '../lib/migrate.js';
@@ -25,13 +25,14 @@ function mediaOrigins() {
     const e = new URL(process.env.S3_ENDPOINT);
     list.push(process.env.S3_FORCE_PATH_STYLE === 'true' ? e.origin : `${e.protocol}//${process.env.S3_BUCKET}.${e.host}`);
   }
+  if (storageDriver() === 'blob') list.push(origin(blobPublicBase()));
   return list.filter(Boolean);
 }
 
 function securityHeaders(res, { nonce, admin = false }) {
   const media = mediaOrigins().join(' ');
   const csp = admin
-    ? `default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: blob: ${media}; media-src 'self' blob: ${media}; connect-src 'self' ${media}; frame-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'; object-src 'none'`
+    ? `default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: blob: ${media}; media-src 'self' blob: ${media}; connect-src 'self' ${media}${storageDriver() === 'blob' ? ' https://vercel.com https://*.blob.vercel-storage.com' : ''}; frame-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'; object-src 'none'`
     : `default-src 'self'; script-src 'self' 'nonce-${nonce}'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: ${media}; media-src 'self' ${media}; connect-src 'self'; frame-src https://www.youtube-nocookie.com https://player.vimeo.com; frame-ancestors 'self'; base-uri 'self'; form-action 'self'; object-src 'none'`;
   res.setHeader('Content-Security-Policy', csp);
   res.setHeader('X-Content-Type-Options', 'nosniff');

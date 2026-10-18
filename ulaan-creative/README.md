@@ -80,7 +80,13 @@ Use a managed Postgres, e.g. **Neon** (Vercel Marketplace → Neon), **Supabase*
 
 TLS is required automatically for non-local hosts (`DATABASE_SSL=false` only for a local DB).
 
-## 3. Media storage (Cloudflare R2 example)
+## 3. Media storage
+
+**Easiest: Vercel Blob (no keys to copy).** Vercel → project → **Storage** → **Create** → **Blob** → name it → **Connect** to the project → Redeploy. Vercel adds `BLOB_READ_WRITE_TOKEN` and the site uses Blob automatically (images/videos upload straight from the admin's browser with short-lived, size- and type-limited client tokens). Check Admin → Тохиргоо → Систем: «Медиа storage: BLOB».
+
+**Alternative: any S3-compatible bucket** — Cloudflare R2 example below. When both are configured, S3 wins (`STORAGE_DRIVER=s3|blob` forces one).
+
+### Cloudflare R2
 
 1. Cloudflare dashboard → **R2** → *Create bucket* (e.g. `ulaan-media`).
 2. Bucket → *Settings* → **Public access**: connect a custom domain (e.g. `media.ulaancreative.mn`) or enable the `r2.dev` URL. Put that URL in `MEDIA_PUBLIC_BASE_URL`.

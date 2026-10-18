@@ -5,7 +5,7 @@ import { query, one, tx } from './db.js';
 import { HttpError, json, readJson, clientIp, hashIp } from './http.js';
 import { createSession, destroySession, verifyPassword, hashPassword, validatePasswordStrength, getSessionUser, assertSameOrigin } from './auth.js';
 import { hit, count, clear } from './ratelimit.js';
-import { assertStorage, presignPut, headObject, readHead, readRange, deleteObject, storageDriver } from './storage.js';
+import { assertStorage, presignPut, headObject, readHead, readRange, deleteObject, storageDriver, blobUploadToken } from './storage.js';
 import { probeMp4, isUniversalMp4 } from './mp4-probe.js';
 import { emailConfig, sendTestEmail } from './contact.js';
 import { checkDeclared, sniff, sniffMatches, LIMITS, TYPES } from './media-rules.js';
@@ -445,6 +445,12 @@ export async function createUpload(req, res) {
     `insert into media (id, kind, status, storage_key, thumb_key, original_name, mime, size_bytes, width, height, duration_s, sha256)
      values ($1,$2,'pending',$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
     [id, declared.kind, key, thumbKey, str(b.name, 200, 'name').replace(/[\\/]/g, '_'), declared.mime, Number(b.size), num(b.width, 20000), num(b.height, 20000), num(b.duration, 86400), sha]);
+  if (storageDriver() === 'blob') {
+    // Vercel Blob: the browser uploads with a client token limited to this exact key, size and type
+    const blob = { pathname: key, token: await blobUploadToken(key, { maxBytes: LIMITS[declared.kind], contentTypes: [declared.mime] }) };
+    const thumbBlob = thumbKey ? { pathname: thumbKey, token: await blobUploadToken(thumbKey, { maxBytes: LIMITS.thumb, contentTypes: ['image/webp'] }) } : null;
+    return json(res, 201, { id, blob, thumbBlob, kind: declared.kind });
+  }
   json(res, 201, { id, uploadUrl: await presignPut(key), thumbUploadUrl: thumbKey ? await presignPut(thumbKey) : null, kind: declared.kind });
 }
 

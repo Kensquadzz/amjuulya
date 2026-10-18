@@ -130,7 +130,7 @@ route('/dashboard', async () => {
   const hrefOf = (r) => (r.type === 'project' ? `/portfolio/${r.id}` : r.type === 'influencer' ? `/influencers/${r.id}` : r.type === 'media' ? '/media' : '/content');
   return h('section.page',
     h('header.page__head', h('h1', 'Хянах самбар'), h('p.muted', `Тавтай морил, ${me.email}`)),
-    !session.storage ? h('div.notice.notice--warn', 'Медиа storage тохируулагдаагүй тул зураг/видео байршуулах боломжгүй. README → Storage хэсгийг үзнэ үү.') : null,
+    !session.storage ? h('div.notice.notice--warn', 'Зураг/видео хадгалах сан холбогдоогүй байна. Vercel → Storage → Create → Blob → Connect дараад Redeploy хийнэ.') : null,
     c.new_submissions ? h('div.notice', link('/submissions', {}, `${c.new_submissions} шинэ хүсэлт ирсэн байна →`)) : null,
     h('div.stats-grid',
       stat(c.projects, 'Нийт төсөл', '/portfolio'), stat(c.published, 'Нийтлэгдсэн', '/portfolio'), stat(c.drafts, 'Ноорог', '/portfolio'),

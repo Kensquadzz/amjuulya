@@ -79,9 +79,11 @@ async function preparePhoto(file, limit, onStage) {
     const ctx = c.getContext('2d');
     if (!keepAlpha) { ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, c.width, c.height); }
     ctx.drawImage(bmp, 0, 0, c.width, c.height);
-    const type = keepAlpha ? 'image/webp' : 'image/jpeg';
-    const blob = await canvasBlob(c, type, quality);
-    if (blob.size <= limit) { bmp.close?.(); return new File([blob], `${baseOf(file.name)}.${keepAlpha ? 'webp' : 'jpg'}`, { type }); }
+    const blob = await canvasBlob(c, keepAlpha ? 'image/webp' : 'image/jpeg', quality);
+    // Safari can't encode WebP and silently returns PNG — name/type the file by what it really is
+    const type = blob.type || (keepAlpha ? 'image/webp' : 'image/jpeg');
+    const ext = { 'image/webp': 'webp', 'image/png': 'png', 'image/jpeg': 'jpg' }[type] || 'jpg';
+    if (blob.size <= limit) { bmp.close?.(); return new File([blob], `${baseOf(file.name)}.${ext}`, { type }); }
     quality = Math.max(0.6, quality - 0.1); scale *= 0.8;
   }
   bmp.close?.();

@@ -862,7 +862,7 @@ html.inf-open, html.inf-open body { overflow: hidden; }
 .inf-feat { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); margin: 0 var(--pad) clamp(36px, 4vw, 56px); border: 1px solid rgba(255,255,255,.14); border-radius: 20px; overflow: hidden; background: #141414; }
 .inf-feat[hidden] { display: none; }
 .inf-feat__media { position: relative; aspect-ratio: 16 / 10; background: linear-gradient(160deg, #2a2a2a, #121212); display: grid; place-items: center; }
-.inf-feat__media img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.inf-feat__media img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 50% 15%; } /* portraits: keep faces in frame */
 .inf-feat__media .display { font-size: clamp(80px, 10vw, 160px); color: transparent; -webkit-text-stroke: 1.5px rgba(255,255,255,.5); }
 .inf-feat__body { display: flex; flex-direction: column; justify-content: flex-end; gap: 10px; padding: clamp(22px, 3vw, 40px); }
 .inf-feat__label { font-size: 11px; color: var(--red); }
@@ -911,7 +911,7 @@ html.inf-open, html.inf-open body { overflow: hidden; }
 .inf-card:focus-within { border-color: rgba(255,255,255,.4); }
 .inf-card.is-picked { border-color: var(--red); box-shadow: inset 0 0 0 1px var(--red); }
 .inf-card__media { position: relative; aspect-ratio: 4 / 5; background: linear-gradient(160deg, #2a2a2a, #121212); display: grid; place-items: center; }
-.inf-card__media img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.inf-card__media img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 50% 15%; } /* portraits: keep faces in frame */
 .inf-card__media .display { font-size: clamp(56px, 5vw, 84px); color: transparent; -webkit-text-stroke: 1.5px rgba(255,255,255,.5); }
 .inf-card__open { display: flex; flex-direction: column; gap: 4px; width: 100%; padding: 12px 14px 14px; border: 0; background: none; color: inherit; text-align: left; cursor: pointer; }
 .inf-card__open::before { content: ""; position: absolute; inset: 0; } /* whole card opens details */

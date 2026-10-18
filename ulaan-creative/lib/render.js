@@ -2,6 +2,7 @@
 // Markup/classes follow the original design (public/assets/css/styles.css).
 import { esc } from './http.js';
 import { SERVICE_OPTIONS, BUDGET_OPTIONS } from './defaults.js';
+import { ASSET_V } from './asset-version.js';
 
 /* ------------------------------ helpers ------------------------------ */
 
@@ -17,8 +18,6 @@ const initials = (name) => plain(name).split(/\s+/).filter(Boolean).slice(0, 2).
 
 const ARROW = '<svg viewBox="0 0 16 16"><path d="M4 12 12 4M6 4h6v6" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>';
 
-// Changes with every deploy, so phones never pair new HTML with yesterday's cached CSS/JS
-const ASSET_V = encodeURIComponent(String(process.env.VERCEL_DEPLOYMENT_ID || process.env.VERCEL_GIT_COMMIT_SHA || Date.now().toString(36)).slice(-12));
 
 function mediaImg(m, { alt, sizes = '100vw', eager = false, cls = '' } = {}) {
   if (!m) return '';

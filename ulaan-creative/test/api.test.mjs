@@ -188,8 +188,10 @@ test('contact form: validation, honeypot, rate limit', async () => {
   const hp = await post({ ...ok, website: 'spam' }, '10.9.0.4');
   assert.equal(hp.status, 200);
   let last;
-  for (let i = 0; i < 6; i++) last = await post(ok, '10.9.0.5');
-  assert.equal(last.status, 429, 'rate limited after 5 per 10 min');
+  const ip = `10.9.${Date.now() % 250}.5`;
+  for (let i = 0; i < 4; i++) assert.equal((await post({ ...ok, consent: '' }, ip)).status, 400, 'invalid submissions don\'t use up the limit');
+  for (let i = 0; i < 21; i++) last = await post(ok, ip);
+  assert.equal(last.status, 429, 'rate limited after 20 valid per 10 min');
 });
 
 test('login is rate limited per account', async () => {

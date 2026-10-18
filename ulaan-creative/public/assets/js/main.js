@@ -541,7 +541,7 @@
             qForm.reset(); picked.clear(); syncPicked();
           } else if (r.error === 'not_configured') say('Хүсэлт хүлээн авах сервер одоогоор тохируулагдаагүй байна. Таны хүсэлт илгээгдсэнгүй.', 'error');
           else if (res.status === 429 || r.error === 'too_fast' || r.error === 'rate_limited') say('Түр хүлээгээд дахин оролдоно уу.', 'error');
-          else if (r.error === 'invalid') { if (r.fields && r.fields.influencers) pickErr.textContent = 'Сонгосон бүтээгч олдсонгүй — жагсаалтаа шалгана уу.'; Object.keys(r.fields || {}).forEach((n) => { if (rules[n]) check(n); }); say('Мэдээллээ шалгаад дахин илгээнэ үү.', 'error'); }
+          else if (r.error === 'invalid') { if (r.fields && r.fields.influencers) pickErr.textContent = 'Сонгосон бүтээгч олдсонгүй — жагсаалтаа шалгана уу.'; Object.keys(r.fields || {}).forEach((n) => { if (rules[n]) check(n); }); if (r.fields && r.fields.campaignDates) { const e = document.getElementById('q-campaignDates-err'); if (e) e.textContent = 'Огноогоо шалгана уу (дуусах огноо эхлэхээс өмнө байж болохгүй).'; } say('Мэдээллээ шалгаад дахин илгээнэ үү.', 'error'); }
           else say('Илгээх үед алдаа гарлаа. Таны хүсэлт илгээгдсэнгүй — дахин оролдоно уу.', 'error');
         } catch (err) {
           say('Сүлжээний алдаа гарлаа. Таны хүсэлт илгээгдсэнгүй — дахин оролдоно уу.', 'error');
@@ -647,7 +647,12 @@
           setStatus('Түр хүлээгээд дахин оролдоно уу.', 'error');
         } else if (body.error === 'invalid' && body.fields) {
           Object.keys(body.fields).forEach((n) => { if (rules[n]) check(n); });
-          setStatus('Мэдээллээ шалгаад дахин илгээнэ үү.', 'error');
+          // the server knows things the form can't (e.g. a service removed since this page loaded)
+          if (body.fields.service && form.elements.service) {
+            form.elements.service.setAttribute('aria-invalid', 'true');
+            const err = document.getElementById('f-service-err'); if (err) err.textContent = 'Үйлчилгээгээ дахин сонгоно уу.';
+          }
+          setStatus(body.fields.service && !rules.service(form.elements.service.value, form.elements.service) ? 'Үйлчилгээний жагсаалт шинэчлэгдсэн байна — үйлчилгээгээ дахин сонгоод илгээнэ үү.' : 'Мэдээллээ шалгаад дахин илгээнэ үү.', 'error');
         } else {
           setStatus('Илгээх үед алдаа гарлаа. Таны хүсэлт илгээгдсэнгүй — дахин оролдоно уу.', 'error');
         }

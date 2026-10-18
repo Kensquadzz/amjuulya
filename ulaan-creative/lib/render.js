@@ -88,7 +88,7 @@ ${jsonLd ? `<script type="application/ld+json" nonce="${nonce}">${JSON.stringify
 }
 
 function nav({ hasInfluencers, base = '' }) {
-  const links = [['work', 'Work'], ['services', 'Services'], hasInfluencers && ['influencers', 'Influencers'], ['packages', 'Packages'], ['about', 'About'], ['contact', 'Contact']].filter(Boolean);
+  const links = [['work', 'Work'], ['services', 'Services'], ['influencers', 'Influencers'], ['packages', 'Packages'], ['about', 'About'], ['contact', 'Contact']].filter(Boolean);
   return `<header class="nav" data-nav>
   <div class="nav__inner">
     <a class="logo" href="${base || '#top'}" aria-label="Ulaan Creative — нүүр хуудас">
@@ -122,7 +122,7 @@ function footer(c, { hasInfluencers, base = '' }) {
   const socials = [['instagram', 'Instagram'], ['facebook', 'Facebook'], ['tiktok', 'TikTok'], ['youtube', 'YouTube']]
     .filter(([k]) => /^https:\/\//.test(d[k] || ''))
     .map(([k, l]) => `<a class="link-line" href="${attr(d[k])}" target="_blank" rel="noopener">${l} ↗</a>`);
-  const links = [['work', 'Work'], ['services', 'Services'], hasInfluencers && ['influencers', 'Influencers'], ['packages', 'Packages'], ['about', 'About'], ['contact', 'Contact']].filter(Boolean);
+  const links = [['work', 'Work'], ['services', 'Services'], ['influencers', 'Influencers'], ['packages', 'Packages'], ['about', 'About'], ['contact', 'Contact']].filter(Boolean);
   return `<footer class="footer" data-cursor-theme="light">
   <div class="container footer__top">
     <div class="footer__col">
@@ -154,25 +154,6 @@ const previewBar = (label) => label ? `<div class="preview-bar mono" role="statu
 
 /* ------------------------------ sections ------------------------------ */
 
-/** Rising slanted bars (the logo's diagonal stroke) = Create → Grow → Go viral. */
-function heroGraphic(words) {
-  const labels = (words.length === 3 ? words : ['CREATE', 'GROW', 'GO VIRAL']).map((w) => plain(w).replace(/\.$/, ''));
-  const bars = [
-    { bx: 120, h: 260, cls: 'bar bar--outline' },
-    { bx: 300, h: 470, cls: 'bar bar--dark' },
-    { bx: 480, h: 690, cls: 'bar bar--light' },
-  ];
-  const poly = ({ bx, h }) => { const L = 0.35 * h, w = 120; return `${bx},760 ${bx + w},760 ${bx + w - L},${760 - h} ${bx - L},${760 - h}`; };
-  // labels sit inside each bar, just under its top edge (the bars lean 0.35 px per px of height)
-  const tlx = ({ bx, h }) => bx - 0.35 * h;
-  const tops = bars.map((bar) => [tlx(bar) + 60, 760 - bar.h]);
-  return `<svg class="hero__graphic" viewBox="0 0 600 780" preserveAspectRatio="xMidYMax meet" aria-hidden="true" focusable="false">
-      ${bars.map((bar, i) => `<polygon class="${bar.cls}" data-hero-bar points="${poly(bar)}"/>`).join('')}
-      <path class="trend" data-hero-trend d="M${tops[0][0] - 30} ${tops[0][1] - 40} L${tops[1][0] - 20} ${tops[1][1] - 40} L${tops[2][0] + 30} ${tops[2][1] - 30}"/>
-      <path class="trend-head" d="M${tops[2][0] + 30} ${tops[2][1] - 30} l-26 -2 m26 2 l-12 22"/>
-      ${bars.map((bar, i) => { const x = tlx(bar), y = 760 - bar.h; return `<text class="lbl lbl--${i + 1}" data-hero-lbl><tspan class="lbl__n" x="${x + 0.35 * 34 + 14}" y="${y + 34}">0${i + 1}</tspan><tspan x="${x + 0.35 * 58 + 14}" y="${y + 58}">${esc(labels[i] || '')}</tspan></text>`; }).join('')}
-    </svg>`;
-}
 
 function hero(h) {
   const words = lines(h.headline);
@@ -345,7 +326,6 @@ function work(w, projects) {
 }
 
 function creators(s, list) {
-  if (!list.length) return '';
   const card = (p) => {
     const links = [['instagram', 'Instagram'], ['tiktok', 'TikTok'], ['youtube', 'YouTube']].filter(([k]) => p[k]);
     const data = [p.followers != null && ['Followers', fmtFollowers(p.followers)], p.engagement && ['Engagement', p.engagement]].filter(Boolean);
@@ -368,16 +348,27 @@ function creators(s, list) {
     </div>
     <div class="creators__side">
       <p data-reveal>${esc(s.intro)}</p>
-      <div class="creators__controls" data-reveal>
+      ${list.length ? `<div class="creators__controls" data-reveal>
         <button type="button" class="round-btn" data-creators-prev aria-label="Өмнөх" aria-controls="creator-track"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M10 3 5 8l5 5" fill="none" stroke="currentColor" stroke-width="1.6"/></svg></button>
         <button type="button" class="round-btn" data-creators-next aria-label="Дараагийн" aria-controls="creator-track"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m6 3 5 5-5 5" fill="none" stroke="currentColor" stroke-width="1.6"/></svg></button>
         <div class="creators__progress" aria-hidden="true"><span data-creators-progress></span></div>
-      </div>
+      </div>` : ''}
     </div>
   </div>
-  <ul class="creators__track" id="creator-track" role="list" tabindex="0" aria-label="Creator-уудын жагсаалт (хэвтээ гүйлгэх)" data-creators-track data-lenis-prevent>
+  ${list.length ? `<ul class="creators__track" id="creator-track" role="list" tabindex="0" aria-label="Creator-уудын жагсаалт (хэвтээ гүйлгэх)" data-creators-track data-lenis-prevent>
     ${list.map(card).join('\n    ')}
-  </ul>
+  </ul>` : `<div class="container"><div class="creators__empty" data-reveal>
+    <ol class="creators__steps" role="list">
+      <li><span class="mono">01</span>Influencer сонголт</li>
+      <li><span class="mono">02</span>Кампанит ажлын төлөвлөлт</li>
+      <li><span class="mono">03</span>Контент, хамтын ажиллагааны зохицуулалт</li>
+    </ol>
+    <div class="creators__empty-copy">
+      <h3 class="display">${esc(s.emptyTitle)}</h3>
+      <p>${esc(s.emptyText)}</p>
+      <a class="btn-fill btn-fill--dark" href="#contact" data-magnetic><span>Хамтран ажиллах</span><i class="dot" aria-hidden="true"></i></a>
+    </div>
+  </div></div>`}
 </section>`;
 }
 
@@ -418,11 +409,6 @@ function about(a) {
     </div>
   </div>
   <div class="container about__grid">
-    <figure class="about__figure" data-reveal-media>
-      <div class="about__mark" data-parallax-img>${heroGraphic(['STRATEGY', 'CREATIVE', 'RESULT'])}</div>
-      <img class="about__logo" src="/assets/img/ulaan-logo-on-red.webp" width="640" height="252" alt="Ulaan Creative" loading="lazy">
-      <figcaption class="mono">Strategy · Creative · Production · Distribution</figcaption>
-    </figure>
     <div class="about__copy">
       <h3 class="display" data-split>${rich(a.title)}</h3>
       ${a.paragraphs.map((p) => `<p data-reveal>${esc(p)}</p>`).join('\n      ')}

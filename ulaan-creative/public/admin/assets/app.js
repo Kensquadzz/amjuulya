@@ -303,7 +303,8 @@ const SCHEMAS = {
     { name: 'flow', label: 'Санаанаас үр дүн хүртэлх урсгал', type: 'list', itemLabel: 'Алхам', titleOf: (s) => s.en, addLabel: 'Алхам нэмэх', help: 'Жишээ: Idea → Action → Result. 3 алхам хамгийн цэвэрхэн харагдана.', template: { en: '', mn: '', text: '' }, fields: [{ name: 'en', label: 'EN', type: 'text' }, { name: 'mn', label: 'MN', type: 'text' }, { name: 'text', label: 'Тайлбар', type: 'text' }] },
     { name: 'emptyTitle', label: 'Төсөл байхгүй үеийн гарчиг', type: 'text' }, { name: 'emptyText', label: 'Төсөл байхгүй үеийн текст', type: 'textarea' } ] },
   influencers: { title: 'Influencer хэсгийн текст', fields: [
-    { name: 'label', label: 'Шошго', type: 'text' }, { name: 'title', label: 'Гарчиг', type: 'textarea', rows: 2 }, { name: 'intro', label: 'Текст', type: 'textarea' } ] },
+    { name: 'label', label: 'Шошго', type: 'text' }, { name: 'title', label: 'Гарчиг', type: 'textarea', rows: 2 }, { name: 'intro', label: 'Текст', type: 'textarea' },
+    { name: 'emptyTitle', label: 'Influencer нэмэгдээгүй үеийн гарчиг', type: 'text' }, { name: 'emptyText', label: 'Influencer нэмэгдээгүй үеийн текст', type: 'textarea' } ] },
   about: { title: 'Бидний тухай', fields: [
     { name: 'label', label: 'Шошго', type: 'text' },
     { name: 'manifesto', label: 'Манифест (том текст)', type: 'textarea', help: '*одоор* хүрээлсэн үг улаанаар тодорно.' },

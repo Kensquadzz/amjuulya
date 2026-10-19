@@ -296,12 +296,13 @@ function work(w, projects) {
       : `<div class="ph ph--${(i % 5) + 1}" aria-hidden="true"><span class="display">${esc(initials(p.title) || 'UC')}</span></div>`;
     return `<li class="work__item work-card" data-cursor="Үзэх">
         <a class="work__link" href="/work/${attr(p.slug)}" aria-label="${attr(p.title)}">
-          <figure class="work__media" data-reveal-media>${media}${p.video || p.videoUrl ? '<span class="work__play mono" aria-hidden="true">▶ Video</span>' : ''}</figure>
-          <div class="work__meta">
-            <span class="mono">${String(i + 1).padStart(2, '0')}${p.category ? ` — ${esc(p.category)}` : ''}</span>
-            <h3>${esc(p.title)}</h3>
-            ${p.client ? `<span class="work__client mono">${esc(p.client)}</span>` : ''}
-          </div>
+          <figure class="work__media" data-reveal-media>${media}${p.video || p.videoUrl ? '<span class="work__play mono" aria-hidden="true">▶ Video</span>' : ''}
+            <figcaption class="work__meta">
+              <span class="mono">${String(i + 1).padStart(2, '0')}${p.category ? ` — ${esc(p.category)}` : ''}</span>
+              <h3>${esc(p.title)}</h3>
+              ${p.client ? `<span class="work__client mono">${esc(p.client)}</span>` : ''}
+            </figcaption>
+          </figure>
         </a>
       </li>`;
   });

@@ -641,15 +641,12 @@ export function serviceOptions(content) {
 }
 
 function contact(c, content) {
-  const d = content.contact_details;
-  const details = [['Email', d.email && `<a href="mailto:${attr(d.email)}">${esc(d.email)}</a>`], ['Phone', d.phone && `<a href="tel:${attr(d.phone.replace(/[^\d+]/g, ''))}">${esc(d.phone)}</a>`], ['Studio', d.address && esc(d.address)]].filter(([, v]) => v);
   return `<section class="contact" id="contact" aria-labelledby="contact-title" data-cursor-theme="light">
   <div class="container contact__grid">
     <div class="contact__intro">
       <p class="label mono" data-reveal>${esc(c.label)}</p>
       <h2 class="display contact__title" id="contact-title" data-split>${rich(c.title)}</h2>
       <p data-reveal>${esc(c.copy)}</p>
-      ${details.length ? `<ul class="contact__details mono" role="list" data-reveal>${details.map(([k, v]) => `<li><span>${k}</span><span>${v}</span></li>`).join('')}</ul>` : ''}
     </div>
     <form class="form" action="/api/contact" method="post" novalidate data-contact-form data-success="${attr(c.successMessage)}">
       <div class="form__row">

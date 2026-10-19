@@ -490,12 +490,12 @@ html:not(.motion-ok) .marquee__track { animation: none; }
 .work-row .inf-row__edge--prev { background: linear-gradient(90deg, rgba(245,243,239,.95), rgba(245,243,239,0)); }
 .work-row .inf-row__edge--next { background: linear-gradient(270deg, rgba(245,243,239,.95), rgba(245,243,239,0)); }
 .work-row__track { gap: clamp(14px, 1.6vw, 24px); }
-.work-row { --card: clamp(260px, 27vw, 380px); }
-.work-card { flex: 0 0 var(--card); scroll-snap-align: start; list-style: none; }
+.work-row { --h: clamp(300px, 27vw, 420px); }
+.work-card { flex: 0 0 calc(var(--h) * var(--ar, .8)); scroll-snap-align: start; list-style: none; }
 .work-card .work__meta h3 { font-size: clamp(17px, 1.5vw, 22px); }
 /* arrows cover the images only, not the titles */
-.work-row .inf-row__edge { top: 18px; bottom: auto; height: calc(var(--card) * .75); }
-.work-card .work__media { aspect-ratio: 4 / 3; border-radius: 12px; }
+.work-row .inf-row__edge { top: 18px; bottom: auto; height: var(--h); }
+.work-card .work__media { height: var(--h); border-radius: 12px; }
 .work-card .work__media img { pointer-events: none; }
 /* title sits on the poster, Netflix-style, over a bottom fade */
 .work-card .work__meta {
@@ -507,7 +507,7 @@ html:not(.motion-ok) .marquee__track { animation: none; }
 .work-card .work__client { grid-column: 1; grid-row: auto; }
 .work-card .work__meta h3 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .work-card .work__meta h3 { color: var(--white); text-shadow: 0 1px 10px rgba(0,0,0,.5); transition: color .3s; }
-.work-card .work__link:hover .work__meta h3 { color: #ff4b5a; }
+@media (hover: hover) { .work-card .work__link:hover .work__meta h3 { color: #ff4b5a; } }
 .work-row__track.is-dragging .work-card { pointer-events: none; }
 .work__media { position: relative; overflow: hidden; background: var(--black); }
 .work__media > img, .work__media > .ph {
@@ -545,7 +545,8 @@ html:not(.motion-ok) .marquee__track { animation: none; }
 
 @media (max-width: 900px) {
   .work__head { grid-template-columns: 1fr; }
-  .work-row { --card: 66vw; }
+  .work-row { --h: min(68vw, 62svh); }
+  .work-card { flex-basis: min(calc(var(--h) * var(--ar, .8)), 86vw); }
 }
 
 /* =========================================================

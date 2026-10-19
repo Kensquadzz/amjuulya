@@ -294,7 +294,10 @@ function work(w, projects) {
       ? mediaImg(p.cover, { alt: p.cover.alt || p.title, sizes: '(max-width: 760px) 72vw, 360px' })
       : p.video?.thumbUrl ? `<img src="${attr(p.video.thumbUrl)}" alt="${attr(p.title)}" loading="lazy" decoding="async">`
       : `<div class="ph ph--${(i % 5) + 1}" aria-hidden="true"><span class="display">${esc(initials(p.title) || 'UC')}</span></div>`;
-    return `<li class="work__item work-card" data-cursor="Үзэх">
+    // each card keeps its poster's own shape (same height, width follows the image), so nothing is cropped
+    const dim = p.cover?.width ? p.cover : p.video?.width ? p.video : null;
+    const ratio = dim ? Math.min(1.78, Math.max(0.56, dim.width / dim.height)) : 0.8;
+    return `<li class="work__item work-card" data-cursor="Үзэх" style="--ar:${ratio.toFixed(3)}">
         <a class="work__link" href="/work/${attr(p.slug)}" aria-label="${attr(p.title)}">
           <figure class="work__media" data-reveal-media>${media}${p.video || p.videoUrl ? '<span class="work__play mono" aria-hidden="true">▶ Video</span>' : ''}
             <figcaption class="work__meta">

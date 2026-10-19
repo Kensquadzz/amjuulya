@@ -861,6 +861,7 @@
 
   /* ---------------- Work: parallax inside media ---------------- */
   $$('.work__media').forEach((m) => {
+    if (m.closest('.work-card')) return; // row posters show the whole image — no parallax shift
     const inner = m.querySelector('img, .ph span');
     if (!inner) return;
     gsap.fromTo(inner, { yPercent: -8 }, {

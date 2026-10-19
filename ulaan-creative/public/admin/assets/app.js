@@ -423,10 +423,10 @@ const SCHEMAS = {
     { name: 'items', label: 'Үйлчилгээ', type: 'list', itemLabel: 'Үйлчилгээ', titleOf: (s) => s.title.replace(/\n/g, ' '), addLabel: 'Үйлчилгээ нэмэх',
       template: { visual: 'ai', tag: '', title: '', description: '', bullets: [], works: [] },
       fields: [{ name: 'title', label: 'Нэр', type: 'textarea', rows: 2 }, { name: 'tag', label: 'Жижиг шошго', type: 'text' },
-        { name: 'visual', label: 'Визуал / өнгө', type: 'select', options: [['ai', 'Бүтээлийн галерей (хар)'], ['influencer', 'Influencer тойрог (улаан)'], ['video', 'Видео камер — FILMING (цагаан)'], ['strategy', 'Стратегийн шат (хар)']] },
+        { name: 'visual', label: 'Визуал / өнгө', type: 'select', options: [['ai', 'Бүтээлийн галерей (хар)'], ['influencer', 'Influencer тойрог (улаан)'], ['video', 'Видео камер — REC (бүтээлийн видео тоглоно)'], ['strategy', 'Стратегийн шат (хар)']] },
         { name: 'description', label: 'Тайлбар', type: 'textarea' }, { name: 'bullets', label: 'Жагсаалт (мөр бүрт нэг)', type: 'lines', help: '"Стратегийн шат" визуал эхний 4 мөрийг шат болгон харуулна.' },
         { name: 'works', label: 'Бүтээлүүд (зураг / видео)', type: 'list', itemLabel: 'Бүтээл', titleOf: (w) => w.title, addLabel: 'Бүтээл нэмэх',
-          help: '"Бүтээлийн галерей" визуалтай үйлчилгээнд эхний 4 бүтээл харагдана. Видео сайтаас шууд тоглогдоно. Хоосон бол "Бүтээлүүд удахгүй нэмэгдэнэ" гэж харагдана.',
+          help: '"Бүтээлийн галерей" визуал: эхний 4 бүтээл харагдана, хоосон бол "Бүтээлүүд удахгүй нэмэгдэнэ". "Видео камер — REC" визуал: эхний видео REC хүрээн дотор дуугүй, давтагдаж тоглоно (босоо 9:16 видео хамгийн тохиромжтой); хоосон бол RECORDING чимэглэл харагдана.',
           template: { mediaId: null, title: '', caption: '' },
           fields: [{ name: 'mediaId', label: 'Зураг эсвэл видео', type: 'media', kind: 'any' }, { name: 'title', label: 'Гарчиг', type: 'text' }, { name: 'caption', label: 'Тайлбар', type: 'text' }] }] } ] },
   packages: { title: 'Багцууд & үнэ', fields: [

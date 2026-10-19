@@ -495,10 +495,46 @@ route('/content', () => contentSections(['hero', 'intro', 'marquee', 'work', 'in
   title: 'Вэбсайтын агуулга',
   intro: '"Ноорог хадгалах" нь зөвхөн preview-д харагдана. "Нийтлэх" дарсны дараа олон нийтийн сайт шинэчлэгдэнэ.',
 }));
-route('/services', () => contentSections(['services', 'packages'], {
-  title: 'Үйлчилгээ & үнэ',
-  notice: h('div.notice.notice--warn', h('strong', 'Эзэмшигчийн баталгаажуулалт шаардлагатай: '), 'Premium багцад "+ НӨАТ" гэж бичигдсэн бол Starter, Growth багцад НӨАТ-ын тэмдэглэгээ алга. НӨАТ-ын нөхцөлийг нягтлан, үнийн текстийг энд засна уу.'),
-}));
+/** Shortcut card: the video that plays inside the REC viewfinder of the video service
+ *  (stored as that service's first "work", same as editing it in the form below). */
+async function recVideoCard() {
+  const { items } = await api('/content');
+  const value = structuredClone(items.find((i) => i.key === 'services').value);
+  const item = value.items.find((x) => x.visual === 'video');
+  if (!item) return h('div.card', h('h2', '🎬 REC видео'), h('p.muted', '«Видео камер — REC» визуалтай үйлчилгээ алга. Доорх «Үйлчилгээнүүд» хэсгээс нэг үйлчилгээний «Визуал / өнгө»-ийг «Видео камер — REC» болгоно уу.'));
+  const first = item.works[0] || null;
+  let picked = null;
+  if (first?.mediaId) { try { picked = (await api('/media?limit=200')).items.find((m) => m.id === first.mediaId) || null; } catch { /* preview only */ } }
+  const title = h('input#rec-title', { type: 'text', maxlength: 120, value: first?.title || '', placeholder: 'Жишээ: Mongol GrandPrix — reels' });
+  const btn = h('button.btn', { type: 'button' }, 'Хадгалаад нийтлэх');
+  btn.onclick = async () => {
+    busy(btn, true);
+    try {
+      item.works = picked ? [{ mediaId: picked.id, title: title.value.trim(), caption: '' }] : [];
+      await api('/content/services', { method: 'PUT', body: { value } });
+      await api('/content/services/publish', { method: 'POST', body: {} });
+      setDirty(false); toast(picked ? 'REC видео сайт дээр нийтлэгдлээ' : 'REC видео хасагдлаа'); render();
+    } catch (e) { toast(e.message, 'error'); } finally { busy(btn, false); }
+  };
+  title.oninput = () => setDirty(true);
+  return h('div.card.rec-card',
+    h('h2', `🎬 REC видео — ${item.title.replace(/\n/g, ' ')}`),
+    h('p.muted', 'Сайтын «Үйлчилгээ» хэсгийн камерын (REC) хүрээн дотор тоглох видео. Дуугүй, давтагдаж тоглоно; үзэгч дуугаа асааж болно. Босоо 9:16 reels видео хамгийн тохиромжтой. Зураг сонговол хөдөлгөөнгүй харагдана. Хоосон бол RECORDING чимэглэл харагдана.'),
+    mediaField({ label: 'Видео (эсвэл зураг)', kind: 'any', value: picked, onChange: (m) => { picked = m; setDirty(true); } }),
+    h('div.field', h('label', { for: 'rec-title' }, 'Гарчиг (видеоны доор харагдана, заавал биш)'), title),
+    h('div.row', btn, h('span.muted', 'Үйлчилгээнүүдийн бусад нийтлээгүй өөрчлөлт байвал хамт нийтлэгдэнэ.')));
+}
+
+route('/services', async () => {
+  const [page, rec] = await Promise.all([contentSections(['services', 'packages'], {
+    title: 'Үйлчилгээ & үнэ',
+    notice: h('div.notice.notice--warn', h('strong', 'Эзэмшигчийн баталгаажуулалт шаардлагатай: '), 'Premium багцад "+ НӨАТ" гэж бичигдсэн бол Starter, Growth багцад НӨАТ-ын тэмдэглэгээ алга. НӨАТ-ын нөхцөлийг нягтлан, үнийн текстийг энд засна уу.'),
+  }), recVideoCard()]);
+  // right under the page title, above the long services form
+  const head = page.querySelector('.page__head') || page.firstElementChild;
+  head.after(rec);
+  return page;
+});
 route('/seo', () => contentSections(['seo'], { title: 'SEO / Metadata', intro: 'Production домэйн (canonical, sitemap, OG URL)-ийг SITE_URL орчны хувьсагчаар тохируулна.' }));
 
 /* ----------------------------- submissions ----------------------------- */

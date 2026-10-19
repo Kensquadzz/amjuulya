@@ -440,7 +440,7 @@ export async function createUpload(req, res) {
   if (replaceId) {
     const target = await one(`select kind from media where id = $1 and status = 'ready'`, [replaceId]);
     if (!target) throw new HttpError(404, 'not_found');
-    if (target.kind !== declared.kind) throw new HttpError(400, 'invalid_file', `Зөвхөн ${target.kind === 'image' ? 'зураг' : 'видео'}-оор солих боломжтой.`);
+    if (target.kind !== declared.kind) throw new HttpError(400, 'invalid_file', target.kind === 'image' ? 'Зөвхөн зургаар солих боломжтой.' : 'Зөвхөн видеогоор солих боломжтой.');
   } else if (sha) {
     const dup = await one(`select * from media where sha256 = $1 and status = 'ready' limit 1`, [sha]);
     if (dup) return json(res, 200, { existing: mediaView(dup) });

@@ -6,7 +6,7 @@ import { hit } from './ratelimit.js';
 import { json, readJson, clientIp, hashIp, esc } from './http.js';
 import { getPublishedContent, isUuid } from './content.js';
 import { serviceOptions } from './render.js';
-import { BUDGET_OPTIONS } from './defaults.js';
+import { BUDGET_OPTIONS, DEFAULT_CONTENT } from './defaults.js';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 const PHONE_RE = /^\+?[\d\s\-()]{8,20}$/;
@@ -66,20 +66,23 @@ export async function handleContact(req, res) {
   if (Number.isFinite(ts) && ts > 0 && Date.now() - ts < MIN_FILL_MS) return json(res, 429, { ok: false, error: 'too_fast' });
 
   const ipHash = hashIp(clientIp(req));
+  // without the database the default services still validate, so the email can go out
+  const content = await getPublishedContent().catch(() => structuredClone(DEFAULT_CONTENT));
+  const services = serviceOptions(content);
+  const { data, fields } = validateContact(body, services);
+  if (Object.keys(fields).length) return json(res, 400, { ok: false, error: 'invalid', fields });
+
+  // Counted only for valid submissions; mobile carriers share IPs (CGNAT), so the limit is generous
+  const LIMIT = 20;
   if (dbConfigured()) {
-    const rl = await hit('contact', ipHash, { limit: 5, windowSec: 600 });
+    const rl = await hit('contact', ipHash, { limit: LIMIT, windowSec: 600 });
     if (!rl.allowed) return json(res, 429, { ok: false, error: 'rate_limited' });
   } else {
     const now = Date.now();
     const recent = (memHits.get(ipHash) || []).filter((t) => now - t < 600_000);
-    if (recent.length >= 5) return json(res, 429, { ok: false, error: 'rate_limited' });
+    if (recent.length >= LIMIT) return json(res, 429, { ok: false, error: 'rate_limited' });
     memHits.set(ipHash, [...recent, now]);
   }
-
-  const content = await getPublishedContent().catch(() => null);
-  const services = content ? serviceOptions(content) : [];
-  const { data, fields } = validateContact(body, services);
-  if (Object.keys(fields).length) return json(res, 400, { ok: false, error: 'invalid', fields });
 
   const emailReady = emailConfig().ready;
   if (!dbConfigured() && !emailReady) {

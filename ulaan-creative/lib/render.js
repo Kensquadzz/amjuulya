@@ -3,6 +3,7 @@
 import { esc } from './http.js';
 import { SERVICE_OPTIONS, BUDGET_OPTIONS } from './defaults.js';
 import { ASSET_V } from './asset-version.js';
+import { TIERS } from './tiers.js';
 
 /* ------------------------------ helpers ------------------------------ */
 
@@ -338,7 +339,8 @@ const SOCIAL_ICONS = {
 
 /** Influencer list: full-screen panel opened from the nav ("Influencers"), cards fanned in an arc
  *  and swiped sideways. Price is never part of the public data, so it can't appear here. */
-const FOLLOWER_RANGES = [['all', 'Бүгд'], ['1k-10k', '1K–10K'], ['10k-50k', '10K–50K'], ['50k-100k', '50K–100K'], ['100k-500k', '100K–500K'], ['500k+', '500K+']];
+const FOLLOWER_RANGES = [['all', 'Бүгд'], ...TIERS.map((t) => [t.id, `${t.name} · ${t.range}`])];
+const tierName = (p) => (TIERS.find((t) => t.id === p.tier) || {}).name || '';
 const catNames = (p) => (p.categories && p.categories.length ? p.categories.map((c) => c.name) : p.category ? [p.category] : []);
 const platforms = (p) => SOCIALS.filter(([k]) => p[k]).map(([, l]) => l);
 
@@ -351,7 +353,7 @@ function influencerFilter(categories) {
         <label class="inf-chip"><input type="checkbox" name="cat" value="all" checked data-cat-all><span>Бүгд</span></label>
         ${categories.map((c) => `<label class="inf-chip"><input type="checkbox" name="cat" value="${attr(c.id)}"><span>${esc(c.name)}</span></label>`).join('')}
       </div></fieldset>` : ''}
-      <fieldset class="inf-filter__group"><legend class="mono">Дагагч</legend><div class="inf-filter__chips">
+      <fieldset class="inf-filter__group"><legend class="mono">Дагагчийн ангилал</legend><div class="inf-filter__chips">
         ${FOLLOWER_RANGES.map(([v, l], i) => `<label class="inf-chip"><input type="radio" name="followers" value="${v}"${i ? '' : ' checked'}><span>${l}</span></label>`).join('')}
       </div></fieldset>
       <label class="inf-filter__group"><span class="mono">Эрэмбэ</span><span class="inf-filter__select"><select name="sort">
@@ -368,11 +370,11 @@ function influencerFilter(categories) {
 const pickBtn = (p, cls = '') => `<button type="button" class="inf-pick${cls}" data-inf-pick="${attr(p.id)}" aria-pressed="false" aria-label="${attr(p.name)} — кампанит ажилд сонгох"><span class="inf-pick__off">+ Сонгох</span><span class="inf-pick__on">✓ Сонгосон</span></button>`;
 const metaLine = (p) => [platforms(p).join(' · '), p.followers != null && `${fmtFollowers(p.followers)} дагагч`, p.engagement && `ER ${p.engagement}`].filter(Boolean).map(esc).join('<i aria-hidden="true">/</i>');
 
-function influencerCard(p) {
+function influencerCard(p, { label } = {}) {
   return `<li class="inf-card" data-inf-item="${attr(p.id)}">
         <div class="inf-card__media">${p.photo ? mediaImg(p.photo, { alt: '', sizes: '(max-width: 760px) 46vw, 240px' }) : `<span class="display" aria-hidden="true">${esc(initials(p.name))}</span>`}</div>
         <button type="button" class="inf-card__open" data-inf-open="${attr(p.id)}" aria-label="${attr(p.name)} — дэлгэрэнгүй">
-          <span class="inf-card__cat mono">${esc(catNames(p).join(' · ') || 'Influencer')}</span>
+          <span class="inf-card__cat mono">${esc(label ?? (catNames(p).join(' · ') || 'Influencer'))}</span>
           <strong class="inf-card__name">${esc(p.name)}</strong>
           <span class="inf-card__meta mono">${metaLine(p)}</span>
         </button>
@@ -388,7 +390,7 @@ function influencerDetail(p) {
     ${p.photo ? mediaImg(p.photo, { alt: '', sizes: '(max-width: 760px) 100vw, 420px', cls: 'inf-detail__backdrop' }) : ''}
     <div class="inf-detail__media${p.photo ? ' has-photo' : ''}">${p.photo ? mediaImg(p.photo, { alt: p.photo.alt || p.name, sizes: '(max-width: 760px) 100vw, 420px', cls: 'inf-detail__photo' }) : `<span class="display" aria-hidden="true">${esc(initials(p.name))}</span>`}</div>
     <div class="inf-detail__body">
-      <p class="mono inf-detail__cat">${esc(catNames(p).join(' · ') || 'Influencer')}</p>
+      <p class="mono inf-detail__cat">${esc(tierName(p) || 'Influencer')}</p>
       <h3 class="display inf-detail__name" id="inf-detail-title">${esc(p.name)}</h3>
       ${p.bio ? `<p class="inf-detail__bio">${esc(p.bio)}</p>` : ''}
       ${data.length ? `<dl class="inf-detail__data mono">${data.map(([k, v]) => `<div><dt>${k}</dt><dd>${esc(v)}</dd></div>`).join('')}</dl>` : ''}
@@ -421,7 +423,7 @@ function influencersPreview(s, list) {
     <div class="inf-row__viewport">
       <button type="button" class="inf-row__edge inf-row__edge--prev" data-inf-row-prev aria-label="Өмнөх бүтээгчид"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M10 3 5 8l5 5" fill="none" stroke="currentColor" stroke-width="1.8"/></svg></button>
       <ul class="inf-row__track" role="list" aria-label="Онцлох influencer-ууд" data-inf-track>
-      ${picks.map(influencerCard).join('\n      ')}
+      ${picks.map((p) => influencerCard(p)).join('\n      ')}
       </ul>
       <button type="button" class="inf-row__edge inf-row__edge--next" data-inf-row-next aria-label="Дараагийн бүтээгчид"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m6 3 5 5-5 5" fill="none" stroke="currentColor" stroke-width="1.8"/></svg></button>
     </div>
@@ -434,41 +436,55 @@ function influencersPreview(s, list) {
 
 /** Netflix-inspired creator browser, opened from the nav ("Influencers"): optional featured
  *  creator, horizontal category rows, search + filter, multi-select → one campaign inquiry. */
-function influencersPanel(s, list, categories = []) {
+/** Hero collage: up to 20 creators chosen in admin (order/size/focus from admin), drawn as one
+ *  artwork. Falls back to the first creators with photos until the admin picks some. */
+function influencerCollage(s, list, tools) {
+  const withPhoto = list.filter((p) => p.photo);
+  const chosen = withPhoto.filter((p) => p.inCollage).sort((a, b) => a.collageOrder - b.collageOrder);
+  const tiles = (chosen.length ? chosen : withPhoto).slice(0, 20);
+  if (tiles.length < 3) return '';
+  // Tiles go, in admin order, into whichever column is currently shortest; every column then
+  // stretches to the full hero height, so the collage is one solid block with no holes.
+  const WEIGHT = { s: 1, m: 1.4, l: 1.9, xl: 2.6 };
+  const cols = Array.from({ length: Math.min(6, tiles.length) }, () => ({ h: 0, tiles: [] }));
+  for (const p of tiles) { const c = cols.reduce((a, b) => (b.h < a.h ? b : a)); const w = WEIGHT[p.collageSize] || WEIGHT.m; c.tiles.push([p, w]); c.h += w; }
+  const tile = ([p, w]) => `<button type="button" class="inf-collage__tile" data-inf-open="${attr(p.id)}" aria-label="${attr(p.name)} — дэлгэрэнгүй" style="--w:${w};--focus:${{ top: '50% 12%', center: '50% 50%', bottom: '50% 88%' }[p.collageFocus] || '50% 12%'}">${mediaImg(p.photo, { alt: '', sizes: '(max-width: 760px) 34vw, 18vw' })}<span class="inf-collage__name mono">${esc(p.name)}</span></button>`;
+  return `<section class="inf-collage" aria-labelledby="inf-title">
+      <div class="inf-collage__art" style="--cols:${cols.length}">
+        ${cols.map((c) => `<div class="inf-collage__col">${c.tiles.map(tile).join('')}</div>`).join('')}
+      </div>
+      <div class="inf-collage__type">
+        <h2 class="display inf__title inf-collage__title" id="inf-title">${rich(s.title)}</h2>
+        <p class="inf-collage__intro">${esc(s.intro)}</p>
+      </div>
+    </section>
+    <div class="inf__toolbar">${tools}</div>`;
+}
+
+function influencersPanel(s, list) {
   const empty = !list.length;
-  // rows follow the admin-managed categories; creators without a category go to "Other"
-  const cats = categories.length ? categories : [...new Map(list.flatMap((p) => p.categories || []).map((c) => [c.id, c])).values()];
-  const other = cats.find((c) => /^other$|^бусад$/i.test(c.name));
-  const rows = cats.map((c) => ({ ...c, people: list.filter((p) => (p.categories || []).some((x) => x.id === c.id) || (c === other && !(p.categories || []).length)) }));
-  if (!other && list.some((p) => !(p.categories || []).length)) rows.push({ id: 'none', name: 'Other', people: list.filter((p) => !(p.categories || []).length) });
-  const featured = list.find((p) => p.featured);
-  const data = list.map((p, i) => [p.id, { n: plain(p.name).toLowerCase(), f: p.followers ?? null, c: (p.categories || []).map((x) => x.id), o: i, name: p.name }]);
+  // one row per follower tier (NANO … MEGA); the tier comes from the follower count
+  const rows = TIERS.map((t) => ({ id: t.id, name: t.name, range: t.range, people: list.filter((p) => p.tier === t.id) }));
+  const data = list.map((p, i) => [p.id, { n: plain(p.name).toLowerCase(), f: p.followers ?? null, t: p.tier, o: i, name: p.name }]);
+  const tools = empty ? '' : `<div class="inf__tools">
+        <label class="inf__search"><span class="sr-only">Нэрээр хайх</span><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="m11 11 4 4" stroke="currentColor" stroke-width="1.5"/></svg><input type="search" placeholder="Нэрээр хайх" autocomplete="off" maxlength="80" data-inf-search></label>
+        <button type="button" class="inf__filter-btn mono" data-inf-filter-toggle aria-expanded="false" aria-controls="inf-filter">Filter<span class="inf__filter-count" data-inf-filter-count hidden></span></button>
+        ${influencerFilter([])}
+      </div>`;
+  const collage = influencerCollage(s, list, tools);
   return `<div class="inf" id="influencers" role="dialog" aria-modal="true" aria-labelledby="inf-title" data-inf>
   <div class="inf__scroll" data-inf-scroll data-lenis-prevent>
     <div class="inf__top">
       <p class="label mono">${esc(s.label)}</p>
       <a class="inf__close" href="#top" data-inf-close aria-label="Хаах"><span aria-hidden="true">✕</span></a>
     </div>
-    <header class="inf__intro">
+    ${collage || `<header class="inf__intro">
       <div>
         <h2 class="display inf__title" id="inf-title">${rich(s.title)}</h2>
         <p>${esc(s.intro)}</p>
       </div>
-      ${empty ? '' : `<div class="inf__tools">
-        <label class="inf__search"><span class="sr-only">Нэрээр хайх</span><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="m11 11 4 4" stroke="currentColor" stroke-width="1.5"/></svg><input type="search" placeholder="Нэрээр хайх" autocomplete="off" maxlength="80" data-inf-search></label>
-        <button type="button" class="inf__filter-btn mono" data-inf-filter-toggle aria-expanded="false" aria-controls="inf-filter">Filter<span class="inf__filter-count" data-inf-filter-count hidden></span></button>
-        ${influencerFilter(cats)}
-      </div>`}
-    </header>
-    ${featured ? `<article class="inf-feat" data-inf-item="${attr(featured.id)}" data-inf-featured>
-      <div class="inf-feat__media">${featured.photo ? mediaImg(featured.photo, { alt: featured.photo.alt || featured.name, sizes: '(max-width: 760px) 100vw, 60vw' }) : `<span class="display" aria-hidden="true">${esc(initials(featured.name))}</span>`}</div>
-      <div class="inf-feat__body">
-        <p class="mono inf-feat__label">Онцлох бүтээгч · ${esc(catNames(featured).join(' · ') || 'Influencer')}</p>
-        <h3 class="display inf-feat__name">${esc(featured.name)}</h3>
-        <p class="inf-card__meta mono">${metaLine(featured)}</p>
-        <div class="inf-feat__actions"><button type="button" class="inf-link mono" data-inf-open="${attr(featured.id)}">Дэлгэрэнгүй</button>${pickBtn(featured, ' inf-pick--lg')}</div>
-      </div>
-    </article>` : ''}
+      ${tools}
+    </header>`}
     ${empty ? `<div class="inf__empty">
       <h3 class="display">${esc(s.emptyTitle)}</h3>
       <p>${esc(s.emptyText)}</p>
@@ -476,13 +492,13 @@ function influencersPanel(s, list, categories = []) {
     </div>` : `<div class="inf-rows">
       ${rows.filter((r) => r.people.length).map((r) => `<section class="inf-row" data-inf-row="${attr(r.id)}" aria-label="${attr(r.name)}">
         <div class="inf-row__head">
-          <h3 class="inf-row__title">${esc(r.name)} <span class="mono" data-inf-row-count>${r.people.length}</span></h3>
+          <h3 class="inf-row__title">${esc(r.name)} <span class="mono" data-inf-row-count>${r.people.length}</span> <span class="mono inf-row__range">${esc(r.range)} дагагч</span></h3>
           <div class="inf-row__pages" aria-hidden="true" data-inf-pages></div>
         </div>
         <div class="inf-row__viewport">
           <button type="button" class="inf-row__edge inf-row__edge--prev" data-inf-row-prev aria-label="${attr(r.name)} — өмнөх"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M10 3 5 8l5 5" fill="none" stroke="currentColor" stroke-width="1.8"/></svg></button>
           <ul class="inf-row__track" role="list" data-inf-track>
-      ${r.people.map(influencerCard).join('\n      ')}
+      ${r.people.map((p) => influencerCard(p, { label: r.name })).join('\n      ')}
           </ul>
           <button type="button" class="inf-row__edge inf-row__edge--next" data-inf-row-next aria-label="${attr(r.name)} — дараагийн"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m6 3 5 5-5 5" fill="none" stroke="currentColor" stroke-width="1.8"/></svg></button>
         </div>
@@ -493,6 +509,7 @@ function influencersPanel(s, list, categories = []) {
   ${empty ? '' : `<script type="application/json" data-inf-data>${JSON.stringify(Object.fromEntries(data)).replace(/</g, '\\u003c')}</script>
   ${list.map(influencerDetail).join('\n  ')}
   <div class="inf-bar" data-inf-bar hidden>
+    <p class="inf-bar__limit mono" role="alert" data-inf-limit hidden></p>
     <button type="button" class="inf-bar__review" data-inf-review aria-expanded="false" aria-controls="inf-bar-list"><span class="inf-bar__count" data-inf-count>0</span> <span>бүтээгч сонгосон</span> <span class="inf-bar__caret" aria-hidden="true">▴</span></button>
     <ul class="inf-bar__list" id="inf-bar-list" role="list" data-inf-picked-list hidden></ul>
     <button type="button" class="btn-fill btn-fill--light inf-bar__go" data-inf-inquire><span>Хүсэлт илгээх</span><i class="dot" aria-hidden="true"></i></button>
@@ -661,7 +678,7 @@ ${about(c.about)}
 ${faq(c.faq)}
 ${contact(c.contact, c)}
 </main>
-${influencersPanel({ ...c.influencers, consentLabel: c.contact.consentLabel }, influencers, influencerCategories)}
+${influencersPanel({ ...c.influencers, consentLabel: c.contact.consentLabel }, influencers)}
 ${footer(c, { hasInfluencers })}
 ${scripts(nonce)}
 </body>

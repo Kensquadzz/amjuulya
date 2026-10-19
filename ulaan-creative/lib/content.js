@@ -3,6 +3,7 @@
 import { DEFAULT_CONTENT, CONTENT_KEYS } from './defaults.js';
 import { query, one, dbConfigured } from './db.js';
 import { publicUrl } from './storage.js';
+import { tierOf } from './tiers.js';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export const isUuid = (v) => typeof v === 'string' && UUID_RE.test(v);
@@ -171,6 +172,12 @@ export function influencerView(r, media, { admin = false } = {}) {
     engagement: admin || r.engagement_verified ? r.engagement : '',
     categories: r.categories || [],
     featured: Boolean(r.featured),
+    tier: tierOf(r.follower_count != null ? Number(r.follower_count) : null)?.id || null,
+    // hero collage on the Influencer tab (layout only — nothing private)
+    inCollage: Boolean(r.in_collage),
+    collageOrder: r.collage_order ?? 0,
+    collageSize: r.collage_size || 'm',
+    collageFocus: r.collage_focus || 'top',
     status: r.status,
     sortOrder: r.sort_order,
     updatedAt: r.updated_at,

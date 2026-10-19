@@ -141,6 +141,7 @@ const routes = [
   ['GET', /^\/influencers$/, (q, s) => A.listInfluencers(q, s)],
   ['POST', /^\/influencers$/, (q, s) => A.saveInfluencer(q, s, null)],
   ['POST', /^\/influencers\/reorder$/, (q, s) => A.reorderInfluencers(q, s)],
+  ['POST', /^\/influencers\/collage$/, (q, s) => A.saveInfluencerCollage(q, s)],
   ['GET', /^\/influencer-categories$/, (q, s) => A.listInfluencerCategories(q, s)],
   ['POST', /^\/influencer-categories$/, (q, s) => A.createInfluencerCategory(q, s)],
   ['POST', /^\/influencer-categories\/reorder$/, (q, s) => A.reorderInfluencerCategories(q, s)],

@@ -244,8 +244,21 @@
     const KEY = 'uc-inf-picked';
     let saved = [];
     try { saved = JSON.parse(sessionStorage.getItem(KEY) || '[]'); } catch (e) { saved = []; }
-    const picked = new Set((Array.isArray(saved) ? saved : []).filter((id) => people[id]));
+    const picked = new Set((Array.isArray(saved) ? saved : []).filter((id) => people[id]).slice(0, 10));
     const bar = $('[data-inf-bar]', inf);
+    const MAX_PICK = 10;
+    let limitTimer = 0;
+    function togglePick(id) {
+      if (picked.has(id)) picked.delete(id);
+      else if (picked.size >= MAX_PICK) {
+        const msg = $('[data-inf-limit]', inf);
+        const text = `Нэг хүсэлтэд хамгийн ихдээ ${MAX_PICK} бүтээгч сонгоно. Сонголтоо хасаад дахин оролдоно уу.`;
+        if (getComputedStyle(inf).display === 'none') { window.alert(text); return; } // picked from the home preview
+        if (msg) { msg.textContent = text; msg.hidden = false; clearTimeout(limitTimer); limitTimer = setTimeout(() => { msg.hidden = true; }, 4000); }
+        return;
+      } else picked.add(id);
+      syncPicked();
+    }
     const chip = (id) => { const li = document.createElement('li'); li.textContent = nameOf(id); const x = document.createElement('button'); x.type = 'button'; x.dataset.infUnpick = id; x.setAttribute('aria-label', `${nameOf(id)} — хасах`); x.textContent = '✕'; li.appendChild(x); return li; };
     function syncPicked() {
       try { sessionStorage.setItem(KEY, JSON.stringify([...picked])); } catch (e) { /* private mode */ }
@@ -255,7 +268,7 @@
       if (homePicked) { homePicked.hidden = !picked.size; $('[data-home-picked]', homePicked).textContent = String(picked.size); }
       if (bar) {
         bar.hidden = picked.size === 0;
-        $('[data-inf-count]', bar).textContent = String(picked.size);
+        $('[data-inf-count]', bar).textContent = `${picked.size}/${MAX_PICK}`;
         $('[data-inf-picked-list]', bar).replaceChildren(...[...picked].map(chip));
         if (!picked.size) { $('[data-inf-picked-list]', bar).hidden = true; $('[data-inf-review]', bar).setAttribute('aria-expanded', 'false'); }
       }
@@ -292,7 +305,6 @@
     const panel = $('[data-inf-filter]', inf);
     const toggleBtn = $('[data-inf-filter-toggle]', inf);
     const search = $('[data-inf-search]', inf);
-    const RANGES = { all: [0, Infinity], '1k-10k': [1e3, 1e4], '10k-50k': [1e4, 5e4], '50k-100k': [5e4, 1e5], '100k-500k': [1e5, 5e5], '500k+': [5e5, Infinity] };
     const state = { q: '', cats: new Set(), followers: 'all', sort: 'recommended' };
     const readForm = () => {
       if (!form) return;
@@ -303,12 +315,11 @@
     const filterActive = () => state.cats.size > 0 || state.followers !== 'all' || state.sort !== 'recommended';
     function applyFilters() {
       const q = state.q.trim().toLowerCase();
-      const [min, max] = RANGES[state.followers] || RANGES.all;
       const matches = (id) => {
         const d = people[id]; if (!d) return false;
         if (q && !d.n.includes(q)) return false;
         if (state.cats.size && !d.c.some((c) => state.cats.has(c))) return false;
-        if (state.followers !== 'all' && (d.f == null || d.f < min || d.f >= max)) return false;
+        if (state.followers !== 'all' && d.t !== state.followers) return false; // follower tier
         return true;
       };
       const cmp = (a, b) => {
@@ -459,7 +470,7 @@
     const home = $('[data-inf-home]');
     if (home) home.addEventListener('click', (e) => {
       const pick = e.target.closest('[data-inf-pick]');
-      if (pick) { const id = pick.dataset.infPick; if (picked.has(id)) picked.delete(id); else picked.add(id); syncPicked(); return; }
+      if (pick) { togglePick(pick.dataset.infPick); return; }
       const open = e.target.closest('[data-inf-open]');
       if (open) { openInf(); openDetail(open.dataset.infOpen, open); return; }
       const inquire = e.target.closest('[data-home-inquire]');
@@ -471,7 +482,7 @@
     inf.addEventListener('click', (e) => {
       const t = e.target;
       const pick = t.closest('[data-inf-pick]');
-      if (pick) { const id = pick.dataset.infPick; if (picked.has(id)) picked.delete(id); else picked.add(id); syncPicked(); return; }
+      if (pick) { togglePick(pick.dataset.infPick); return; }
       const un = t.closest('[data-inf-unpick]');
       if (un) { picked.delete(un.dataset.infUnpick); syncPicked(); return; }
       const open = t.closest('[data-inf-open]');
@@ -541,7 +552,7 @@
             qForm.reset(); picked.clear(); syncPicked();
           } else if (r.error === 'not_configured') say('Хүсэлт хүлээн авах сервер одоогоор тохируулагдаагүй байна. Таны хүсэлт илгээгдсэнгүй.', 'error');
           else if (res.status === 429 || r.error === 'too_fast' || r.error === 'rate_limited') say('Түр хүлээгээд дахин оролдоно уу.', 'error');
-          else if (r.error === 'invalid') { if (r.fields && r.fields.influencers) pickErr.textContent = 'Сонгосон бүтээгч олдсонгүй — жагсаалтаа шалгана уу.'; Object.keys(r.fields || {}).forEach((n) => { if (rules[n]) check(n); }); if (r.fields && r.fields.campaignDates) { const e = document.getElementById('q-campaignDates-err'); if (e) e.textContent = 'Огноогоо шалгана уу (дуусах огноо эхлэхээс өмнө байж болохгүй).'; } say('Мэдээллээ шалгаад дахин илгээнэ үү.', 'error'); }
+          else if (r.error === 'invalid') { if (r.fields && r.fields.influencers) pickErr.textContent = r.fields.influencers === 'too_many' ? 'Нэг хүсэлтэд хамгийн ихдээ 10 бүтээгч сонгоно.' : 'Сонгосон бүтээгч олдсонгүй — жагсаалтаа шалгана уу.'; Object.keys(r.fields || {}).forEach((n) => { if (rules[n]) check(n); }); if (r.fields && r.fields.campaignDates) { const e = document.getElementById('q-campaignDates-err'); if (e) e.textContent = 'Огноогоо шалгана уу (дуусах огноо эхлэхээс өмнө байж болохгүй).'; } say('Мэдээллээ шалгаад дахин илгээнэ үү.', 'error'); }
           else say('Илгээх үед алдаа гарлаа. Таны хүсэлт илгээгдсэнгүй — дахин оролдоно уу.', 'error');
         } catch (err) {
           say('Сүлжээний алдаа гарлаа. Таны хүсэлт илгээгдсэнгүй — дахин оролдоно уу.', 'error');

@@ -242,73 +242,101 @@ route('/portfolio/:id', projectEditor);
 
 /* ----------------------------- influencers ----------------------------- */
 
-/** Category manager: add, rename, reorder, delete (deleting never removes influencer profiles). */
-function categoryManager(cats, reload) {
-  const addInput = h('input', { type: 'text', maxlength: 60, placeholder: 'Шинэ ангиллын нэр', 'aria-label': 'Шинэ ангиллын нэр' });
-  const add = async () => {
-    const name = addInput.value.trim(); if (!name) return;
-    try { await api('/influencer-categories', { method: 'POST', body: { name } }); toast('Ангилал нэмэгдлээ'); reload(); } catch (e) { toast(e.message, 'error'); }
+// Same follower tiers as lib/tiers.js — computed from the follower count, never chosen by hand
+const TIERS = [['NANO', 1e3, 1e4], ['MICRO', 1e4, 5e4], ['MID-TIER', 5e4, 1e5], ['MACRO', 1e5, 5e5], ['MEGA', 5e5, Infinity]];
+const tierOf = (n) => (n == null || n === '' || !Number.isFinite(Number(n)) ? null : (TIERS.find(([, lo, hi]) => Number(n) >= lo && Number(n) < hi) || [null])[0]);
+const tierText = (n) => tierOf(n) || (n == null || n === '' ? 'Ангилалгүй — дагагчийн тоо оруулаагүй' : 'Ангилалгүй — 1K-аас бага');
+const COLLAGE_SIZES = [['s', 'Жижиг'], ['m', 'Дунд'], ['l', 'Том'], ['xl', 'Маш том']];
+const COLLAGE_FOCUS = [['top', 'Дээд хэсэг (нүүр)'], ['center', 'Төв'], ['bottom', 'Доод хэсэг']];
+const opts = (list, value) => list.map(([v, l]) => h('option', { value: v, selected: v === value }, l));
+
+/** Hero collage on the site's Influencer tab: who is in it, order, tile size and photo focus. */
+function collageManager(items, reload) {
+  const byId = Object.fromEntries(items.map((p) => [p.id, p]));
+  let list = items.filter((p) => p.inCollage).sort((a, b) => a.collageOrder - b.collageOrder).map((p) => ({ id: p.id, size: p.collageSize, focus: p.collageFocus }));
+  const body = h('div');
+  const preview = h('div.collage-preview', { 'aria-hidden': 'true' });
+  const save = async (btn) => {
+    busy(btn, true);
+    try { await api('/influencers/collage', { method: 'POST', body: { items: list } }); toast('Collage хадгалагдлаа'); reload(); }
+    catch (e) { toast(e.message, 'error'); } finally { busy(btn, false); }
   };
-  const row = (c, mv) => {
-    const input = h('input', { type: 'text', value: c.name, maxlength: 60, 'aria-label': 'Ангиллын нэр' });
-    const save = async () => {
-      const name = input.value.trim();
-      if (!name || name === c.name) { input.value = c.name; return; }
-      try { await api(`/influencer-categories/${c.id}`, { method: 'PUT', body: { name } }); c.name = name; toast('Нэр солигдлоо'); } catch (e) { input.value = c.name; toast(e.message, 'error'); }
-    };
-    input.onchange = save;
-    input.onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); save(); } };
-    return h('li.row-item', orderButtons(mv),
-      h('div.row-item__main', input, h('span.muted', `${c.influencers} influencer`)),
-      h('div.row-item__actions', h('button.btn.btn--danger.btn--sm', { type: 'button', onclick: async () => {
-        if (!(await confirmDialog(`"${c.name}" ангиллыг устгах уу? Influencer-ууд устахгүй — зөвхөн энэ ангиллаас хасагдана.`, { okLabel: 'Ангилал устгах', danger: true }))) return;
-        try { await api(`/influencer-categories/${c.id}`, { method: 'DELETE' }); toast('Ангилал устгагдлаа'); reload(); } catch (e) { toast(e.message, 'error'); }
-      } }, 'Устгах')));
+  const draw = () => {
+    // same packing as the site (lib/render.js influencerCollage): shortest column first, columns fill the height
+    const WEIGHT = { s: 1, m: 1.4, l: 1.9, xl: 2.6 };
+    const cols = Array.from({ length: Math.min(6, list.length) }, () => ({ h: 0, el: h('div.collage-preview__col') }));
+    for (const x of list) {
+      const p = byId[x.id]; const c = cols.reduce((a, b) => (b.h < a.h ? b : a)); const w = WEIGHT[x.size] || WEIGHT.m;
+      c.el.append(h('div.collage-preview__tile', { style: { flexGrow: String(w), backgroundImage: p.photo ? `url("${p.photo.thumbUrl || p.photo.url}")` : '', backgroundPosition: { top: '50% 12%', center: '50% 50%', bottom: '50% 88%' }[x.focus] } }));
+      c.h += w;
+    }
+    preview.replaceChildren(...cols.map((c) => c.el));
+    const candidates = items.filter((p) => !list.some((x) => x.id === p.id));
+    const addSel = h('select', h('option', { value: '' }, '+ Collage-д нэмэх…'), candidates.map((p) => h('option', { value: p.id, disabled: !p.photo }, `${p.name}${p.photo ? '' : ' (зураггүй)'}${p.status === 'published' ? '' : ' — ноорог'}`)));
+    addSel.onchange = () => { if (addSel.value) { list.push({ id: addSel.value, size: 'm', focus: 'top' }); setDirty(true); draw(); } };
+    body.replaceChildren(
+      list.length ? h('ol.collage-list', list.map((x, i) => {
+        const p = byId[x.id];
+        const size = h('select', { 'aria-label': `${p.name} — хэмжээ` }, opts(COLLAGE_SIZES, x.size)); size.onchange = () => { x.size = size.value; setDirty(true); draw(); };
+        const focus = h('select', { 'aria-label': `${p.name} — зургийн аль хэсэг харагдах` }, opts(COLLAGE_FOCUS, x.focus)); focus.onchange = () => { x.focus = focus.value; setDirty(true); draw(); };
+        const move = (d) => { const j = i + d; if (j < 0 || j >= list.length) return; [list[i], list[j]] = [list[j], list[i]]; setDirty(true); draw(); };
+        return h('li.collage-list__item',
+          h('span.collage-list__n', String(i + 1)), mediaThumb(p.photo, { size: 'sm' }),
+          h('div.collage-list__main', h('strong', p.name), p.status === 'published' ? null : h('span.muted', ' — ноорог (сайт дээр харагдахгүй)'), h('div.row', size, focus)),
+          h('div.row-item__actions',
+            h('button.btn.btn--ghost.btn--sm', { type: 'button', disabled: i === 0, onclick: () => move(-1), 'aria-label': 'Дээш' }, '↑'),
+            h('button.btn.btn--ghost.btn--sm', { type: 'button', disabled: i === list.length - 1, onclick: () => move(1), 'aria-label': 'Доош' }, '↓'),
+            h('button.btn.btn--ghost.btn--sm', { type: 'button', onclick: () => { list = list.filter((y) => y.id !== x.id); setDirty(true); draw(); } }, 'Хасах')));
+      })) : h('p.muted', 'Collage-д influencer сонгоогүй байна. Сонгох хүртэл сайт зурагтай эхний 20 influencer-ийг автоматаар харуулна.'),
+      h('div.row', list.length < 20 ? addSel : h('span.muted', 'Дээд тал нь 20 influencer.'), h('button.btn', { type: 'button', onclick: (e) => save(e.currentTarget) }, 'Collage хадгалах')));
   };
+  draw();
   return h('div.card',
-    h('div.card__head', h('h2', 'Ангиллууд'), h('span.muted', 'Сайтын influencer хэсгийн мөрүүд энэ дарааллаар гарна')),
-    cats.length ? h('div.cat-list', sortableList({ items: cats, render: row, endpoint: '/influencer-categories/reorder', onChanged: reload })) : h('p.muted', 'Ангилал алга.'),
-    h('div.row.cat-add', addInput, h('button.btn.btn--ghost', { type: 'button', onclick: add }, '+ Ангилал нэмэх')));
+    h('h2', 'Hero collage'),
+    h('p.muted', 'Сайтын Influencers хэсгийн дээд талд эдгээр зургууд нэг бүтэн artwork болж харагдана (15–20 influencer санал болгоно). Дараалал, хэмжээ, зургийн аль хэсэг харагдахыг энд тохируулна. Influencer-ийн эх зураг, мэдээлэл өөрчлөгдөхгүй.'),
+    preview, body);
 }
 
 route('/influencers', async () => {
-  const [{ items }, { items: cats }] = await Promise.all([api('/influencers'), api('/influencer-categories')]);
+  const { items } = await api('/influencers');
   const reload = () => render();
   const row = (p, mv) => h('li.row-item',
     orderButtons(mv), mediaThumb(p.photo, { size: 'sm' }),
-    h('div.row-item__main', link(`/influencers/${p.id}`, { class: 'row-item__title' }, p.name), h('span.muted', [p.featured ? '★ Онцлох' : '', p.categories.map((c) => c.name).join(', ') || p.category, p.followers != null ? `${p.followers.toLocaleString()} дагагч` : ''].filter(Boolean).join(' · '))),
+    h('div.row-item__main', link(`/influencers/${p.id}`, { class: 'row-item__title' }, p.name), h('span.muted', [p.featured ? '★ Онцлох' : '', tierText(p.followers), p.followers != null ? `${p.followers.toLocaleString()} дагагч` : '', p.inCollage ? 'Collage' : ''].filter(Boolean).join(' · '))),
     statusBadge(p.status),
     h('div.row-item__actions',
       h('button.btn.btn--ghost.btn--sm', { type: 'button', onclick: async () => { const s = p.status === 'published' ? 'draft' : 'published'; try { await api(`/influencers/${p.id}/status`, { method: 'POST', body: { status: s } }); toast(s === 'published' ? 'Нийтлэгдлээ' : 'Нийтлэлээс буцаагдлаа'); reload(); } catch (e) { toast(e.message, 'error'); } } }, p.status === 'published' ? 'Нуух' : 'Нийтлэх'),
       link(`/influencers/${p.id}`, { class: 'btn btn--sm' }, 'Засах')));
   return h('section.page',
     h('header.page__head', h('h1', 'Influencer-ууд'), link('/influencers/new', { class: 'btn' }, '+ Influencer нэмэх')),
-    h('p.muted', 'Зөвхөн баталгаажсан мэдээллийг оруулна уу. Хоосон талбарууд сайт дээр харагдахгүй. Сайтын цэсний «Influencers»-ийг дарахад нийтлэгдсэн influencer-ууд ангиллын мөрүүдээр гарна. Дараалал = «Санал болгосон» эрэмбэ. Үнэ зөвхөн энд харагдана, сайт болон public API-д хэзээ ч гарахгүй.'),
-    items.length ? sortableList({ items, render: row, endpoint: '/influencers/reorder', onChanged: reload }) : h('div.empty', h('p', 'Одоогоор influencer бүртгэгдээгүй.'), link('/influencers/new', { class: 'btn' }, 'Эхнийхийг нэмэх')),
-    categoryManager(cats, reload));
+    h('p.muted', 'Зөвхөн баталгаажсан мэдээллийг оруулна уу. Сайтын Influencers хэсэгт нийтлэгдсэн influencer-ууд дагагчийн тоогоор автоматаар NANO (1K–9,999), MICRO (10K–49,999), MID-TIER (50K–99,999), MACRO (100K–499,999), MEGA (500K+) мөрүүдэд гарна. 1K-аас бага эсвэл тоо оруулаагүй influencer мөрөнд гарахгүй. «Нуух» = идэвхгүй болгох. Үнэ зөвхөн энд харагдана.'),
+    items.length ? collageManager(items, reload) : null,
+    items.length ? sortableList({ items, render: row, endpoint: '/influencers/reorder', onChanged: reload }) : h('div.empty', h('p', 'Одоогоор influencer бүртгэгдээгүй.'), link('/influencers/new', { class: 'btn' }, 'Эхнийхийг нэмэх')));
 });
 
 async function influencerEditor({ id }) {
   const isNew = id === 'new';
-  const { items: allCats } = await api('/influencer-categories');
-  const p = isNew ? { name: '', photo: null, instagram: '', tiktok: '', youtube: '', facebook: '', followers: null, category: '', bio: '', engagement: '', engagementVerified: false, featured: false, categoryIds: [], price: '', status: 'draft' } : (await api(`/influencers/${id}`)).item;
+  const p = isNew ? { name: '', photo: null, instagram: '', tiktok: '', youtube: '', facebook: '', followers: null, category: '', bio: '', engagement: '', engagementVerified: false, featured: false, categoryIds: [], price: '', status: 'draft', inCollage: false, collageSize: 'm', collageFocus: 'top' } : (await api(`/influencers/${id}`)).item;
   const v = { ...p, followers: p.followers ?? '', categoryIds: [...(p.categoryIds || [])] };
   const toggle = (name, label, help) => { const el = h('input', { type: 'checkbox', id: `i-${name}`, checked: Boolean(v[name]) }); el.onchange = () => { v[name] = el.checked; setDirty(true); }; return h('div.field.field--toggle', h('label.switch', { for: `i-${name}` }, el, h('span', label)), help ? h('p.help', help) : null); };
-  const catBoxes = h('fieldset.field.field--wide', h('legend', 'Ангиллууд (олныг сонгож болно)'),
-    allCats.length ? h('div.row', allCats.map((c) => { const el = h('input', { type: 'checkbox', checked: v.categoryIds.includes(c.id) }); el.onchange = () => { v.categoryIds = el.checked ? [...v.categoryIds, c.id] : v.categoryIds.filter((x) => x !== c.id); setDirty(true); }; return h('label.check-inline', el, ' ', c.name); })) : h('p.muted', 'Ангилал алга — Influencer-ууд хуудаснаас нэмнэ үү.'),
-    h('p.help', 'Ангилалгүй influencer сайт дээр «Other» мөрөнд гарна.'));
+  const tierNote = h('p.help', { 'aria-live': 'polite' });
+  const showTier = () => { tierNote.textContent = `Ангилал (автоматаар): ${tierText(String(v.followers).replace(/[\s,]/g, '') === '' ? null : String(v.followers).replace(/[\s,]/g, ''))}`; };
+  const collageSize = h('select#i-collageSize', opts(COLLAGE_SIZES, v.collageSize)); collageSize.onchange = () => { v.collageSize = collageSize.value; setDirty(true); };
+  const collageFocus = h('select#i-collageFocus', opts(COLLAGE_FOCUS, v.collageFocus)); collageFocus.onchange = () => { v.collageFocus = collageFocus.value; setDirty(true); };
   const input = (name, label, { textarea, wide, ...attrs } = {}) => {
     const el = h(textarea ? 'textarea' : 'input', { id: `i-${name}`, value: v[name] ?? '', ...attrs });
     el.oninput = () => { v[name] = el.value; setDirty(true); };
     return h('div.field', { class: wide ? 'field--wide' : '' }, h('label', { for: `i-${name}` }, label), el);
   };
+  const followersField = input('followers', 'Дагагчдын тоо (ангиллыг үүнээс тооцно)', { inputmode: 'numeric', maxlength: 14, placeholder: 'Жишээ: 125000' });
+  followersField.querySelector('input').addEventListener('input', showTier); showTier();
   const errorBox = h('p.error', { role: 'alert' });
   const statusSel = h('select#i-status', h('option', { value: 'draft' }, 'Ноорог (нууц)'), h('option', { value: 'published' }, 'Нийтлэгдсэн'));
   statusSel.value = v.status; statusSel.onchange = () => { v.status = statusSel.value; setDirty(true); };
   const save = async (status) => {
     errorBox.textContent = '';
     if (!v.name.trim()) { errorBox.textContent = 'Нэр оруулна уу.'; return; }
-    const body = { name: v.name, photoId: v.photo?.id || null, instagram: v.instagram, tiktok: v.tiktok, youtube: v.youtube, facebook: v.facebook, price: v.price, featured: v.featured, engagementVerified: v.engagementVerified, categoryIds: v.categoryIds, followers: v.followers, category: v.category, bio: v.bio, engagement: v.engagement, status: status || v.status };
+    const body = { name: v.name, photoId: v.photo?.id || null, instagram: v.instagram, tiktok: v.tiktok, youtube: v.youtube, facebook: v.facebook, price: v.price, featured: v.featured, engagementVerified: v.engagementVerified, categoryIds: v.categoryIds, followers: v.followers, category: v.category, bio: v.bio, engagement: v.engagement, inCollage: v.inCollage, collageSize: v.collageSize, collageFocus: v.collageFocus, status: status || v.status };
     try {
       const r = await api(isNew ? '/influencers' : `/influencers/${id}`, { method: isNew ? 'POST' : 'PUT', body });
       setDirty(false); toast('Хадгалагдлаа');
@@ -324,10 +352,12 @@ async function influencerEditor({ id }) {
     h('form.editor', { onsubmit: (e) => { e.preventDefault(); save(); } },
       h('div.card', h('div.form-grid',
         input('name', 'Нэр *', { maxlength: 120, required: true }),
-        catBoxes,
-        toggle('featured', 'Онцлох бүтээгч (сайтын дээд хэсэгт том харагдана)', 'Олон онцлох байвал жагсаалтын эхнийх нь харагдана.'),
         mediaField({ label: 'Профайл зураг', kind: 'image', value: v.photo, onChange: (m) => { v.photo = m; setDirty(true); } }),
-        input('followers', 'Дагагчдын тоо (заавал биш)', { inputmode: 'numeric', maxlength: 14, placeholder: 'Жишээ: 125000' }),
+        h('div', followersField, tierNote),
+        toggle('featured', 'Онцлох бүтээгч (нүүр хуудасны preview-д эхэнд харагдана)', null),
+        toggle('inCollage', 'Hero collage-д оруулах', 'Influencers хэсгийн дээд талын collage-д харагдана (дээд тал нь 20). Дараалал болон бүх collage-г Influencer-ууд хуудасны «Hero collage» хэсгээс тохируулна.'),
+        h('div.field', h('label', { for: 'i-collageSize' }, 'Collage дахь хэмжээ'), collageSize),
+        h('div.field', h('label', { for: 'i-collageFocus' }, 'Зургийн аль хэсэг харагдах'), collageFocus),
         input('instagram', 'Instagram URL', { type: 'url', maxlength: 500 }),
         input('tiktok', 'TikTok URL', { type: 'url', maxlength: 500 }),
         input('youtube', 'YouTube URL', { type: 'url', maxlength: 500 }),

@@ -200,3 +200,18 @@ test('login is rate limited per account', async () => {
   for (let i = 0; i < 6; i++) r = await fetch(`${BASE}/api/admin/auth/login`, { method: 'POST', headers: { ...H, 'X-Forwarded-For': `10.8.0.${i}` }, body: JSON.stringify({ email, password: 'wrong-password-1' }) });
   assert.equal(r.status, 429);
 });
+
+test('influencer collage: max 20, no duplicates; campaign request: max 10 creators', async () => {
+  const cookie = await login();
+  const h = { ...H, cookie, Origin: BASE };
+  const id = '00000000-0000-4000-8000-000000000001';
+  let r = await fetch(`${BASE}/api/admin/influencers/collage`, { method: 'POST', headers: h, body: JSON.stringify({ items: [{ id }, { id }] }) });
+  assert.equal(r.status, 400, 'duplicates refused');
+  const many = Array.from({ length: 21 }, (_, i) => ({ id: `00000000-0000-4000-8000-${String(i).padStart(12, '0')}` }));
+  r = await fetch(`${BASE}/api/admin/influencers/collage`, { method: 'POST', headers: h, body: JSON.stringify({ items: many }) });
+  assert.equal(r.status, 400, 'more than 20 refused');
+  const eleven = many.slice(0, 11).map((x) => x.id);
+  r = await fetch(`${BASE}/api/contact`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Forwarded-For': '10.7.0.9' }, body: JSON.stringify({ kind: 'influencer', service: 'influencer', name: 'Tier Test', contact: '99112233', message: 'Campaign for eleven creators', consent: 'yes', ts: Date.now() - 10000, influencers: eleven }) });
+  assert.equal(r.status, 400);
+  assert.equal((await r.json()).fields.influencers, 'too_many');
+});

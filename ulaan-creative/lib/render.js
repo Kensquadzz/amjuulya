@@ -249,6 +249,22 @@ function strategyVisual(item) {
   </div>`;
 }
 
+/** Video service: the camera viewfinder (REC, timecode, corners). With a video added in the admin it
+ *  plays inside the frame — muted, looping, only while on screen — with a sound toggle; an image
+ *  shows as a still. Without media the decorative RECORDING frame stays. */
+function recordVisual(item, mediaMap) {
+  const works = item.works.map((w) => ({ ...w, media: mediaMap[w.mediaId] })).filter((w) => w.media);
+  const w = works.find((x) => x.media.kind === 'video') || works[0];
+  if (!w) return STATIC_VISUALS.video;
+  const m = w.media;
+  const label = w.title || m.alt || 'Видео бүтээл';
+  const inner = m.kind === 'video'
+    ? `<video class="vis-vid__media" muted loop playsinline preload="metadata"${m.thumbUrl ? ` poster="${attr(m.thumbUrl)}"` : ''} aria-label="${attr(label)}" data-rec-video><source src="${attr(m.url)}" type="${attr(m.mime === 'video/quicktime' ? 'video/mp4' : m.mime)}"></video>
+      <button type="button" class="vis-vid__sound mono" data-rec-sound aria-pressed="false" aria-label="Дуу асаах">🔇 Дуу</button>`
+    : mediaImg(m, { alt: label, sizes: '(max-width: 900px) 70vw, 30vw', cls: 'vis-vid__media' });
+  return `<div class="svc__visual vis-vid vis-vid--live"><div class="vis-vid__frame">${inner}<span class="c tl" aria-hidden="true"></span><span class="c tr" aria-hidden="true"></span><span class="c bl" aria-hidden="true"></span><span class="c br" aria-hidden="true"></span><span class="vis-vid__rec mono" aria-hidden="true"><i></i>REC</span><span class="vis-vid__tc mono" aria-hidden="true" data-timecode>00:00:00:00</span>${w.title ? `<span class="vis-vid__meta mono">${esc(w.title)}</span>` : ''}</div></div>`;
+}
+
 const STATIC_VISUALS = {
   influencer: `<div class="svc__visual vis-inf" aria-hidden="true"><div class="vis-inf__ring r1"><i></i><i></i><i></i></div><div class="vis-inf__ring r2"><i></i><i></i><i></i><i></i></div><div class="vis-inf__ring r3"><i></i><i></i><i></i><i></i><i></i></div><div class="vis-inf__core display">BRAND</div><span class="vis-inf__chip mono c1">reels</span><span class="vis-inf__chip mono c2">tiktok</span><span class="vis-inf__chip mono c3">stories</span></div>`,
   video: `<div class="svc__visual vis-vid" aria-hidden="true"><div class="vis-vid__frame"><span class="c tl"></span><span class="c tr"></span><span class="c bl"></span><span class="c br"></span><span class="vis-vid__rec mono"><i></i>REC</span><span class="vis-vid__tc mono" data-timecode>00:00:00:00</span><span class="vis-vid__meta mono">9:16 · 4K · 25FPS</span><span class="vis-vid__cross"></span><span class="vis-vid__word display">RECORDING</span></div></div>`,
@@ -259,6 +275,7 @@ const SVC_THEME = { ai: ['svc--ai', 'dark'], influencer: ['svc--inf', 'light'], 
 function serviceVisual(item, mediaMap) {
   if (item.visual === 'ai') return showcaseVisual(item, mediaMap);
   if (item.visual === 'strategy' || item.visual === 'calendar') return strategyVisual(item);
+  if (item.visual === 'video') return recordVisual(item, mediaMap);
   return STATIC_VISUALS[item.visual] || showcaseVisual(item, mediaMap);
 }
 

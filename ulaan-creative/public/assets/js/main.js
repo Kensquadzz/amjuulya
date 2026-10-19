@@ -189,7 +189,7 @@
   const tc = $('[data-timecode]');
   let tcTimer = null, tcFrames = 0;
   const tcStart = () => {
-    if (!tc || tcTimer || reduceMotion) return;
+    if (!tc || tcTimer || reduceMotion || $('[data-rec-video]')) return;
     tcTimer = setInterval(() => {
       tcFrames += 1;
       const f = tcFrames % 25, s = Math.floor(tcFrames / 25) % 60, m = Math.floor(tcFrames / 1500) % 60;
@@ -204,6 +204,31 @@
       entries.forEach((en) => (en.isIntersecting ? tcStart() : tcStop()));
     }, { threshold: 0.25 });
     $$('.vis-vid').forEach((el) => vio.observe(el));
+  }
+
+  /* ---------------- Video service: admin video inside the REC frame ---------------- */
+  const recVideo = $('[data-rec-video]');
+  if (recVideo) {
+    const soundBtn = $('[data-rec-sound]');
+    // muted autoplay is allowed everywhere; it only runs while the frame is on screen
+    const play = () => { const p = recVideo.play(); if (p && p.catch) p.catch(() => {}); };
+    if ('IntersectionObserver' in window) {
+      new IntersectionObserver((entries) => entries.forEach((en) => {
+        if (en.isIntersecting) { if (!reduceMotion || !recVideo.muted) play(); } else recVideo.pause();
+      }), { threshold: 0.35 }).observe(recVideo);
+    } else if (!reduceMotion) play();
+    if (soundBtn) soundBtn.addEventListener('click', () => {
+      recVideo.muted = !recVideo.muted;
+      soundBtn.setAttribute('aria-pressed', String(!recVideo.muted));
+      soundBtn.setAttribute('aria-label', recVideo.muted ? 'Дуу асаах' : 'Дуу хаах');
+      soundBtn.textContent = recVideo.muted ? '🔇 Дуу' : '🔊 Дуу';
+      play();
+    });
+    // the timecode shows the video's real position
+    if (tc) recVideo.addEventListener('timeupdate', () => {
+      const t = recVideo.currentTime, f = Math.floor((t % 1) * 25), sec = Math.floor(t) % 60, min = Math.floor(t / 60) % 60;
+      tc.textContent = `00:${String(min).padStart(2, '0')}:${String(sec).padStart(2, '0')}:${String(f).padStart(2, '0')}`;
+    });
   }
 
   /* ---------------- Influencers: rows, search/filter, multi-select → campaign inquiry ---------------- */

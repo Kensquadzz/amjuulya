@@ -291,19 +291,20 @@ function services(s, mediaMap) {
 function work(w, projects) {
   const items = projects.map((p, i) => {
     const media = p.cover
-      ? mediaImg(p.cover, { alt: p.cover.alt || p.title, sizes: '(max-width: 900px) 100vw, 60vw' })
+      ? mediaImg(p.cover, { alt: p.cover.alt || p.title, sizes: '(max-width: 760px) 72vw, 360px' })
       : p.video?.thumbUrl ? `<img src="${attr(p.video.thumbUrl)}" alt="${attr(p.title)}" loading="lazy" decoding="async">`
       : `<div class="ph ph--${(i % 5) + 1}" aria-hidden="true"><span class="display">${esc(initials(p.title) || 'UC')}</span></div>`;
-    return `<article class="work__item w${(i % 5) + 1}" data-cursor="Үзэх">
+    return `<li class="work__item work-card" data-cursor="Үзэх">
         <a class="work__link" href="/work/${attr(p.slug)}" aria-label="${attr(p.title)}">
-          <figure class="work__media" data-reveal-media>${media}${p.video || p.videoUrl ? '<span class="work__play mono" aria-hidden="true">▶ Video</span>' : ''}</figure>
-          <div class="work__meta">
-            <span class="mono">${String(i + 1).padStart(2, '0')}${p.category ? ` — ${esc(p.category)}` : ''}</span>
-            <h3>${esc(p.title)}</h3>
-            ${p.client ? `<span class="work__client mono">${esc(p.client)}</span>` : ''}
-          </div>
+          <figure class="work__media" data-reveal-media>${media}${p.video || p.videoUrl ? '<span class="work__play mono" aria-hidden="true">▶ Video</span>' : ''}
+            <figcaption class="work__meta">
+              <span class="mono">${String(i + 1).padStart(2, '0')}${p.category ? ` — ${esc(p.category)}` : ''}</span>
+              <h3>${esc(p.title)}</h3>
+              ${p.client ? `<span class="work__client mono">${esc(p.client)}</span>` : ''}
+            </figcaption>
+          </figure>
         </a>
-      </article>`;
+      </li>`;
   });
   return `<section class="work" id="work" aria-labelledby="work-title" data-cursor-theme="dark">
   <div class="container">
@@ -320,7 +321,16 @@ function work(w, projects) {
         ${f.text ? `<p>${esc(f.text)}</p>` : ''}
       </li>`).join('')}
     </ol>` : ''}
-    ${items.length ? `<div class="work__grid">${items.join('\n      ')}</div>` : `<div class="work__empty" data-reveal>
+    ${items.length ? `<div class="inf-row work-row" aria-label="Төслүүд">
+      <div class="inf-row__head work-row__head"><span class="mono">${items.length} төсөл</span><div class="inf-row__pages" aria-hidden="true" data-inf-pages></div></div>
+      <div class="inf-row__viewport">
+        <button type="button" class="inf-row__edge inf-row__edge--prev" data-inf-row-prev aria-label="Өмнөх төслүүд"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M10 3 5 8l5 5" fill="none" stroke="currentColor" stroke-width="1.8"/></svg></button>
+        <ul class="inf-row__track work-row__track" role="list" data-inf-track>
+      ${items.join('\n      ')}
+        </ul>
+        <button type="button" class="inf-row__edge inf-row__edge--next" data-inf-row-next aria-label="Дараагийн төслүүд"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m6 3 5 5-5 5" fill="none" stroke="currentColor" stroke-width="1.8"/></svg></button>
+      </div>
+    </div>` : `<div class="work__empty" data-reveal>
       <div><h3 class="display">${esc(w.emptyTitle)}</h3><p>${esc(w.emptyText)}</p></div>
       <a class="btn-fill btn-fill--dark" href="#contact" data-magnetic><span>Төслөө ярилцах</span><i class="dot" aria-hidden="true"></i></a>
     </div>`}

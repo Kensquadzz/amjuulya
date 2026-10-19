@@ -381,7 +381,7 @@
 
     /* --- rows: Netflix-style paging with eased scroll, mouse drag with momentum, page dashes --- */
     const easeInOut = (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
-    const cardStep = (track) => { const c = track.querySelector('.inf-card:not([hidden])'); if (!c) return track.clientWidth; const gap = parseFloat(getComputedStyle(track).columnGap) || 0; return c.offsetWidth + gap; };
+    const cardStep = (track) => { const c = track.querySelector(':scope > :not([hidden])'); if (!c) return track.clientWidth; const gap = parseFloat(getComputedStyle(track).columnGap) || 0; return c.offsetWidth + gap; };
     function glide(track, to, dur) {
       const max = track.scrollWidth - track.clientWidth;
       to = Math.max(0, Math.min(max, to));

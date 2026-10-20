@@ -436,18 +436,14 @@ async function handleMessagingEvent(event, pageId) {
     return;
   }
 
-  // ---------- Зураг (төлбөрийн баримт) ----------
+  // ---------- Зураг, видео, файл ----------
+  // AI зургийг харж шийднэ: банкны баримт бол [[RECEIPT]], бусад бол асуултад хариулна
   const attachments = event.message?.attachments || [];
-  if (attachments.some((a) => a.type === "image") && !event.message?.text) {
-    console.log("Payment screenshot received from:", senderId);
-    await sendText(
-      senderId,
-      "✅ Төлбөрийн баримтыг хүлээн авлаа. Баярлалаа!\n\n" +
-        "📧 Файл хүлээн авах ИМЭЙЛ хаягаа илгээгээгүй бол энд бичээрэй.\n\n" +
-        "⏳ Админ баталгаажуулсны дараа танд мэдэгдэх болно."
-    );
-    await notifyAdmin(senderId, "Төлбөрийн баримт (зураг) ирлээ", "[зураг]");
-    return;
+  if (attachments.length && !event.message?.text) {
+    const img = attachments.find((a) => a.type === "image" && a.payload?.url);
+    const kind = img ? "зураг" : attachments[0].type === "video" ? "видео" : "файл";
+    console.log("Attachment from:", senderId, kind);
+    return handleAI(senderId, pageId, `[Хэрэглэгч ${kind} илгээлээ]`, { imageUrl: img?.payload?.url, attachment: true });
   }
 
   // ---------- Текст ----------
@@ -508,9 +504,15 @@ async function handleText(psid, pageId, raw) {
     );
   }
 
-  // Богино мессежээр бүтээгдэхүүн нэрлэсэн бол шууд карт харуулна
   const wordCount = text.split(/\s+/).length;
   const productId = detectProduct(text);
+
+  // "Canva Pro авах", "мастер пак авъя", "дансаа явуулаарай" → шууд төлбөрийн мэдээлэл
+  if (productId && BUY_RE.test(text) && !AFTER_BUY_RE.test(text)) {
+    return handleBuy(psid, pageId, productId);
+  }
+
+  // Богино мессежээр бүтээгдэхүүн нэрлэсэн бол шууд карт харуулна
   if (productId && wordCount <= 4) {
     return showProduct(psid, pageId, productId);
   }
@@ -518,6 +520,10 @@ async function handleText(psid, pageId, raw) {
   // Бусад бүх мессежийг AI-д
   return handleAI(psid, pageId, raw);
 }
+
+// Худалдан авах хүсэл / аль хэдийн төлсөн (эдгээрт данс дахин илгээхгүй)
+const BUY_RE = /(авах|авъя|авья|авмаар|авна|авии|avah|awah|avya|avia|avmaar|awmaar|avna|avii|захиал|zahial|төлөх|tuluh|данс|dans)/i;
+const AFTER_BUY_RE = /(ирээгүй|ireegui|ireegu|төлсөн|tulsun|tolson|шилжүүлсэн|shiljuulsen|авсан|avsan|awsan)/i;
 
 function detectProduct(text) {
   for (const [id, words] of Object.entries(KEYWORDS)) {
@@ -740,6 +746,12 @@ OFFICE PACK-ИЙН ТУХАЙ:
 - Тодорхой нэг байгууллагад зориулсан файл ороогүй, зөвхөн нийтлэг хэрэглээний загварууд.
 - MASTER PACK = 4 PACK-ийн 110 файл бүгд. Үндсэн үнэ ${fmt(PRODUCTS.MASTER.oldPrice)}, одоо ${fmt(PRODUCTS.MASTER.price)}. Хэрэв "тус тусад нь авбал хэд вэ" гэж асуувал PACK тус бүрийн үнийг жагсааж хэл (${PACK_IDS.map((id) => `${PRODUCTS[id].short} ${fmt(PRODUCTS[id].price)}`).join(", ")}). Нийлбэр дүн, хэмнэлтийн дүнг ХЭЗЭЭ Ч бүү тооцож хэл.
 
+ЗУРАГ:
+- Хэрэглэгч зураг илгээвэл сайн хар. Бүх зураг төлбөрийн баримт БИШ.
+- Банкны апп/шилжүүлгийн дэлгэц (дүн, данс, гүйлгээний утга харагдана) бол: баярлалаа гэж, имэйл хаягаа өгөөгүй бол асуу, админ шалгаад илгээнэ гэж хэлээд [[RECEIPT]].
+- Бусад зураг (Canva-ийн дэлгэц, алдааны мэдэгдэл, загвар г.м.) бол юу харагдаж байгааг ойлгож, хэрэглэгчийн асуултад хариул. Canva Pro-д BG Remover, Magic Edit, Magic Eraser, Magic Expand, Upscale, Premium загвар, элемент, фонт зэрэг Pro хэрэгслүүд бүгд нээгдэнэ.
+- Видео, файлыг харах боломжгүй — юу асуух гэснээ бичиж, эсвэл дэлгэцийн зураг илгээхийг хүс.
+
 ТӨЛБӨРИЙН ЖУРАМ:
 Хэрэглэгч данс руу шилжүүлж (гүйлгээний утгад нэр + утасны дугаар), баримтын screenshot-оо чатад илгээж, имэйл хаягаа бичнэ. Админ шалгаад файл/урилгыг имэйлээр илгээнэ. QPay зэрэг автомат төлбөрийн систем байхгүй.
 
@@ -772,11 +784,12 @@ OFFICE PACK-ИЙН ТУХАЙ:
 - [[MENU]] — бүх бүтээгдэхүүний цэсийг харуулах (зөвхөн анхны мэндчилгээ эсвэл "юу байгаа вэ" гэж асуувал)
 - [[PRODUCT:ID]] — нэг бүтээгдэхүүний карт (үнэ, агуулга, АВАХ товч). Карт өөрөө үнэ, агуулгыг харуулдаг тул энэ үед текстээ 1 өгүүлбэрээс хэтрүүлэхгүй, үнэ, дэлгэрэнгүйг бүү давт.
 - [[LIST:ID]] — PACK-ийн бүх файлын нэрсийг илгээх (MASTER бол 4 PACK бүгд)
-- [[BUY:ID]] — хэрэглэгч тодорхой бүтээгдэхүүнийг авахаар шийдсэн бол төлбөрийн мэдээлэл илгээх
+- [[BUY:ID]] — хэрэглэгч авах, захиалах, данс, төлбөрийн мэдээлэл хүсвэл ШУУД төлбөрийн мэдээлэл илгээх (картыг дахин бүү харуул). Аль бүтээгдэхүүн болохыг яриан дээрээс ойлго.
+- [[RECEIPT]] — хэрэглэгч банкны гүйлгээний баримт илгээсэн үед
 Дансны дугаарыг өөрөө бүү бич — [[BUY:ID]] ашигла.`;
 }
 
-async function handleAI(psid, pageId, raw) {
+async function handleAI(psid, pageId, raw, { imageUrl, attachment = false } = {}) {
   const apiKey = process.env.ANTHROPIC_API_KEY;
 
   await senderAction(psid, "typing_on");
@@ -795,7 +808,7 @@ async function handleAI(psid, pageId, raw) {
 
   // "за", "ok", "баярлалаа", 👍 гэх мэт — өмнө нь асуулт асуугаагүй бол хариулахгүй
   const lastPage = [...history].reverse().find((m) => m.fromPage);
-  if (ACK_RE.test(raw) && !(lastPage && !lastPage.admin && /[?？]\s*$/.test(lastPage.text || ""))) {
+  if (!attachment && ACK_RE.test(raw) && !(lastPage && !lastPage.admin && /[?？]\s*$/.test(lastPage.text || ""))) {
     console.log("Ack — no reply:", psid, raw);
     return;
   }
@@ -809,19 +822,35 @@ async function handleAI(psid, pageId, raw) {
   if (!apiKey) {
     console.error("ANTHROPIC_API_KEY тохируулаагүй байна");
   } else {
-    reply = await askClaude(apiKey, buildMessages(history, raw));
+    // Одоо илгээсэн зураг, эсвэл сүүлийн 4 мессеж дотор хэрэглэгчийн илгээсэн зураг ("ийм цонх..." г.м.)
+    const recentImage =
+      imageUrl || [...history].slice(-4).reverse().find((m) => !m.fromPage && m.image)?.image;
+    const image = recentImage ? await loadImage(recentImage) : null;
+    reply = await askClaude(apiKey, buildMessages(history, raw, image));
   }
 
   // AI ажиллахгүй бол: анх удаа бичсэн хүнд цэс, бусад үед хэрэглэгчид юу ч бичихгүй, админд мэдэгдэнэ
   if (!reply) {
+    if (attachment) return notifyAdmin(psid, `Хэрэглэгч ${raw.includes("зураг") ? "зураг" : "файл"} илгээсэн (бот уншиж чадсангүй)`, raw);
     if (!talkedBefore) return sendMenu(psid);
     return notifyAdmin(psid, "Бот хариулж чадсангүй", raw);
   }
 
   // Төгсгөлийн товчны тэмдэглэгээ
-  const marker = reply.match(/\[\[(MENU|HUMAN|SKIP|PRODUCT:(\w+)|BUY:(\w+)|LIST:(\w+))\]\]/);
+  const marker = reply.match(/\[\[(MENU|HUMAN|SKIP|RECEIPT|PRODUCT:(\w+)|BUY:(\w+)|LIST:(\w+))\]\]/);
   // Messenger markdown-ыг үргэлж зөв харуулдаггүй тул ** арилгана
   const text = reply.replace(/\[\[[^\]]*\]\]/g, "").replace(/\*\*/g, "").trim();
+
+  if (marker?.[1] === "RECEIPT") {
+    await sendText(
+      psid,
+      text ||
+        "✅ Төлбөрийн баримтыг хүлээн авлаа. Баярлалаа!\n\n" +
+          "📧 Файл хүлээн авах ИМЭЙЛ хаягаа илгээгээгүй бол энд бичээрэй.\n\n" +
+          "⏳ Админ баталгаажуулсны дараа танд мэдэгдэх болно."
+    );
+    return notifyAdmin(psid, "Төлбөрийн баримт ирлээ — шалгаад илгээнэ үү", raw);
+  }
 
   if (marker?.[1] === "SKIP") {
     console.log("AI chose not to reply:", psid, raw);
@@ -966,7 +995,7 @@ async function askClaude(apiKey, messages) {
 }
 
 // Messenger-ийн түүхийг Claude-ийн формат руу хөрвүүлэх
-function buildMessages(history, current) {
+function buildMessages(history, current, image = null) {
   const msgs = [];
   for (const m of history) {
     const role = m.fromPage ? "assistant" : "user";
@@ -987,7 +1016,33 @@ function buildMessages(history, current) {
   }
 
   while (msgs.length && msgs[0].role !== "user") msgs.shift();
-  return msgs.length ? msgs : [{ role: "user", content: current }];
+  if (!msgs.length) msgs.push({ role: "user", content: current });
+
+  // Зургийг хэрэглэгчийн сүүлийн мессежид хавсаргана
+  if (image) {
+    const lastUser = msgs[msgs.length - 1];
+    lastUser.content = [
+      { type: "image", source: { type: "base64", media_type: image.mediaType, data: image.data } },
+      { type: "text", text: lastUser.content },
+    ];
+  }
+  return msgs;
+}
+
+// Messenger-ийн зургийг татаж Claude-д өгөх (5MB хүртэл)
+async function loadImage(url) {
+  try {
+    const r = await fetch(url);
+    if (!r.ok) return null;
+    const mediaType = (r.headers.get("content-type") || "").split(";")[0].trim();
+    if (!/^image\/(jpeg|png|gif|webp)$/.test(mediaType)) return null;
+    const buf = Buffer.from(await r.arrayBuffer());
+    if (buf.length > 4.5 * 1024 * 1024) return null;
+    return { mediaType, data: buf.toString("base64") };
+  } catch (e) {
+    console.error("Image download failed:", e);
+    return null;
+  }
 }
 
 // Хэрэглэгчтэй хийсэн сүүлийн мессежүүд (хуучнаас шинэ рүү)
@@ -996,7 +1051,7 @@ async function recentMessages(psid, limit) {
   try {
     const url =
       `${GRAPH}/me/conversations?platform=messenger&user_id=${psid}` +
-      `&fields=messages.limit(${limit}){message,from,created_time}&access_token=${token}`;
+      `&fields=messages.limit(${limit}){message,from,created_time,attachments{image_data{url}}}&access_token=${token}`;
     const response = await fetch(url);
     if (!response.ok) {
       console.error("Conversation fetch error:", await response.text());
@@ -1006,7 +1061,12 @@ async function recentMessages(psid, limit) {
     const items = data.data?.[0]?.messages?.data || [];
     return items
       .reverse()
-      .map((m) => ({ text: m.message, fromPage: m.from?.id !== psid, at: Date.parse(m.created_time) || 0 }));
+      .map((m) => {
+        const atts = m.attachments?.data || [];
+        const image = atts.find((a) => a.image_data?.url)?.image_data.url;
+        const text = m.message || (image ? "[зураг]" : atts.length ? "[файл/видео]" : "");
+        return { text, image, fromPage: m.from?.id !== psid, at: Date.parse(m.created_time) || 0 };
+      });
   } catch (error) {
     console.error("Conversation fetch failed:", error);
     return [];

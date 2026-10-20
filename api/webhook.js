@@ -267,6 +267,9 @@ const BANK = {
 
 const fmt = (n) => n.toLocaleString("en-US") + "₮";
 
+// Пэйжийн албан ёсны утас (Facebook-ийн автомат хариунд ч бичигдсэн)
+const CONTACT_PHONE = "8005-3358";
+
 // Хэрэглэгч бичгээр бүтээгдэхүүн нэрлэвэл таних түлхүүр үгс
 const KEYWORDS = {
   MASTER: ["master", "мастер", "110"],
@@ -363,6 +366,16 @@ async function handleMessagingEvent(event, pageId) {
     // "#bot" → ботыг дахин асаана, "#stop" → 30 хоног зогсооно
     if (text.trim() === "#bot") return resumeUser(customerId);
     if (text.trim() === "#stop") return pauseUser(customerId, 24 * 30);
+
+    // Facebook-ийн өөрийн автомат хариу (Instant reply, FAQ г.м.) — админ биш.
+    // Хэрэглэгч бичсэнээс хойш 10 секундэд ирсэн, эсвэл өмнө нь автомат гэж танигдсан текст.
+    const sinceCustomer = Date.now() - Number((await kvGet(`lastin:${customerId}`)) || 0);
+    if (sinceCustomer < 10000 || (await isAutoText(event.message.text))) {
+      await rememberAutoText(customerId, event.message.text);
+      console.log("Facebook automation echo — bot keeps running:", customerId);
+      return;
+    }
+
     await pauseUser(customerId, HUMAN_PAUSE_HOURS);
     await kvDel(`resumed:${customerId}`);
     // AI дараа нь таны бичсэнийг "засах" гэж оролдохгүйн тулд санана
@@ -384,6 +397,9 @@ async function handleMessagingEvent(event, pageId) {
     }
     return;
   }
+
+  // Хэрэглэгч бичсэн цаг (Facebook-ийн автомат хариуг админаас ялгахад)
+  await kvSet(`lastin:${senderId}`, Date.now(), 120);
 
   // Админы команд (#admin, #on, #off, #status) — админы хувийн чатад бот хариулахгүй
   const rawText = event.message?.text?.trim() || "";
@@ -741,8 +757,12 @@ OFFICE PACK-ИЙН ТУХАЙ:
 - Canva урилга / файл имэйлээр ирээгүй гэвэл: уучлалт гуйж, Spam/Promotions хавтсаа шалгах, Canva урилгыг Accept дарах хэрэгтэйг хэлээд, ямар имэйл өгснийг асуу. Төгсгөлд [[HUMAN]] бич.
 - Гомдол, уурласан, мөнгө буцаах, "хүнтэй ярья" гэвэл: уучлалт гуйж, админ удахгүй холбогдоно гэж хэлээд төгсгөлд [[HUMAN]] бич.
 
-АДМИНЫ МЕССЕЖҮҮД (МАШ ЧУХАЛ):
-- Ярианд "[АДМИН]" гэж эхэлсэн мессежийг пэйжийн админ (хүн) гараар бичсэн. Админы хэлсэн үнэ, үйлчилгээ, тохиролцоо, амлалтыг ХЭЗЭЭ Ч бүү үгүйсгэ, "алдаа байсан" гэж бүү хэл, уучлалт бүү гуй, бүү засварла.
+ХОЛБОО БАРИХ:
+- Утас: ${CONTACT_PHONE}. Эсвэл энэ чатаар бичвэл админ хариулна. "Холбоо барих", "утасны дугаар" гэж асуувал үүнийг хэл.
+
+ӨМНӨХ МЕССЕЖҮҮД (МАШ ЧУХАЛ):
+- Пэйжийн нэрээр бичигдсэн өмнөх мессежүүдийг заавал чи бичээгүй: "[АДМИН]" — админ (хүн) гараар бичсэн, "[ПЭЙЖИЙН АВТОМАТ ХАРИУ]" — Facebook-ийн автомат хариу. Тэмдэглэгээгүй ч бусад хүн бичсэн байж болно.
+- Пэйжийн нэрээр өмнө бичигдсэн ЯМАР Ч мессежийн үнэ, утасны дугаар, үйлчилгээ, тохиролцоо, амлалтыг ХЭЗЭЭ Ч бүү үгүйсгэ, "алдаа", "баталгаажаагүй", "үл тоомсорло" гэж бүү хэл, уучлалт бүү гуй, бүү засварла. Зүгээр хэрэглэгчийн сүүлийн асуултад хариул.
 - Каталогт байхгүй үйлчилгээ, тусгай захиалгын яриа (жишээ нь видео хийлгэх, дизайн, лого, өөр үнэтэй тохиролцоо) явж байвал — энэ нь админы ажил. Юу ч бүү бич, зөвхөн [[HUMAN]].
 - Хэрэглэгч "за", "ok", "ойлголоо", "баярлалаа" гэх мэт товч хариу бичсэн бол, энэ нь таны асуултын хариу биш бол [[SKIP]].
 
@@ -761,8 +781,15 @@ async function handleAI(psid, pageId, raw) {
 
   await senderAction(psid, "typing_on");
 
-  const [history, admins] = await Promise.all([recentMessages(psid, 12), adminTexts(psid)]);
-  for (const m of history) m.admin = m.fromPage && admins.has(normText(m.text));
+  const [history, admins, autos] = await Promise.all([
+    recentMessages(psid, 12),
+    adminTexts(psid),
+    autoTexts(psid),
+  ]);
+  for (const m of history) {
+    m.admin = m.fromPage && admins.has(normText(m.text));
+    m.auto = m.fromPage && !m.admin && (autos.has(normText(m.text)) || (await isAutoText(m.text)));
+  }
   // Бот/админ энэ хүнд өмнө нь бичсэн эсэх — бичсэн бол цэсийг дахин бүү илгээ
   const talkedBefore = history.some((m) => m.fromPage);
 
@@ -943,7 +970,8 @@ function buildMessages(history, current) {
   const msgs = [];
   for (const m of history) {
     const role = m.fromPage ? "assistant" : "user";
-    const text = (m.admin ? "[АДМИН] " : "") + (m.text || "").trim();
+    const tag = m.admin ? "[АДМИН] " : m.auto ? "[ПЭЙЖИЙН АВТОМАТ ХАРИУ] " : "";
+    const text = tag + (m.text || "").trim();
     if (!text) continue;
     const last = msgs[msgs.length - 1];
     if (last && last.role === role) last.content += "\n" + text;
@@ -1126,6 +1154,26 @@ async function adminTexts(psid) {
   return new Set(await kvList(`admintxt:${psid}`, 30));
 }
 
+const textKey = (t) => {
+  let h = 0;
+  for (const c of normText(t)) h = (Math.imul(31, h) + c.codePointAt(0)) | 0;
+  return (h >>> 0).toString(36);
+};
+
+async function rememberAutoText(psid, text) {
+  if (!text) return;
+  await kvSet(`autotext:${textKey(text)}`, "1", 90 * 24 * 3600);
+  await kvPush(`autotxt:${psid}`, normText(text), 20, 30 * 24 * 3600);
+}
+
+async function isAutoText(text) {
+  return !!text && !!(await kvGet(`autotext:${textKey(text)}`));
+}
+
+async function autoTexts(psid) {
+  return new Set(await kvList(`autotxt:${psid}`, 20));
+}
+
 async function adminPsid() {
   return process.env.ADMIN_PSID || (await kvGet("admin:psid")) || "";
 }
@@ -1234,10 +1282,10 @@ async function notifyAdmin(psid, reason, userText, { paused = false } = {}) {
 }
 
 // Хэрэглэгчийг админд шилжүүлэх: (сонголтоор) хариу бичиж, бот зогсоод, админд мэдэгдэнэ
+// Бот зогсохгүй — хэрэглэгч өөр асуулт асуувал хариулсаар байна. Админ гараар бичмэгц бот зогсоно.
 async function handOff(psid, reason, userText, replyText) {
   if (replyText) await sendText(psid, replyText);
-  await pauseUser(psid, HUMAN_PAUSE_HOURS);
-  await notifyAdmin(psid, reason, userText, { paused: true });
+  await notifyAdmin(psid, reason, userText);
 }
 
 // ==========================================

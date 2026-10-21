@@ -38,7 +38,8 @@ function coerce(shape, value, path) {
   if (shape === null || /mediaId$/i.test(path)) return isUuid(value) ? value : null;
   if (typeof shape === 'boolean') return value === true || value === 'true';
   if (typeof shape === 'number') { const n = Number(value); return Number.isFinite(n) ? n : shape; }
-  // strings
+  // strings: a field missing from saved content (added after it was saved) keeps its default
+  if (value === undefined) return shape;
   return typeof value === 'string' || typeof value === 'number' ? String(value).trim().slice(0, 5000) : '';
 }
 

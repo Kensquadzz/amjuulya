@@ -181,8 +181,9 @@ test('security headers on public and admin pages', async () => {
 
 test('contact form: validation, honeypot, rate limit', async () => {
   const post = (b, ip) => fetch(`${BASE}/api/contact`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Forwarded-For': ip }, body: JSON.stringify(b) });
-  const ok = { name: 'API Test', contact: '99112233', service: 'ai', message: 'Testing the contact endpoint', consent: 'yes', ts: Date.now() - 10000 };
+  const ok = { name: 'API Test', contact: 'api-test@example.com', service: 'ai', message: 'Testing the contact endpoint', consent: 'yes', ts: Date.now() - 10000 };
   assert.equal((await post({ ...ok, consent: '' }, '10.9.0.1')).status, 400, 'consent required');
+  assert.equal((await post({ ...ok, contact: '99112233' }, '10.9.0.6')).status, 400, 'e-mail only, no phone numbers');
   assert.equal((await post({ ...ok, service: 'hacker' }, '10.9.0.2')).status, 400, 'unknown service');
   assert.equal((await post({ ...ok, ts: Date.now() }, '10.9.0.3')).status, 429, 'too fast');
   const hp = await post({ ...ok, website: 'spam' }, '10.9.0.4');
@@ -211,7 +212,7 @@ test('influencer collage: max 20, no duplicates; campaign request: max 10 creato
   r = await fetch(`${BASE}/api/admin/influencers/collage`, { method: 'POST', headers: h, body: JSON.stringify({ items: many }) });
   assert.equal(r.status, 400, 'more than 20 refused');
   const eleven = many.slice(0, 11).map((x) => x.id);
-  r = await fetch(`${BASE}/api/contact`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Forwarded-For': '10.7.0.9' }, body: JSON.stringify({ kind: 'influencer', service: 'influencer', name: 'Tier Test', contact: '99112233', message: 'Campaign for eleven creators', consent: 'yes', ts: Date.now() - 10000, influencers: eleven }) });
+  r = await fetch(`${BASE}/api/contact`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Forwarded-For': '10.7.0.9' }, body: JSON.stringify({ kind: 'influencer', service: 'influencer', name: 'Tier Test', contact: 'tier-test@example.com', message: 'Campaign for eleven creators', consent: 'yes', ts: Date.now() - 10000, influencers: eleven }) });
   assert.equal(r.status, 400);
   assert.equal((await r.json()).fields.influencers, 'too_many');
 });

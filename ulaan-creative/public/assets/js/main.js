@@ -548,10 +548,9 @@
       const qSubmit = $('.inf-q__submit', qForm);
       const shownAt = { t: Date.now() };
       const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
-      const phoneRe = /^\+?[\d\s\-()]{8,20}$/;
       const rules = {
         name: (v) => (v.trim().length < 2 ? 'Нэрээ оруулна уу.' : ''),
-        contact: (v) => { const t = v.trim(); if (!t) return 'Утас эсвэл имэйлээ оруулна уу.'; return emailRe.test(t) || (phoneRe.test(t) && t.replace(/\D/g, '').length >= 8) ? '' : 'Зөв утас эсвэл имэйл оруулна уу.'; },
+        contact: (v) => { const t = v.trim(); if (!t) return 'Имэйлээ оруулна уу.'; return emailRe.test(t) ? '' : 'Зөв имэйл хаяг оруулна уу.'; },
         message: (v) => (v.trim().length < 10 ? 'Кампанит ажлын зорилгоо товч бичнэ үү (дор хаяж 10 тэмдэгт).' : ''),
         consent: (v, el) => (el.checked ? '' : 'Мэдээлэл хадгалахыг зөвшөөрнө үү.'),
         campaignEnd: (v) => { const s0 = qForm.elements.campaignStart.value; return s0 && v && v < s0 ? 'Дуусах огноо эхлэх огнооноос өмнө байж болохгүй.' : ''; },
@@ -618,13 +617,12 @@
     ts.value = String(Date.now());
 
     const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
-    const phoneRe = /^\+?[\d\s\-()]{8,20}$/;
     const rules = {
       name: (v) => (v.trim().length < 2 ? 'Нэрээ оруулна уу.' : ''),
       contact: (v) => {
         const t = v.trim();
-        if (!t) return 'Имэйл эсвэл утасны дугаараа оруулна уу.';
-        return emailRe.test(t) || (phoneRe.test(t) && t.replace(/\D/g, '').length >= 8) ? '' : 'Зөв имэйл эсвэл утасны дугаар оруулна уу.';
+        if (!t) return 'Имэйлээ оруулна уу.';
+        return emailRe.test(t) ? '' : 'Зөв имэйл хаяг оруулна уу.';
       },
       service: (v) => (!v ? 'Үйлчилгээ сонгоно уу.' : ''),
       message: (v) => (v.trim().length < 10 ? 'Төслийнхөө талаар товч бичнэ үү (дор хаяж 10 тэмдэгт).' : ''),

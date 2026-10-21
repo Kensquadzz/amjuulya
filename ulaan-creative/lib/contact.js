@@ -9,7 +9,6 @@ import { serviceOptions } from './render.js';
 import { BUDGET_OPTIONS, DEFAULT_CONTENT } from './defaults.js';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
-const PHONE_RE = /^\+?[\d\s\-()]{8,20}$/;
 const MIN_FILL_MS = 2500;
 const str = (v, max) => (typeof v === 'string' ? v.trim().slice(0, max) : '');
 const memHits = new Map(); // fallback limiter when no database is configured
@@ -49,8 +48,7 @@ export function validateContact(body, services) {
   if ((body.campaignStart && !from) || (body.campaignEnd && !to) || (from && to && to < from)) fields.campaignDates = 'invalid';
   data.campaignDates = from || to ? `${from || '…'} → ${to || '…'}` : '';
   if (data.name.length < 2) fields.name = 'required';
-  const digits = data.contact.replace(/\D/g, '');
-  if (!(EMAIL_RE.test(data.contact) || (PHONE_RE.test(data.contact) && digits.length >= 8))) fields.contact = 'invalid';
+  if (!EMAIL_RE.test(data.contact)) fields.contact = 'invalid'; // e-mail only: the auto-reply goes there
   if (!services.some(([v]) => v === data.service)) fields.service = 'invalid';
   if (data.budget && !BUDGET_OPTIONS.some(([v]) => v === data.budget)) fields.budget = 'invalid';
   if (data.message.length < 10) fields.message = 'too_short';
@@ -139,7 +137,7 @@ async function sendEmail(data, services) {
   const serviceLabel = (services.find(([v]) => v === data.service) || [, data.service])[1];
   const budget = (BUDGET_OPTIONS.find(([v]) => v === data.budget) || [, '—'])[1];
   const isInf = data.kind === 'influencer';
-  const rows = [['Нэр', data.name], ['Компани / брэнд', data.company || '—'], ['Имэйл / утас', data.contact]];
+  const rows = [['Нэр', data.name], ['Компани / брэнд', data.company || '—'], ['Имэйл', data.contact]];
   if (isInf) rows.push(['Сонгосон influencer', (data.influencers || []).map((i) => i.name).join(', ') || '—'], ['Кампанит ажлын огноо', data.campaignDates || '—']);
   else rows.push(['Үйлчилгээ', serviceLabel], ['Төсөв', budget]);
   if (data.notes) rows.push(['Нэмэлт тэмдэглэл', data.notes]);

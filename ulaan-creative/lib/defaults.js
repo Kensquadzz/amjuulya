@@ -121,6 +121,24 @@ export const DEFAULT_CONTENT = {
     consentLabel: 'Ulaan Creative миний илгээсэн мэдээллийг зөвхөн энэ хүсэлтэд хариу өгөх зорилгоор хадгалж, ашиглахыг зөвшөөрч байна.',
     privacyNotice: 'Таны мэдээллийг гуравдагч этгээдэд худалдахгүй, дамжуулахгүй. Мэдээллээ устгуулахыг хүсвэл бидэнд мэдэгдэнэ үү.',
     successMessage: 'Баярлалаа! Таны хүсэлтийг хүлээн авлаа. Бид удахгүй эргэн холбогдоно.',
+    // Automatic reply e-mailed to whoever filled in the form (only when they left an e-mail address)
+    autoReplySubject: 'Ulaan Creative — Хүсэлтийг тань хүлээн авлаа',
+    autoReplyBody: `Сайн байна уу,
+
+Ulaan Creative агентлагтай холбогдсонд баярлалаа.
+
+Манай агентлагийн үйлчилгээ, хамтын ажиллагааны боломж болон хэрэгжүүлсэн төслүүдийн талаарх дэлгэрэнгүй мэдээллийг дараах Company Profile-оос танилцана уу:
+
+https://canva.link/d1848c5yw8at7cj
+
+Бид таны бизнес, брэндийн зорилгод нийцсэн үр дүнтэй маркетингийн шийдлийг мэргэжлийн түвшинд боловсруулан санал болгоход бэлэн байна.
+
+Хамтын ажиллагааны талаар дэлгэрэнгүй ярилцах хүсэлтэй бол бидэнтэй холбогдоно уу.
+
+Холбоо барих утас: 80053358
+
+Хүндэтгэсэн,
+Ulaan Creative`,
   },
   // Business contact details: empty until the owner confirms them. Empty values are never shown publicly.
   contact_details: {

@@ -417,7 +417,9 @@ const SCHEMAS = {
     { name: 'items', label: 'Асуулт, хариулт', type: 'list', itemLabel: 'Асуулт', titleOf: (s) => s.q, addLabel: 'Асуулт нэмэх', help: 'Асуулт нэмэгдэж нийтлэгдсэн үед л сайт дээр FAQ хэсэг харагдана.', template: { q: '', a: '' }, fields: [{ name: 'q', label: 'Асуулт', type: 'text' }, { name: 'a', label: 'Хариулт', type: 'textarea' }] } ] },
   contact: { title: 'Холбоо барих хэсэг', fields: [
     { name: 'label', label: 'Шошго', type: 'text' }, { name: 'title', label: 'Гарчиг', type: 'textarea', rows: 3 }, { name: 'copy', label: 'Текст', type: 'textarea' },
-    { name: 'consentLabel', label: 'Зөвшөөрлийн текст (checkbox)', type: 'textarea' }, { name: 'privacyNotice', label: 'Нууцлалын мэдэгдэл', type: 'textarea' }, { name: 'successMessage', label: 'Амжилттай илгээсний мессеж', type: 'textarea' } ] },
+    { name: 'consentLabel', label: 'Зөвшөөрлийн текст (checkbox)', type: 'textarea' }, { name: 'privacyNotice', label: 'Нууцлалын мэдэгдэл', type: 'textarea' }, { name: 'successMessage', label: 'Амжилттай илгээсний мессеж', type: 'textarea' },
+    { name: 'autoReplySubject', label: 'Автомат хариу имэйлийн гарчиг', type: 'text' },
+    { name: 'autoReplyBody', label: 'Автомат хариу имэйл', type: 'textarea', rows: 14, help: 'Формд имэйл хаягаа үлдээсэн хүнд илгээгдэнэ. Холбоос (https://…) дарагддаг линк болно. Хоосон орхивол автомат хариу илгээгдэхгүй.' } ] },
   footer: { title: 'Footer', fields: [{ name: 'tagline', label: 'Footer уриа', type: 'textarea', rows: 3 }] },
   services: { title: 'Үйлчилгээнүүд', fields: [
     { name: 'label', label: 'Шошго', type: 'text' }, { name: 'title', label: 'Гарчиг', type: 'textarea', rows: 2 }, { name: 'intro', label: 'Текст', type: 'textarea' },

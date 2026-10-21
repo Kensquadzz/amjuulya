@@ -126,6 +126,11 @@ export async function handleContact(req, res) {
     if (emailed && stored) await query('update contact_submissions set email_sent = true where id = $1', [stored]).catch(() => {});
   }
 
+  // Auto-reply to the sender; a failure here never turns a stored submission into an error
+  if (emailReady && (stored || emailed) && EMAIL_RE.test(data.contact)) {
+    await sendAutoReply(data.contact, content.contact || {}).catch((e) => console.error('[contact] auto-reply failed:', e.message));
+  }
+
   if (!stored && !emailed) return json(res, 502, { ok: false, error: 'delivery_failed' });
   return json(res, 200, { ok: true });
 }
@@ -158,6 +163,22 @@ ${admin ? `<p style="margin-top:18px"><a href="${esc(admin)}" style="color:#E509
 ${EMAIL_RE.test(data.contact) ? '<p style="color:#666;font-size:13px">«Reply» дарж хүсэлт илгээгчид шууд хариулж болно.</p>' : ''}</div>`,
       ...(EMAIL_RE.test(data.contact) ? { reply_to: data.contact } : {}),
     }),
+  });
+  if (!r.ok) throw new Error(`Resend ${r.status}: ${(await r.text().catch(() => '')).slice(0, 300)}`);
+  return true;
+}
+
+async function sendAutoReply(to, c) {
+  const text = String(c.autoReplyBody ?? DEFAULT_CONTENT.contact.autoReplyBody).trim();
+  if (!text) return false;
+  const subject = String(c.autoReplySubject || DEFAULT_CONTENT.contact.autoReplySubject).trim();
+  const cfg = emailConfig();
+  const linkify = (t) => esc(t).replace(/https?:\/\/[^\s<]+/g, (u) => `<a href="${u}" style="color:#E50920">${u}</a>`);
+  const html = `<div style="font-family:Arial,sans-serif;font-size:15px;line-height:1.6;color:#111;max-width:640px">${text.split(/\n{2,}/).map((p) => `<p style="margin:0 0 14px">${linkify(p).replace(/\n/g, '<br>')}</p>`).join('')}</div>`;
+  const r = await fetch(`${cfg.api}/emails`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${cfg.key}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ from: cfg.from, to: [to], subject, text, html, reply_to: cfg.to }),
   });
   if (!r.ok) throw new Error(`Resend ${r.status}: ${(await r.text().catch(() => '')).slice(0, 300)}`);
   return true;

@@ -14,7 +14,8 @@ const NAV = [
   ['/media', 'Медиа сан', 'Media Library'],
   ['/influencers', 'Influencer-ууд', 'Influencers'],
   ['/content', 'Вэбсайтын агуулга', 'Website Content'],
-  ['/services', 'Үйлчилгээ & үнэ', 'Services & Pricing'],
+  ['/services', 'Үйлчилгээ', 'Services'],
+  ['/packages', 'Багцууд & үнэ', 'Packages & Pricing'],
   ['/submissions', 'Ирсэн хүсэлтүүд', 'Contact Submissions'],
   ['/seo', 'SEO / Metadata', 'SEO'],
   ['/settings', 'Тохиргоо', 'Settings'],
@@ -435,7 +436,7 @@ const SCHEMAS = {
     { name: 'items', label: 'Багцууд', type: 'list', itemLabel: 'Багц', titleOf: (s) => `${s.name.replace(/\n/g, ' ')} ${s.price}`, addLabel: 'Багц нэмэх',
       template: { id: '', tier: '', name: '', tagline: '', price: '', priceSuffix: '', badge: '', theme: 'light', ctaLabel: 'Багц сонгох', features: [] },
       fields: [{ name: 'name', label: 'Нэр', type: 'textarea', rows: 2 }, { name: 'id', label: 'ID (латин, жишээ: starter)', type: 'text', help: 'Хүсэлтийн формд ашиглагдана. Өөрчлөхгүй байх нь зүйтэй.' }, { name: 'tier', label: 'Жижиг шошго', type: 'text' }, { name: 'tagline', label: 'Товч тайлбар', type: 'text' },
-        { name: 'price', label: 'Үнэ', type: 'text' }, { name: 'priceSuffix', label: 'Үнийн дагавар (жишээ: + НӨАТ)', type: 'text' }, { name: 'badge', label: 'Тэмдэг', type: 'text' },
+        { name: 'price', label: 'Үнэ', type: 'text' }, { name: 'priceSuffix', label: 'Үнийн дагавар (жишээ: / сар)', type: 'text' }, { name: 'badge', label: 'Тэмдэг', type: 'text' },
         { name: 'theme', label: 'Өнгө', type: 'select', options: [['light', 'Цагаан'], ['dark', 'Хар'], ['red', 'Улаан']] }, { name: 'ctaLabel', label: 'Товчны текст', type: 'text' }, { name: 'features', label: 'Багтсан зүйлс (мөр бүрт нэг)', type: 'lines', rows: 8 }] } ] },
   seo: { title: 'SEO / Metadata', fields: [
     { name: 'title', label: 'Хуудасны гарчиг (title)', type: 'text', max: 120, help: '50–60 тэмдэгт орчим байхад тохиромжтой.' },
@@ -525,11 +526,13 @@ async function recVideoCard() {
     h('div.row', btn, h('span.muted', 'Үйлчилгээнүүдийн бусад нийтлээгүй өөрчлөлт байвал хамт нийтлэгдэнэ.')));
 }
 
+route('/packages', () => contentSections(['packages'], {
+  title: 'Багцууд & үнэ',
+  intro: 'Сайтын «Багцууд» хэсэг. Багц бүрийн нэр, үнэ («₮1,500,000»), үнийн дагалдах бичиг («/ сар»), товч тайлбар, жагсаалт (мөр бүрт нэг зүйл)-ыг энд засна. «Нийтлэх» дарсны дараа сайт дээр гарна.',
+}));
+
 route('/services', async () => {
-  const [page, rec] = await Promise.all([contentSections(['services', 'packages'], {
-    title: 'Үйлчилгээ & үнэ',
-    notice: h('div.notice.notice--warn', h('strong', 'Эзэмшигчийн баталгаажуулалт шаардлагатай: '), 'Premium багцад "+ НӨАТ" гэж бичигдсэн бол Starter, Growth багцад НӨАТ-ын тэмдэглэгээ алга. НӨАТ-ын нөхцөлийг нягтлан, үнийн текстийг энд засна уу.'),
-  }), recVideoCard()]);
+  const [page, rec] = await Promise.all([contentSections(['services'], { title: 'Үйлчилгээ' }), recVideoCard()]);
   // right under the page title, above the long services form
   const head = page.querySelector('.page__head') || page.firstElementChild;
   head.after(rec);

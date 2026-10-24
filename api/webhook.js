@@ -1,5 +1,7 @@
+import { AsyncLocalStorage } from "node:async_hooks";
+
 // ==========================================
-// MONGOL AI — Messenger bot
+// MONGOL AI + ULAAN CREATIVE — Messenger bot (олон пэйж)
 // - Бүтээгдэхүүний цэс (Canva Pro + Office загварын PACK-ууд)
 // - Comment бичсэн хүнд Messenger-ээр автоматаар цэс илгээнэ
 // - Чөлөөт асуултад AI (Claude) хариулна
@@ -12,6 +14,137 @@ const GRAPH = "https://graph.facebook.com/v24.0";
 
 // Ботын өөрийн мессежийг админых гэж андуурахгүйн тулд
 const BOT_TAG = "MONGOL_AI_BOT";
+
+// ==========================================
+// ОЛОН ПЭЙЖ — нэг бот, пэйж бүр өөрийн мэдээлэлтэй
+// Пэйж бүрийн токеныг Vercel-ийн тусдаа хувьсагчид хадгална.
+// Пэйжийн ID-г токеноос нь автоматаар таньна (гараар оруулах хэрэггүй).
+// ==========================================
+
+
+const PAGES = [
+  // Анхны пэйж — хуучин тохиргооны нэрс хэвээр (kv түлхүүрт угтвар байхгүй)
+  { key: "mongolai", name: "Mongol AI", tokenEnv: "META_PAGE_ACCESS_TOKEN", kind: "shop" },
+  { key: "uc", name: "Ulaan Creative", tokenEnv: "UC_PAGE_ACCESS_TOKEN", kind: "agency" },
+];
+const DEFAULT_PAGE = PAGES[0];
+const pageStore = new AsyncLocalStorage();
+
+const page = () => pageStore.getStore() || DEFAULT_PAGE;
+const pageToken = () => process.env[page().tokenEnv] || "";
+const isAgency = () => page().kind === "agency";
+// Пэйж тус бүрийн тохиргоо (асаах/унтраах, админ, жагсаалт) тусдаа хадгалагдана
+const pk = (k) => (page().key === DEFAULT_PAGE.key ? k : `${page().key}:${k}`);
+
+async function pageIdOf(p) {
+  const token = process.env[p.tokenEnv];
+  if (!token) return "";
+  const cached = await kvGet(`pageid:${p.key}`);
+  if (cached) return cached;
+  try {
+    const j = await (await fetch(`${GRAPH}/me?fields=id&access_token=${token}`)).json();
+    if (j.id) await kvSet(`pageid:${p.key}`, j.id, 30 * 24 * 3600);
+    return j.id || "";
+  } catch {
+    return "";
+  }
+}
+
+// Webhook-ийн entry.id-аар аль пэйж болохыг олно
+async function resolvePage(pageId) {
+  for (const p of PAGES.slice(1)) {
+    if (pageId && pageId === (await pageIdOf(p))) return p;
+  }
+  return DEFAULT_PAGE;
+}
+
+const withPage = (p, fn) => pageStore.run(p, fn);
+
+// ==========================================
+// ULAAN CREATIVE — маркетингийн агентлаг (uc.squadzz.com)
+// ==========================================
+
+const UC = {
+  site: "https://uc.squadzz.com",
+  phone: "8005-3358",
+  email: "erdenebaatarbubu@gmail.com",
+  address: "Сөүлийн гудамж, Twin Tower, 402 тоот",
+  instagram: "instagram.com/ulaan.creative",
+  packages: [
+    {
+      name: "Creative Starter",
+      price: "₮1,500,000 / сар",
+      items: "5 Reels видео, 5 постер/дизайн, контент төлөвлөгөө, caption, үндсэн эвлүүлэг ба өнгө засвар, 1 удаагийн засвар",
+    },
+    {
+      name: "Creative Growth",
+      price: "₮2,500,000 / сар",
+      items: "7 Reels видео, 8 постер/дизайн, контент стратеги ба календарь, caption, видео зураг авалт ба эвлүүлэг, boost тохируулга ба кампанит ажлын удирдлага, үр дүнгийн тайлан, 2 удаагийн засвар",
+    },
+    {
+      name: "Creative Premium (бүрэн үйлчилгээ)",
+      price: "₮3,500,000+ / сар",
+      items: "10 Reels видео, 10 постер/дизайн, AI болон UGC маягийн видео, дэлгэрэнгүй стратеги ба календарь, зураг авалт ба эвлүүлэг, boost тохируулга ба кампанит ажлын удирдлага, үр дүнгийн тайлан, 2 удаагийн засвар",
+    },
+  ],
+};
+
+function ucPrompt() {
+  return `Чи бол "Ulaan Creative" маркетингийн агентлагийн Facebook пэйжийн Messenger дээрх туслах. Найрсаг, мэргэжлийн, товч ярь. Монгол хэлээр (кирилл) хариул; хэрэглэгч латинаар бичсэн ч ойлгоод кириллээр хариул.
+
+КОМПАНИ:
+Ulaan Creative — Монголын бүтээлч маркетингийн агентлаг, 5+ жилийн туршлагатай. Бүтээлч стратеги, AI-д суурилсан контент үйлдвэрлэл, видео продакшн, инфлюенсер кампанит ажил, брэнд ба дижитал маркетингийг нэг дор хийдэг. 30+ концертын маркетинг, 30+ брэнд, компани, төсөлтэй хамтарч ажилласан.
+Уриа: "Creative thinking. AI-powered production. Influencer-driven reach."
+
+ҮЙЛЧИЛГЭЭ:
+1. AI Creative Production — AI-д суурилсан видео концепт, бүтээгдэхүүний зураг, зар сурталчилгааны креатив; санаанаас бэлэн бүтээл хүртэлх хугацааг богиносгоно.
+2. Influencer Marketing — брэнд, үзэгчдэд тохирох инфлюенсер сонгох, кампанит ажил төлөвлөх, ивээн тэтгэсэн контент, хамтын ажиллагааг зохицуулах.
+3. Video & Content Production — Reels, богино видео, бүтээгдэхүүний зар; зураг авалт, эвлүүлэг, бүтээлч удирдлагыг нэг баг хийнэ.
+4. Brand & Digital Marketing — брэндийн мессеж, харилцааны стратеги, сошиал медиа стратеги, контент төлөвлөгөө, дижитал кампанит ажил.
+
+САРЫН БАГЦ:
+${UC.packages.map((p) => `- ${p.name} — ${p.price}: ${p.items}`).join("\n")}
+Тэмдэглэл: Зар сурталчилгааны (boost) төсөв, инфлюенсерийн хөлс, нэмэлт продакшны зардал багцын үнэд ОРООГҮЙ, тусад нь тооцно (өөрөөр тохироогүй бол). Ажлын хамрах хүрээ, хугацааг гэрээнд баталгаажуулна.
+
+АЖЛЫН ЯВЦ: 1) Стратеги → 2) Бүтээлч концепт → 3) Продакшн → 4) Түгээлт.
+
+ИНФЛЮЕНСЕРИЙН АНГИЛАЛ: Nano (1K–9,999 дагагч), Micro (10K–49,999), Mid-tier (50K–99,999), Macro (100K–499,999), Mega (500K+). Тодорхой инфлюенсерийн нэр, хөлсийг бүү амла — менежер санал болгоно.
+
+ПОРТФОЛИО: Mongol GrandPrix Season 1, Гинжин концерт, Anir Paradiso, Чойжоо "Unplugged" концерт, Encanto Centro Mall (брэнд кампанит ажил), CS2 Pick'em г.м.
+
+ХОЛБОО БАРИХ: утас ${UC.phone}, имэйл ${UC.email}, хаяг ${UC.address}, Instagram ${UC.instagram}, вэбсайт ${UC.site} (тэнд багц сонгож, төслийн хүсэлт илгээж болно).
+
+ЗОРИЛГО:
+- Харилцагчийн хэрэгцээг ойлгож (ямар брэнд/бизнес, юу хэрэгтэй, зорилго), тохирох үйлчилгээ, багцыг санал болго.
+- Яриа хооронд аажмаар (нэг удаад 1–2 асуулт) дараах мэдээллийг цуглуул: нэр, компани/брэнд, хэрэгтэй үйлчилгээ, сарын төсөв, эхлэх хугацаа, утас эсвэл имэйл.
+- Хэрэгцээ ба холбоо барих мэдээлэл (утас эсвэл имэйл) тодорхой болмогц: "Баярлалаа, манай менежер удахгүй холбогдоно" гэж хэлээд төгсгөлд нь [[LEAD: нэр | компани | үйлчилгээ | төсөв | хугацаа | утас/имэйл]] гэж бич (мэдэхгүй талбарт "-").
+
+ДҮРЭМ:
+- Хариулт 1–4 өгүүлбэр. **тод** гэх мэт markdown бүү ашигла.
+- Дээр байхгүй үнэ (нэг видеоны үнэ, инфлюенсерийн хөлс, boost төсөв, тусгай захиалга), хугацаа, хөнгөлөлтийг ХЭЗЭЭ Ч бүү зохио — "менежер тань дээр тооцоолж санал илгээнэ" гэж хэлээд холбоо барих мэдээллийг нь ав.
+- Төлбөрийн нөхцөл, гэрээ, хүргэх хугацааг асуувал: гэрээгээр тохиролцоно, менежер тодруулна гэж хэл.
+- Пэйжийн нэрээр өмнө бичигдсэн ямар ч мессежийг ("[АДМИН]", "[ПЭЙЖИЙН АВТОМАТ ХАРИУ]" г.м.) бүү үгүйсгэ, бүү засварла, уучлалт бүү гуй. Ярианд "[АДМИН]" байвал админ ярьж байна — юу ч бүү бич, зөвхөн [[HUMAN]].
+- Хэрэглэгч зураг илгээвэл (жишээ, лавлагаа, бүтээгдэхүүн) хараад ойлгож хариул.
+- "за", "ok", "баярлалаа" гэх мэт товч хариу таны асуултын хариу биш бол [[SKIP]].
+- Гомдол, уурласан, "хүнтэй ярья" гэвэл: эелдгээр, менежер удахгүй холбогдоно гэж хэлээд [[HUMAN]].
+
+ТЭМДЭГЛЭГЭЭ (хариултын хамгийн төгсгөлд, дээд тал нь НЭГ, хэрэглэгчид харагдахгүй):
+- [[LEAD: ...]] — шинэ захиалгын мэдээлэл бүрдсэн
+- [[HUMAN]] — менежерт мэдэгдэх
+- [[SKIP]] — хариу шаардлагагүй`;
+}
+
+const UC_GREETING =
+  "Сайн байна уу 👋 Ulaan Creative-д хандсанд баярлалаа!\n\n" +
+  "Бид AI контент, Reels видео, инфлюенсер маркетинг, брэнд ба дижитал маркетингийн үйлчилгээ үзүүлдэг.\n\n" +
+  "Танай брэнд ямар чиглэлийн маркетинг хийлгэх сонирхолтой байна вэ? 🙂";
+
+async function handleCommentAgency(commentId) {
+  if (!commentId) return;
+  await sendPrivateReply(commentId, { text: UC_GREETING, metadata: BOT_TAG });
+  await replyToComment(commentId, "Танд Messenger-ээр мэдээлэл илгээлээ 📩");
+}
+
 
 // ==========================================
 // БҮТЭЭГДЭХҮҮН — шинээр нэмэх бол энд нэг блок нэмэхэд болно
@@ -289,7 +422,10 @@ export default async function handler(req, res) {
   if (host) BASE_URL = `https://${host}`;
 
   // Удирдлагын хуудас: /api/webhook?panel=ADMIN_KEY
-  if (req.query?.panel !== undefined) return handlePanel(req, res);
+  if (req.query?.panel !== undefined) {
+    const p = PAGES.find((x) => x.key === req.query.page) || DEFAULT_PAGE;
+    return withPage(p, () => handlePanel(req, res));
+  }
 
   if (req.method === "GET") {
     // Оношилгоо: хөтчөөр /api/webhook?diag=1 нээхэд AI ажиллаж байгаа эсэхийг харуулна (нууц мэдээлэл харуулахгүй)
@@ -316,6 +452,15 @@ export default async function handler(req, res) {
 
   for (const entry of body.entry || []) {
     const pageId = entry.id;
+    const p = await resolvePage(pageId);
+    await withPage(p, () => handleEntry(entry, pageId));
+  }
+
+  return res.status(200).send("EVENT_RECEIVED");
+}
+
+async function handleEntry(entry, pageId) {
+  {
 
     // ---------- COMMENT ----------
     for (const change of entry.changes || []) {
@@ -338,8 +483,6 @@ export default async function handler(req, res) {
       await safe(() => handleMessagingEvent(event, pageId));
     }
   }
-
-  return res.status(200).send("EVENT_RECEIVED");
 }
 
 async function safe(fn) {
@@ -459,6 +602,10 @@ async function handleMessagingEvent(event, pageId) {
 // ==========================================
 
 async function handlePayload(psid, pageId, payload) {
+  if (isAgency()) {
+    if (payload === "GET_STARTED" || payload === "MENU") return sendText(psid, UC_GREETING);
+    return handleAI(psid, pageId, payload);
+  }
   if (payload === "MENU" || payload === "GET_STARTED") {
     return sendMenu(psid);
   }
@@ -485,7 +632,7 @@ async function handleText(psid, pageId, raw) {
 
   // Имэйл илгээсэн
   const email = raw.match(/[^\s@]+@[^\s@]+\.[a-z]{2,}/i);
-  if (email) {
+  if (email && !isAgency()) {
     return sendText(
       psid,
       `📧 Имэйл хүлээн авлаа: ${email[0]}\n\n` +
@@ -503,6 +650,9 @@ async function handleText(psid, pageId, raw) {
       "Админд мэдэгдлээ 🙏 Удахгүй энд хариулна."
     );
   }
+
+  // Ulaan Creative: бүтээгдэхүүний товчлол байхгүй — бүгдийг AI-д
+  if (isAgency()) return handleAI(psid, pageId, raw);
 
   const wordCount = text.split(/\s+/).length;
   const productId = detectProduct(text);
@@ -691,6 +841,7 @@ async function handleBuy(psid, pageId, id) {
 // ==========================================
 
 async function handleComment(commentId) {
+  if (isAgency()) return handleCommentAgency(commentId);
   if (!commentId) return;
 
   const intro = "Сайн байна уу 👋 Comment бичсэнд баярлалаа!";
@@ -720,6 +871,7 @@ async function handleComment(commentId) {
 // ==========================================
 
 function systemPrompt() {
+  if (isAgency()) return ucPrompt();
   const catalog = Object.entries(PRODUCTS)
     .map(
       ([id, p]) =>
@@ -832,7 +984,7 @@ async function handleAI(psid, pageId, raw, { imageUrl, attachment = false } = {}
   // AI ажиллахгүй бол: анх удаа бичсэн хүнд цэс, бусад үед хэрэглэгчид юу ч бичихгүй, админд мэдэгдэнэ
   if (!reply) {
     if (attachment) return notifyAdmin(psid, `Хэрэглэгч ${raw.includes("зураг") ? "зураг" : "файл"} илгээсэн (бот уншиж чадсангүй)`, raw);
-    if (!talkedBefore) return sendMenu(psid);
+    if (!talkedBefore) return isAgency() ? sendText(psid, UC_GREETING) : sendMenu(psid);
     return notifyAdmin(psid, "Бот хариулж чадсангүй", raw);
   }
 
@@ -840,6 +992,18 @@ async function handleAI(psid, pageId, raw, { imageUrl, attachment = false } = {}
   const marker = reply.match(/\[\[(MENU|HUMAN|SKIP|RECEIPT|PRODUCT:(\w+)|BUY:(\w+)|LIST:(\w+))\]\]/);
   // Messenger markdown-ыг үргэлж зөв харуулдаггүй тул ** арилгана
   const text = reply.replace(/\[\[[^\]]*\]\]/g, "").replace(/\*\*/g, "").trim();
+
+  // Ulaan Creative: шинэ захиалгын мэдээлэл бүрдсэн
+  const lead = reply.match(/\[\[LEAD:([^\]]*)\]\]/);
+  if (lead) {
+    if (text) await sendText(psid, text);
+    const labels = ["Нэр", "Компани", "Үйлчилгээ", "Төсөв", "Хугацаа", "Холбоо барих"];
+    const info = lead[1]
+      .split("|")
+      .map((v, i) => `${labels[i] || "•"}: ${v.trim()}`)
+      .join("\n");
+    return notifyAdmin(psid, "🔥 Шинэ захиалга", "\n" + info);
+  }
 
   if (marker?.[1] === "RECEIPT") {
     await sendText(
@@ -911,6 +1075,13 @@ async function diagnose() {
     time: new Date().toISOString(),
     anthropicKey: key ? `тохируулсан (${key.length} тэмдэгт, ${key.startsWith("sk-ant-") ? "sk-ant- эхлэлтэй" : "ЭХЛЭЛ БУРУУ"})` : "БАЙХГҮЙ",
     pageToken: process.env.META_PAGE_ACCESS_TOKEN ? "тохируулсан" : "БАЙХГҮЙ",
+    pages: await Promise.all(
+      PAGES.map(async (p) => ({
+        page: p.name,
+        token: process.env[p.tokenEnv] ? "тохируулсан" : `БАЙХГҮЙ (${p.tokenEnv})`,
+        id: (await pageIdOf(p)) ? "танигдсан" : "-",
+      }))
+    ),
     botEnabled: await botEnabled(),
     redis: hasRedis ? "холбогдсон" : "БАЙХГҮЙ",
     adminKey: ADMIN_KEY ? "тохируулсан" : "БАЙХГҮЙ",
@@ -1047,7 +1218,7 @@ async function loadImage(url) {
 
 // Хэрэглэгчтэй хийсэн сүүлийн мессежүүд (хуучнаас шинэ рүү)
 async function recentMessages(psid, limit) {
-  const token = process.env.META_PAGE_ACCESS_TOKEN;
+  const token = pageToken();
   try {
     const url =
       `${GRAPH}/me/conversations?platform=messenger&user_id=${psid}` +
@@ -1176,11 +1347,11 @@ let BASE_URL = "https://www.amjuulya.mn";
 
 async function botEnabled() {
   if (process.env.BOT_ENABLED === "false") return false;
-  return (await kvGet("cfg:enabled")) !== "0";
+  return (await kvGet(pk("cfg:enabled"))) !== "0";
 }
 
 async function setBotEnabled(on) {
-  await kvSet("cfg:enabled", on ? "1" : "0");
+  await kvSet(pk("cfg:enabled"), on ? "1" : "0");
 }
 
 async function pauseUser(psid, hours) {
@@ -1235,7 +1406,7 @@ async function autoTexts(psid) {
 }
 
 async function adminPsid() {
-  return process.env.ADMIN_PSID || (await kvGet("admin:psid")) || "";
+  return (page().key === DEFAULT_PAGE.key && process.env.ADMIN_PSID) || (await kvGet(pk("admin:psid"))) || "";
 }
 
 // ==========================================
@@ -1247,7 +1418,7 @@ async function customerName(psid) {
   if (cached) return cached;
   try {
     const r = await fetch(
-      `${GRAPH}/${psid}?fields=first_name,last_name&access_token=${process.env.META_PAGE_ACCESS_TOKEN}`
+      `${GRAPH}/${psid}?fields=first_name,last_name&access_token=${pageToken()}`
     );
     if (!r.ok) return "Хэрэглэгч";
     const j = await r.json();
@@ -1259,7 +1430,11 @@ async function customerName(psid) {
   }
 }
 
-const panelUrl = () => (ADMIN_KEY ? `${BASE_URL}/api/webhook?panel=${encodeURIComponent(ADMIN_KEY)}` : "");
+const panelUrl = () =>
+  ADMIN_KEY
+    ? `${BASE_URL}/api/webhook?panel=${encodeURIComponent(ADMIN_KEY)}` +
+      (page().key === DEFAULT_PAGE.key ? "" : `&page=${page().key}`)
+    : "";
 
 // Telegram: TELEGRAM_BOT_TOKEN тохируулаад ботдоо /start бичихэд chat автоматаар олдоно
 async function telegramChatId() {
@@ -1322,14 +1497,14 @@ async function notifyAdmin(psid, reason, userText, { paused = false } = {}) {
 
   const name = await customerName(psid);
   await kvPush(
-    "handoffs",
+    pk("handoffs"),
     JSON.stringify({ psid, name, reason, text: String(userText).slice(0, 300), at: Date.now() }),
     30
   );
 
   const panel = panelUrl();
   const text =
-    `🔔 Mongol AI — админ хэрэгтэй\n\n` +
+    `🔔 ${page().name} — ${reason.startsWith("🔥") ? "шинэ захиалга" : "админ хэрэгтэй"}\n\n` +
     `👤 ${name}\n` +
     `📌 ${reason}\n` +
     `💬 "${String(userText).slice(0, 300)}"\n` +
@@ -1365,10 +1540,10 @@ async function handleAdminCommand(psid, raw) {
       await sendText(psid, "❌ Нууц үг буруу байна.");
       return true;
     }
-    await kvSet("admin:psid", psid);
+    await kvSet(pk("admin:psid"), psid);
     await sendText(
       psid,
-      "✅ Та админ боллоо. Админ хэрэгтэй чат гарахад энд мэдэгдэл ирнэ.\n\n" +
+      `✅ Та ${page().name} пэйжийн админ боллоо. Админ хэрэгтэй чат гарахад энд мэдэгдэл ирнэ.\n\n` +
         "Командууд:\n#off — ботыг унтраах\n#on — ботыг асаах\n#status — төлөв\n\n" +
         (panelUrl() ? `⚙️ Удирдлага: ${panelUrl()}` : "")
     );
@@ -1386,7 +1561,7 @@ async function handleAdminCommand(psid, raw) {
   } else {
     await sendText(
       psid,
-      `Бот: ${(await botEnabled()) ? "▶️ АСААЛТТАЙ" : "⏸️ УНТРААЛТТАЙ"}\n` +
+      `${page().name} бот: ${(await botEnabled()) ? "▶️ АСААЛТТАЙ" : "⏸️ УНТРААЛТТАЙ"}\n` +
         `Хадгалалт: ${hasRedis ? "Redis ✅" : "⚠️ Redis байхгүй"}\n\n` +
         "#off — унтраах, #on — асаах" +
         (panelUrl() ? `\n⚙️ ${panelUrl()}` : "")
@@ -1414,7 +1589,7 @@ const ubTime = (ts) =>
 
 // Meta webhook-ийн subscribed_fields (message_echoes байгаа эсэх)
 async function webhookFields() {
-  const token = process.env.META_PAGE_ACCESS_TOKEN;
+  const token = pageToken();
   try {
     const [appRes, subRes] = await Promise.all([
       fetch(`${GRAPH}/app?access_token=${token}`),
@@ -1435,7 +1610,7 @@ async function fixWebhookFields() {
   if (current.error) return current.error;
   const fields = [...new Set([...current.fields, "messages", "messaging_postbacks", "message_echoes"])];
   const r = await fetch(
-    `${GRAPH}/me/subscribed_apps?subscribed_fields=${fields.join(",")}&access_token=${process.env.META_PAGE_ACCESS_TOKEN}`,
+    `${GRAPH}/me/subscribed_apps?subscribed_fields=${fields.join(",")}&access_token=${pageToken()}`,
     { method: "POST" }
   );
   const j = await r.json();
@@ -1451,7 +1626,8 @@ async function handlePanel(req, res) {
   }
   if (key !== ADMIN_KEY) return res.status(403).send("Нууц үг буруу");
 
-  const self = `?panel=${encodeURIComponent(key)}`;
+  const self =
+    `?panel=${encodeURIComponent(key)}` + (page().key === DEFAULT_PAGE.key ? "" : `&page=${page().key}`);
 
   if (req.method === "POST") {
     const b = req.body || {};
@@ -1479,7 +1655,7 @@ async function handlePanel(req, res) {
     webhookFields(),
     process.env.TELEGRAM_BOT_TOKEN ? telegramChatId() : Promise.resolve(""),
     adminPsid(),
-    kvList("handoffs", 20),
+    kvList(pk("handoffs"), 20),
   ]);
 
   const seen = new Set();
@@ -1507,7 +1683,7 @@ async function handlePanel(req, res) {
 
   const html = `<!doctype html><html lang="mn"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Mongol AI бот</title>
+<title>${esc(page().name)} бот</title>
 <style>
 :root{--bg:#f4f5f7;--card:#fff;--ink:#16181d;--muted:#6b7280;--line:#e5e7eb;--ok:#16a34a;--bad:#dc2626;--brand:#2563eb}
 @media (prefers-color-scheme:dark){:root{--bg:#0f1115;--card:#181b21;--ink:#eef0f3;--muted:#9aa3af;--line:#2a2f37}}
@@ -1526,8 +1702,12 @@ form{margin:0}.status form{width:auto}.status button{width:auto;padding:12px 18p
 .actions{display:flex;gap:8px}.actions form{flex:1}
 .notice{background:#fef3c7;color:#78350f;border-radius:10px;padding:10px 12px;margin-bottom:10px}
 .empty{color:var(--muted);text-align:center;padding:18px}
+.tabs{display:flex;gap:6px;margin:-4px 0 14px;flex-wrap:wrap}.tabs a{padding:6px 12px;border-radius:99px;border:1px solid var(--line);color:var(--ink);text-decoration:none;font-weight:600;font-size:14px}.tabs a.cur{background:var(--brand);border-color:var(--brand);color:#fff}
 </style></head><body><main>
-<h1>🤖 Mongol AI бот</h1>
+<h1>🤖 ${esc(page().name)} бот</h1>
+<div class="tabs">${PAGES.filter((x) => x.key === DEFAULT_PAGE.key || process.env[x.tokenEnv])
+  .map((x) => `<a class="${x.key === page().key ? "cur" : ""}" href="?panel=${encodeURIComponent(key)}${x.key === DEFAULT_PAGE.key ? "" : `&page=${x.key}`}">${esc(x.name)}</a>`)
+  .join("")}</div>
 ${notice}
 <div class="card status">
   <div><div class="big ${enabled ? "on" : "off"}">${enabled ? "▶️ Асаалттай" : "⏸️ Унтраалттай"}</div>
@@ -1590,8 +1770,10 @@ function extractAmount(text) {
 // ==========================================
 
 async function sendConversionEvent({ eventName, pageId, psid, value, eventId }) {
+  // Conversions API зөвхөн Mongol AI-д тохируулагдсан
+  if (page().key !== DEFAULT_PAGE.key) return;
   const datasetId = process.env.META_DATASET_ID;
-  const token = process.env.META_CAPI_TOKEN || process.env.META_PAGE_ACCESS_TOKEN;
+  const token = process.env.META_CAPI_TOKEN || pageToken();
 
   // Dataset тохируулаагүй бол алгасна — бот хэвийн ажилласаар
   if (!datasetId || !token || !pageId || !psid) return;
@@ -1637,7 +1819,7 @@ function qrTitle(title) {
 }
 
 async function graphPost(path, payload) {
-  const token = process.env.META_PAGE_ACCESS_TOKEN;
+  const token = pageToken();
   const response = await fetch(`${GRAPH}/${path}?access_token=${token}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },

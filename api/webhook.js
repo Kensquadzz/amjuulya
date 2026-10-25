@@ -66,6 +66,7 @@ const withPage = (p, fn) => pageStore.run(p, fn);
 
 const UC = {
   site: "https://uc.squadzz.com",
+  portfolio: "https://canva.link/d1848c5yw8at7cj",
   phone: "8005-3358",
   email: "erdenebaatarbubu@gmail.com",
   address: "Сөүлийн гудамж, Twin Tower, 402 тоот",
@@ -74,17 +75,23 @@ const UC = {
     {
       name: "Creative Starter",
       price: "₮1,500,000 / сар",
-      items: "5 Reels видео, 5 постер/дизайн, контент төлөвлөгөө, caption, үндсэн эвлүүлэг ба өнгө засвар, 1 удаагийн засвар",
+      forWho: "Контент үйлдвэрлэлээ эхлүүлж буй брэндүүд",
+      items: "5 Reels видео, 5 постер/дизайн, контент төлөвлөгөө, тайлбар (caption) бичих, үндсэн эвлүүлэг, өнгө засалт, 1 удаагийн засвар",
+      image: "/assets/uc/creative-starter.jpg",
     },
     {
       name: "Creative Growth",
       price: "₮2,500,000 / сар",
-      items: "7 Reels видео, 8 постер/дизайн, контент стратеги ба календарь, caption, видео зураг авалт ба эвлүүлэг, boost тохируулга ба кампанит ажлын удирдлага, үр дүнгийн тайлан, 2 удаагийн засвар",
+      forWho: "Брэндийн танигдалт, контентын чанарыг өсгөх",
+      items: "7 Reels видео, 8 постер/дизайн, контент стратеги, хуанли, тайлбар (caption) бичих, видео зураг авалт, эвлүүлэг, boost тохиргоо, кампанит ажлын удирдлага, гүйцэтгэлийн тайлан, 2 удаагийн засвар",
+      image: "/assets/uc/creative-growth.jpg",
     },
     {
-      name: "Creative Premium (бүрэн үйлчилгээ)",
+      name: "Creative Premium (Full service)",
       price: "₮3,500,000+ / сар",
-      items: "10 Reels видео, 10 постер/дизайн, AI болон UGC маягийн видео, дэлгэрэнгүй стратеги ба календарь, зураг авалт ба эвлүүлэг, boost тохируулга ба кампанит ажлын удирдлага, үр дүнгийн тайлан, 2 удаагийн засвар",
+      forWho: "Өргөн хүрээний контент үйлдвэрлэл, бүтээлч кампанит ажил",
+      items: "10 Reels видео, 10 постер/дизайн, AI, UGC хэв маягийн видео, нарийвчилсан стратеги, хуанли, зураг авалт, эвлүүлэг, boost тохиргоо, кампанит ажлын удирдлага, гүйцэтгэлийн тайлан, 2 удаагийн засвар",
+      image: "/assets/uc/creative-premium.jpg",
     },
   ],
 };
@@ -103,7 +110,7 @@ Ulaan Creative — Монголын бүтээлч маркетингийн аг
 4. Brand & Digital Marketing — брэндийн мессеж, харилцааны стратеги, сошиал медиа стратеги, контент төлөвлөгөө, дижитал кампанит ажил.
 
 САРЫН БАГЦ:
-${UC.packages.map((p) => `- ${p.name} — ${p.price}: ${p.items}`).join("\n")}
+${UC.packages.map((p) => `- ${p.name} — ${p.price} (${p.forWho}): ${p.items}`).join("\n")}
 Тэмдэглэл: Зар сурталчилгааны (boost) төсөв, инфлюенсерийн хөлс, нэмэлт продакшны зардал багцын үнэд ОРООГҮЙ, тусад нь тооцно (өөрөөр тохироогүй бол). Ажлын хамрах хүрээ, хугацааг гэрээнд баталгаажуулна.
 
 АЖЛЫН ЯВЦ: 1) Стратеги → 2) Бүтээлч концепт → 3) Продакшн → 4) Түгээлт.
@@ -111,6 +118,8 @@ ${UC.packages.map((p) => `- ${p.name} — ${p.price}: ${p.items}`).join("\n")}
 ИНФЛЮЕНСЕРИЙН АНГИЛАЛ: Nano (1K–9,999 дагагч), Micro (10K–49,999), Mid-tier (50K–99,999), Macro (100K–499,999), Mega (500K+). Тодорхой инфлюенсерийн нэр, хөлсийг бүү амла — менежер санал болгоно.
 
 ПОРТФОЛИО: Mongol GrandPrix Season 1, Гинжин концерт, Anir Paradiso, Чойжоо "Unplugged" концерт, Encanto Centro Mall (брэнд кампанит ажил), CS2 Pick'em г.м.
+
+PORTFOLIO (бүтээлүүд): ${UC.portfolio}
 
 ХОЛБОО БАРИХ: утас ${UC.phone}, имэйл ${UC.email}, хаяг ${UC.address}, Instagram ${UC.instagram}, вэбсайт ${UC.site} (тэнд багц сонгож, төслийн хүсэлт илгээж болно).
 
@@ -129,15 +138,40 @@ ${UC.packages.map((p) => `- ${p.name} — ${p.price}: ${p.items}`).join("\n")}
 - Гомдол, уурласан, "хүнтэй ярья" гэвэл: эелдгээр, менежер удахгүй холбогдоно гэж хэлээд [[HUMAN]].
 
 ТЭМДЭГЛЭГЭЭ (хариултын хамгийн төгсгөлд, дээд тал нь НЭГ, хэрэглэгчид харагдахгүй):
+- [[INFO]] — мэндчилгээ, "мэдээлэл авах" гэх мэт ерөнхий хүсэлтэд танилцуулга, portfolio, вэбсайтын холбоосыг илгээнэ (энэ үед өөр текст бүү бич)
+- [[PACKAGES]] — багц, үнийг асуувал 3 багцын зургийг илгээнэ (текстээ 1 өгүүлбэрээс хэтрүүлэхгүй, үнийг давтахгүй)
 - [[LEAD: ...]] — шинэ захиалгын мэдээлэл бүрдсэн
 - [[HUMAN]] — менежерт мэдэгдэх
 - [[SKIP]] — хариу шаардлагагүй`;
 }
 
+// Мэдээлэл авахыг хүссэн хүнд илгээх мессеж (эзний бичсэнээр)
 const UC_GREETING =
-  "Сайн байна уу 👋 Ulaan Creative-д хандсанд баярлалаа!\n\n" +
-  "Бид AI контент, Reels видео, инфлюенсер маркетинг, брэнд ба дижитал маркетингийн үйлчилгээ үзүүлдэг.\n\n" +
-  "Танай брэнд ямар чиглэлийн маркетинг хийлгэх сонирхолтой байна вэ? 🙂";
+  "Сайн байна уу! 👋 ULAAN CREATIVE агентлагийг сонирхож байгаад баярлалаа. ❤️\n\n" +
+  "Бид бизнесийн онцлог, зорилгод тохирсон бүтээлч контент болон маркетингийн шийдлүүдийг санал болгодог.\n\n" +
+  "🎬 Манай portfolio:\nhttps://canva.link/d1848c5yw8at7cj\n\n" +
+  "🌐 Вэбсайт:\nhttps://uc.squadzz.com\n\n" +
+  "Та манай вэбсайт болон portfolio-оос үйлчилгээ, бүтээлүүдтэй дэлгэрэнгүй танилцах боломжтой.";
+
+// "мэдээлэл авах", "info", "сайн байна уу" гэх мэт ерөнхий хүсэлт
+const UC_INFO_RE =
+  /^(сайн байна уу|сайн уу|sain bainuu|sain bnuu|sain bnu|sn bnu|hi|hello|сайн байцгаана уу)?[\s,.!]*((дэлгэрэнгүй )?мэдээлэл( авах| авъя| авья| авмаар| өгөөч| өгнө үү)?|(delgerengui )?medeelel( avah| avya| avmaar| ugnuu| ugch)?|info|information|дэлгэрэнгүй|delgerengui|сонирхож байна|sonirhoj bn|sonirhoj baina)?[\s.!?]*$/i;
+
+// Үнэ, багц асуух
+const UC_PRICE_RE = /(үнэ|une\b|unee|багц|bagts|bagc|package|хэд вэ|hed ve|price|төсөв)/i;
+
+async function sendPackages(psid, intro) {
+  await sendText(psid, intro || "Манай сарын багцууд 👇");
+  for (const p of UC.packages) {
+    await sendMessage(psid, {
+      attachment: { type: "image", payload: { url: BASE_URL + p.image, is_reusable: true } },
+    });
+  }
+  await sendText(
+    psid,
+    "Boost төсөв, инфлюенсерийн хөлс багцад ороогүй, тусад нь тооцно. Танай брэнд ямар чиглэлийнх вэ? Тохирох багцыг санал болгоё 🙂"
+  );
+}
 
 async function handleCommentAgency(commentId) {
   if (!commentId) return;
@@ -651,8 +685,12 @@ async function handleText(psid, pageId, raw) {
     );
   }
 
-  // Ulaan Creative: бүтээгдэхүүний товчлол байхгүй — бүгдийг AI-д
-  if (isAgency()) return handleAI(psid, pageId, raw);
+  // Ulaan Creative: "мэдээлэл авах" → танилцуулга, богино үнийн асуулт → багцын зураг, бусад → AI
+  if (isAgency()) {
+    if (UC_INFO_RE.test(raw.trim())) return sendText(psid, UC_GREETING);
+    if (UC_PRICE_RE.test(text) && countWords(text) <= 5) return sendPackages(psid);
+    return handleAI(psid, pageId, raw);
+  }
 
   const wordCount = text.split(/\s+/).length;
   const productId = detectProduct(text);
@@ -670,6 +708,8 @@ async function handleText(psid, pageId, raw) {
   // Бусад бүх мессежийг AI-д
   return handleAI(psid, pageId, raw);
 }
+
+const countWords = (t) => t.trim().split(/\s+/).length;
 
 // Худалдан авах хүсэл / аль хэдийн төлсөн (эдгээрт данс дахин илгээхгүй)
 const BUY_RE = /(авах|авъя|авья|авмаар|авна|авии|avah|awah|avya|avia|avmaar|awmaar|avna|avii|захиал|zahial|төлөх|tuluh|данс|dans)/i;
@@ -992,6 +1032,10 @@ async function handleAI(psid, pageId, raw, { imageUrl, attachment = false } = {}
   const marker = reply.match(/\[\[(MENU|HUMAN|SKIP|RECEIPT|PRODUCT:(\w+)|BUY:(\w+)|LIST:(\w+))\]\]/);
   // Messenger markdown-ыг үргэлж зөв харуулдаггүй тул ** арилгана
   const text = reply.replace(/\[\[[^\]]*\]\]/g, "").replace(/\*\*/g, "").trim();
+
+  // Ulaan Creative: танилцуулга / багцын зураг
+  if (isAgency() && /\[\[INFO\]\]/.test(reply)) return sendText(psid, UC_GREETING);
+  if (isAgency() && /\[\[PACKAGES\]\]/.test(reply)) return sendPackages(psid, text);
 
   // Ulaan Creative: шинэ захиалгын мэдээлэл бүрдсэн
   const lead = reply.match(/\[\[LEAD:([^\]]*)\]\]/);

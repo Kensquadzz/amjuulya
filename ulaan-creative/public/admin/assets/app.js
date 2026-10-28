@@ -555,6 +555,7 @@ route('/submissions', async () => {
       h('summary', h('span.badge', { class: s.status === 'new' ? 'badge--draft' : '' }, label[s.status]), h('strong', s.name), s.company ? h('span.muted', ` · ${s.company}`) : null, h('span.muted.push-right', fmtDate(s.created_at))),
       h('dl.meta',
         h('dt', 'Холбоо барих'), h('dd', h('a', { href: isEmail ? `mailto:${s.contact}` : `tel:${s.contact.replace(/[^\d+]/g, '')}` }, s.contact)),
+        s.phone ? [h('dt', 'Утас'), h('dd', h('a', { href: `tel:${s.phone.replace(/[^\d+]/g, '')}` }, s.phone))] : null,
         h('dt', 'Үйлчилгээ'), h('dd', s.service), h('dt', 'Төсөв'), h('dd', s.budget || '—'),
         s.kind === 'influencer' ? [h('dt', 'Төрөл'), h('dd', 'Influencer кампанит ажил')] : null,
         s.influencers && s.influencers.length ? [h('dt', 'Сонгосон influencer'), h('dd', s.influencers.map((i) => i.name).join(', '))] : null,

@@ -143,13 +143,14 @@ test('campaign inquiry stores the selected (published) influencers', async () =>
   const base = { name: 'Inquiry Test', contact: 'inq@example.com', service: 'influencer', kind: 'influencer', message: 'Campaign objective text', consent: 'yes', ts: Date.now() - 10000 };
   assert.equal((await post({ ...base, influencers: [draft.id] }, '10.7.0.1')).status, 400, 'draft influencer is not selectable');
   assert.equal((await post({ ...base, influencers: [pub.id], campaignStart: '2026-12-10', campaignEnd: '2026-12-01' }, '10.7.0.2')).status, 400, 'end before start');
-  const ok = await post({ ...base, influencers: [pub.id, draft.id], campaignStart: '2026-12-01', campaignEnd: '2026-12-20', notes: 'note' }, '10.7.0.3');
+  const ok = await post({ ...base, influencers: [pub.id, draft.id], campaignStart: '2026-12-01', campaignEnd: '2026-12-20', notes: 'note', phone: '+976 9911 2233' }, '10.7.0.3');
   assert.equal(ok.status, 200);
   const subs = (await (await fetch(`${BASE}/api/admin/submissions`, { headers: A })).json()).items;
   const mine = subs.find((x) => x.contact === 'inq@example.com' && x.kind === 'influencer');
   assert.ok(mine, 'submission stored');
   assert.deepEqual(mine.influencers.map((i) => i.name), ['Inquiry Test Creator'], 'only published influencer kept');
   assert.equal(mine.campaign_dates, '2026-12-01 → 2026-12-20');
+  assert.equal(mine.phone, '+976 9911 2233', 'optional phone stored');
   await fetch(`${BASE}/api/admin/submissions/${mine.id}`, { method: 'DELETE', headers: A });
   for (const x of [pub, draft]) await fetch(`${BASE}/api/admin/influencers/${x.id}`, { method: 'DELETE', headers: A });
 });

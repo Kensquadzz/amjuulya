@@ -559,6 +559,7 @@ function influencersPanel(s, list) {
           <div class="field"><label for="q-company">Компани / байгууллага</label><input id="q-company" name="company" type="text" autocomplete="organization" maxlength="160"></div>
         </div>
         <div class="field"><label for="q-contact">Имэйл <b aria-hidden="true">*</b></label><input id="q-contact" name="contact" type="email" autocomplete="email" inputmode="email" required maxlength="160" aria-describedby="q-contact-err"><p class="field__err" id="q-contact-err" aria-live="polite"></p></div>
+        <div class="field"><label for="q-phone">Холбоо барих утас</label><input id="q-phone" name="phone" type="tel" autocomplete="tel" inputmode="tel" maxlength="40"></div>
         <div class="field"><label for="q-message">Кампанит ажлын зорилго, тайлбар <b aria-hidden="true">*</b></label><textarea id="q-message" name="message" rows="4" required minlength="10" maxlength="4000" aria-describedby="q-message-err"></textarea><p class="field__err" id="q-message-err" aria-live="polite"></p></div>
         <div class="form__row">
           <div class="field"><label for="q-start">Эхлэх огноо (заавал биш)</label><input id="q-start" name="campaignStart" type="date"></div>
@@ -654,6 +655,7 @@ function contact(c, content) {
         <div class="field"><label for="f-company">Компани / брэнд</label><input id="f-company" name="company" type="text" autocomplete="organization" maxlength="160"></div>
       </div>
       <div class="field"><label for="f-contact">Имэйл <b aria-hidden="true">*</b></label><input id="f-contact" name="contact" type="email" autocomplete="email" inputmode="email" required maxlength="160" aria-describedby="f-contact-err"><p class="field__err" id="f-contact-err" aria-live="polite"></p></div>
+      <div class="field"><label for="f-phone">Холбоо барих утас</label><input id="f-phone" name="phone" type="tel" autocomplete="tel" inputmode="tel" maxlength="40"></div>
       <div class="form__row">
         <div class="field"><label for="f-service">Үйлчилгээ <b aria-hidden="true">*</b></label><div class="select"><select id="f-service" name="service" required aria-describedby="f-service-err"><option value="">Сонгоно уу</option>${serviceOptions(content).map(([v, l]) => `<option value="${attr(v)}">${esc(l)}</option>`).join('')}</select></div><p class="field__err" id="f-service-err" aria-live="polite"></p></div>
         <div class="field"><label for="f-budget">Төсөв</label><div class="select"><select id="f-budget" name="budget"><option value="">Сонгоно уу</option>${BUDGET_OPTIONS.map(([v, l]) => `<option value="${v}">${esc(l)}</option>`).join('')}</select></div></div>

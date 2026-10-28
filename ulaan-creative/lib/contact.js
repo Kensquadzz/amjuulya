@@ -35,6 +35,7 @@ export function validateContact(body, services) {
     name: str(body.name, 120),
     company: str(body.company, 160),
     contact: str(body.contact, 160),
+    phone: str(body.phone, 40), // optional and not verified — only kept so the team can call back
     service: str(body.service, 80),
     budget: str(body.budget, 40),
     message: str(body.message, 4000),
@@ -108,9 +109,9 @@ export async function handleContact(req, res) {
   if (dbConfigured()) {
     try {
       const { rows } = await query(
-        `insert into contact_submissions (name, company, contact, service, budget, message, consent, ip_hash, user_agent, influencers, kind, campaign_dates, notes)
-         values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) returning id`,
-        [data.name, data.company, data.contact, data.service, data.budget, data.message, data.consent, ipHash, String(req.headers['user-agent'] || '').slice(0, 300), JSON.stringify(data.influencers), data.kind, data.campaignDates, data.notes],
+        `insert into contact_submissions (name, company, contact, service, budget, message, consent, ip_hash, user_agent, influencers, kind, campaign_dates, notes, phone)
+         values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) returning id`,
+        [data.name, data.company, data.contact, data.service, data.budget, data.message, data.consent, ipHash, String(req.headers['user-agent'] || '').slice(0, 300), JSON.stringify(data.influencers), data.kind, data.campaignDates, data.notes, data.phone],
       );
       stored = rows[0].id;
     } catch (e) {
@@ -138,6 +139,7 @@ async function sendEmail(data, services) {
   const budget = (BUDGET_OPTIONS.find(([v]) => v === data.budget) || [, '—'])[1];
   const isInf = data.kind === 'influencer';
   const rows = [['Нэр', data.name], ['Компани / брэнд', data.company || '—'], ['Имэйл', data.contact]];
+  if (data.phone) rows.push(['Утас', data.phone]);
   if (isInf) rows.push(['Сонгосон influencer', (data.influencers || []).map((i) => i.name).join(', ') || '—'], ['Кампанит ажлын огноо', data.campaignDates || '—']);
   else rows.push(['Үйлчилгээ', serviceLabel], ['Төсөв', budget]);
   if (data.notes) rows.push(['Нэмэлт тэмдэглэл', data.notes]);

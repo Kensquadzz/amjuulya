@@ -647,7 +647,7 @@ export async function testEmail(req, res) {
 export async function listSubmissions(req, res, searchParams) {
   const st = ['new', 'read', 'archived'].includes(searchParams.get('status')) ? searchParams.get('status') : null;
   const { rows } = await query(
-    `select id, name, company, contact, service, budget, message, consent, status, email_sent, influencers, kind, campaign_dates, notes, created_at
+    `select id, name, company, contact, service, budget, message, consent, status, email_sent, influencers, kind, campaign_dates, notes, phone, created_at
        from contact_submissions where ($1::text is null or status = $1) order by created_at desc limit 200`, [st]);
   json(res, 200, { items: rows });
 }

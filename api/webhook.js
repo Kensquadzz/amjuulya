@@ -1024,9 +1024,21 @@ async function handleAI(psid, pageId, raw, { imageUrl, attachment = false } = {}
   // AI ажиллахгүй бол: анх удаа бичсэн хүнд цэс, бусад үед хэрэглэгчид юу ч бичихгүй, админд мэдэгдэнэ
   if (!reply) {
     const why = lastAiError ? ` — ${lastAiError.slice(0, 140)}` : "";
+    await alertAiDown(why);
     if (attachment) {
+      if (!(await kvGet(`imgack:${psid}`))) {
+        await kvSet(`imgack:${psid}`, "1", 30 * 60);
+        await sendText(
+          psid,
+          isAgency()
+            ? "📷 Хүлээн авлаа, баярлалаа! Манай менежер удахгүй хариулна 🙏"
+            : "📷 Зураг хүлээн авлаа. Төлбөрийн баримт бол имэйл хаягаа энд бичээрэй — админ шалгаад илгээнэ. Өөр асуулт бол бичгээр бичээрэй 🙏"
+        );
+      }
       return notifyAdmin(psid, `Хэрэглэгч ${raw.includes("зураг") ? "зураг" : "файл"} илгээсэн (бот уншиж чадсангүй)${why}`, raw);
     }
+    // Түгээмэл асуултад түлхүүр үгээр хариулна
+    if (await ruleReply(psid, pageId, raw, history)) return;
     // AI ажиллахгүй үед хэрэглэгч хариугүй үлдэхгүй: цэс/танилцуулгыг 6 цагт нэг л удаа илгээнэ
     if (!(await kvGet(`fallback:${psid}`))) {
       await kvSet(`fallback:${psid}`, "1", 6 * 3600);
@@ -1170,6 +1182,165 @@ async function diagnose() {
 
 // Claude руу хүсэлт. Тохируулсан model олдохгүй бол дараагийнхыг оролдоно.
 let lastAiError = "";
+
+// AI унтарсныг админд 6 цагт нэг удаа мэдэгдэнэ
+async function alertAiDown(why) {
+  if (await kvGet(pk("aidown"))) return;
+  await kvSet(pk("aidown"), "1", 6 * 3600);
+  const text =
+    `⚠️ ${page().name}: AI ажиллахгүй байна${why}\n\n` +
+    "Бот одоо түлхүүр үгээр хариулж байна (цэс, үнэ, данс, холбоо барих). Ойлгоогүй асуултад та гараар хариулна уу." +
+    (/credit/i.test(why) ? "\n\n💳 platform.claude.com дээр кредит цэнэглэнэ үү." : "");
+  await Promise.all([sendTelegram(text), sendAdminMessenger(text)]);
+}
+
+// ==========================================
+// AI-ГҮЙ ГОРИМ — Claude ажиллахгүй (кредит дууссан г.м.) үед түлхүүр үгээр хариулна.
+// Хариулж чадвал true буцаана.
+// ==========================================
+
+const R = {
+  notReceived: /(ирээгүй|ireegui|ireegu|ирсэнгүй|irsengui|ирэхгүй|irehgui|ажиллахгүй|ajillahgui|нээгдэхгүй|neegdehgui|орохгүй|orohgui)/i,
+  contact: /(утас|utas|дугаар|dugaar|холбоо барих|holboo barih|холбогдох|holbogdoh|хаяг|hayag|байршил|bairshil)/i,
+  pay: /(данс|dans|төлбөр|tulbur|tolbor|төлөх|tuluh|qpay|карт|kart|шилжүүл|shiljuul)/i,
+  delivery: /(хэзээ|hezee|хэр удах|udah|хүргэ|hurge|хэдэн минут|хэдэн цаг|hedn tsag|heden tsag)/i,
+  canvaInfo: /(canva|канва).*(хэдэн|heden|удаан|udaan|хугацаа|hugatsaa|жил|jil|сар\b|sar\b|яаж|yaj|хэрхэн|herhen|хэдэн хүн|багтах)/i,
+  format: /(word|excel|google|утсан дээр|utsan deer|утсаар|формат|format|docx|xlsx|засварла|zasvarla)/i,
+  menu: /(үнэ|une\b|unee|хэд вэ|hed ve|юу байгаа|yu bga|yu baigaa|бүтээгдэхүүн|buteegdehuun|цэс|menu|юу зардаг|yu zardag|сонирхож|sonirhoj)/i,
+  greet: /^(сайн байна уу|сайн уу|сайн байцгаана уу|sain baina uu|sain bainuu|sain bnuu|sain bnu|sn bnu|sn bnuu|hi|hello|hey|мэнд|mend)[\s!.?,]*$/i,
+  services: /(үйлчилгээ|uilchilgee|юу хийдэг|yu hiideg|reels|видео|video|контент|content|дизайн|design|boost)/i,
+  portfolio: /(portfolio|портфолио|бүтээл|buteel|жишээ|jishee|хийсэн ажил|hiisen ajil)/i,
+  influencer: /(инфлюенсер|influencer|инфлуенсер|blogger|блогер|tiktok|тикток)/i,
+};
+
+// Сүүлд ярьсан бүтээгдэхүүн (ботын мессежээс)
+function productFromHistory(history) {
+  for (let i = history.length - 1; i >= Math.max(0, history.length - 8); i--) {
+    const t = (history[i].text || "").toLowerCase();
+    for (const [id, p] of Object.entries(PRODUCTS)) {
+      if (t.includes(p.name.toLowerCase())) return id;
+    }
+  }
+  return null;
+}
+
+async function ruleReply(psid, pageId, raw, history) {
+  const t = raw.toLowerCase();
+  return isAgency() ? ruleReplyAgency(psid, t) : ruleReplyShop(psid, pageId, raw, t, history);
+}
+
+async function ruleReplyShop(psid, pageId, raw, t, history) {
+  if (R.notReceived.test(t)) {
+    await sendText(
+      psid,
+      "Уучлаарай 🙏 Дараахыг шалгаад үзээрэй:\n\n" +
+        "1️⃣ Имэйлийнхээ Spam / Promotions хавтсыг шалгана\n" +
+        "2️⃣ Canva-ийн урилга ирсэн бол Accept дарж идэвхжүүлнэ\n" +
+        "3️⃣ Төлбөр шилжүүлсэн бол баримтын screenshot болон имэйл хаягаа энд илгээнэ\n\n" +
+        "Админд мэдэгдлээ, удахгүй энд хариулна."
+    );
+    await notifyAdmin(psid, "Эрх/файл ирээгүй гэж байна", raw);
+    return true;
+  }
+
+  if (R.contact.test(t)) {
+    await sendText(psid, `📞 Утас: ${CONTACT_PHONE}\n\nЭсвэл энд бичээрэй — админ хариулна 🙂`);
+    return true;
+  }
+
+  if (R.pay.test(t)) {
+    const id = productFromHistory(history);
+    if (id) {
+      await handleBuy(psid, pageId, id);
+      return true;
+    }
+    await sendMessage(psid, {
+      text: "Төлбөрийг дансаар шилжүүлнэ 💳 Аль бүтээгдэхүүнийг авахаа сонговол дансны мэдээллийг шууд илгээнэ 👇",
+      quick_replies: Object.entries(PRODUCTS).map(([pid, p]) => ({
+        content_type: "text",
+        title: qrTitle(`${p.emoji} ${p.short}`),
+        payload: `BUY_${pid}`,
+      })),
+    });
+    return true;
+  }
+
+  if (R.canvaInfo.test(t)) {
+    await sendMessage(psid, {
+      text:
+        "🎨 Canva Pro — 1 жилийн эрх, 15,000₮\n\n" +
+        "Төлбөр баталгаажсаны дараа таны имэйл рүү Canva-ийн урилга илгээнэ. Урилгын Accept дээр дарахад таны Canva бүртгэл дээр Pro эрх нээгдэнэ.\n\n" +
+        "Бүх premium загвар, элемент, фонт, Background remover, Magic хэрэгслүүд бүгд нээгдэнэ.",
+      quick_replies: productQuickReplies("CANVA"),
+    });
+    return true;
+  }
+
+  if (R.delivery.test(t)) {
+    await sendText(
+      psid,
+      "Төлбөрийн баримт болон имэйл хаягаа илгээсний дараа админ шалгаад таны имэйл рүү илгээнэ 📩\n\n" +
+        "Баримт, имэйлээ энд илгээгээгүй бол одоо илгээгээрэй."
+    );
+    return true;
+  }
+
+  if (R.format.test(t)) {
+    await sendText(
+      psid,
+      "📂 Office загварууд Word (.docx) болон Excel (.xlsx) форматтай. Microsoft Word/Excel, Google Docs/Sheets, утсан дээр ч нээгдэж, шууд засварлах боломжтой ✍️"
+    );
+    return true;
+  }
+
+  if (R.greet.test(t.trim()) || R.menu.test(t)) {
+    await sendMenu(psid);
+    return true;
+  }
+
+  return false;
+}
+
+async function ruleReplyAgency(psid, t) {
+  if (R.contact.test(t)) {
+    await sendText(
+      psid,
+      `📞 Утас: ${UC.phone}\n📧 Имэйл: ${UC.email}\n📍 Хаяг: ${UC.address}\n📸 Instagram: ${UC.instagram}\n🌐 ${UC.site}`
+    );
+    return true;
+  }
+  if (R.portfolio.test(t)) {
+    await sendText(psid, `🎬 Манай бүтээлүүд:\n${UC.portfolio}\n\n🌐 Вэбсайт: ${UC.site}`);
+    return true;
+  }
+  if (R.influencer.test(t)) {
+    await sendText(
+      psid,
+      "Бид брэнд, үзэгчдэд тань тохирох инфлюенсерийг сонгож, кампанит ажлыг төлөвлөн зохицуулдаг 🤝\n\n" +
+        "Ангилал: Nano (1K–10K), Micro (10K–50K), Mid-tier (50K–100K), Macro (100K–500K), Mega (500K+).\n\n" +
+        "Инфлюенсерийн хөлс тусдаа тооцогдоно — менежер танд тохирох санал илгээнэ. Танай брэнд, кампанит ажлын зорилгоо бичээрэй 🙂"
+    );
+    return true;
+  }
+  if (R.services.test(t)) {
+    await sendText(
+      psid,
+      "Манай үйлчилгээ:\n\n" +
+        "🤖 AI Creative Production — AI видео, бүтээгдэхүүний зураг, зар сурталчилгааны креатив\n" +
+        "🤝 Influencer Marketing — инфлюенсер сонголт, кампанит ажил\n" +
+        "🎬 Video & Content Production — Reels, богино видео, зураг авалт, эвлүүлэг\n" +
+        "📈 Brand & Digital Marketing — стратеги, контент төлөвлөгөө, дижитал кампанит ажил\n\n" +
+        "Сарын багцуудыг харах бол «багц» гэж бичээрэй 🙂"
+    );
+    return true;
+  }
+  if (R.pay.test(t) || R.delivery.test(t)) {
+    await sendText(psid, "Төлбөрийн нөхцөл, хугацааг гэрээгээр тохиролцоно. Манай менежер тодруулж хариулна 🙏");
+    return true;
+  }
+  return false;
+}
+
 
 async function askClaude(apiKey, messages) {
   lastAiError = "";

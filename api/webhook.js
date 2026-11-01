@@ -1023,9 +1023,17 @@ async function handleAI(psid, pageId, raw, { imageUrl, attachment = false } = {}
 
   // AI ажиллахгүй бол: анх удаа бичсэн хүнд цэс, бусад үед хэрэглэгчид юу ч бичихгүй, админд мэдэгдэнэ
   if (!reply) {
-    if (attachment) return notifyAdmin(psid, `Хэрэглэгч ${raw.includes("зураг") ? "зураг" : "файл"} илгээсэн (бот уншиж чадсангүй)`, raw);
-    if (!talkedBefore) return isAgency() ? sendText(psid, UC_GREETING) : sendMenu(psid);
-    return notifyAdmin(psid, "Бот хариулж чадсангүй", raw);
+    const why = lastAiError ? ` — ${lastAiError.slice(0, 140)}` : "";
+    if (attachment) {
+      return notifyAdmin(psid, `Хэрэглэгч ${raw.includes("зураг") ? "зураг" : "файл"} илгээсэн (бот уншиж чадсангүй)${why}`, raw);
+    }
+    // AI ажиллахгүй үед хэрэглэгч хариугүй үлдэхгүй: цэс/танилцуулгыг 6 цагт нэг л удаа илгээнэ
+    if (!(await kvGet(`fallback:${psid}`))) {
+      await kvSet(`fallback:${psid}`, "1", 6 * 3600);
+      if (isAgency()) await sendText(psid, UC_GREETING);
+      else await sendMenu(psid, talkedBefore ? "Доорх бүтээгдэхүүнээс сонгоно уу 👇 Бусад асуултад админ удахгүй хариулна." : undefined);
+    }
+    return notifyAdmin(psid, `Бот хариулж чадсангүй${why}`, raw);
   }
 
   // Төгсгөлийн товчны тэмдэглэгээ
@@ -1161,7 +1169,10 @@ async function diagnose() {
 }
 
 // Claude руу хүсэлт. Тохируулсан model олдохгүй бол дараагийнхыг оролдоно.
+let lastAiError = "";
+
 async function askClaude(apiKey, messages) {
+  lastAiError = "";
   const models = [
     process.env.ANTHROPIC_MODEL,
     "claude-haiku-5-5",
@@ -1194,15 +1205,22 @@ async function askClaude(apiKey, messages) {
         if (text) return text;
         // Хоосон хариу (бодолд токен дууссан, refusal г.м.) → дараагийн model-ийг оролдоно
         console.error(`Claude API empty reply (${model}):`, data.stop_reason);
+        lastAiError = `хоосон хариу (${data.stop_reason})`;
         continue;
       }
 
       const errText = await response.text();
       console.error(`Claude API error (${model}):`, response.status, errText);
+      try {
+        lastAiError = JSON.parse(errText).error?.message || `HTTP ${response.status}`;
+      } catch {
+        lastAiError = `HTTP ${response.status}`;
+      }
       // Model олдоогүй үед л дараагийн model-ийг оролдоно (key/кредитийн алдаа бол зогсоно)
       if (response.status !== 404 && !/model/i.test(errText)) return "";
     } catch (error) {
       console.error(`Claude API failed (${model}):`, error);
+      lastAiError = error?.name === "AbortError" ? "хугацаа хэтэрсэн (timeout)" : String(error).slice(0, 140);
       return "";
     }
   }
